@@ -317,7 +317,17 @@ export default function NegociaLarApp({
   );
 
   if (currentView === "landing") {
-    return <LandingPage onAccessPlatform={() => setCurrentView("app")} />;
+    return (
+      <LandingPage
+        onAccessPlatform={(userData) => {
+          if (userData) {
+            setCurrentUser(userData);
+            setUserList((prev) => [userData, ...prev.filter((u) => u.id !== userData.id)]);
+          }
+          setCurrentView("app");
+        }}
+      />
+    );
   }
 
   return (
@@ -883,118 +893,139 @@ export default function NegociaLarApp({
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {initialProperties.map((prop) => (
-                <div
-                  key={prop.id}
-                  className="bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 hover:border-amber-500/40 transition duration-300 shadow-lg flex flex-col justify-between"
-                >
-                  <div>
-                    {/* Imagem principal com badge 50/50 */}
-                    <div className="relative h-64 w-full bg-slate-950 overflow-hidden">
-                      <img
-                        src={prop.photos[0] || "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200"}
-                        alt={prop.title}
-                        className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
-                      />
-                      <div className="absolute top-3 left-3 flex gap-2">
-                        <span className="bg-amber-500 text-slate-950 text-xs font-black px-2.5 py-1 rounded-md shadow-lg flex items-center gap-1">
-                          🤝 Parceria {prop.splitPercentage}% / {100 - parseFloat(prop.splitPercentage)}%
-                        </span>
-                        <span className="bg-slate-900/80 backdrop-blur text-white text-xs font-medium px-2.5 py-1 rounded-md border border-slate-700">
-                          {prop.propertyType}
-                        </span>
-                      </div>
-
-                      <div className="absolute bottom-3 left-3 bg-slate-950/80 backdrop-blur px-3 py-1 rounded-lg border border-slate-800 text-xs flex items-center gap-1 text-slate-300">
-                        <Lock className="w-3.5 h-3.5 text-amber-400" />
-                        Endereço Blindado
-                      </div>
-                    </div>
-
-                    {/* Conteúdo */}
-                    <div className="p-5 space-y-4">
-                      <div className="flex items-start justify-between gap-2">
-                        <div>
-                          <div className="flex items-center gap-1.5 text-xs font-medium text-amber-400 mb-1">
-                            <MapPin className="w-3.5 h-3.5" />
-                            {prop.neighborhood}, {prop.city}
-                          </div>
-                          <h3 className="font-bold text-lg text-white leading-snug">{prop.title}</h3>
-                        </div>
-                        <div className="text-right">
-                          <div className="text-xl font-black text-amber-400">{formatBRL(prop.salePrice)}</div>
-                          {prop.condoFee && (
-                            <div className="text-xs text-slate-400">Cond: {formatBRL(prop.condoFee)}</div>
-                          )}
-                        </div>
-                      </div>
-
-                      <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">{prop.description}</p>
-
-                      {/* Características */}
-                      <div className="grid grid-cols-4 gap-2 pt-3 border-t border-slate-800/80 text-xs text-slate-300">
-                        <div className="flex items-center gap-1.5 bg-slate-800/40 p-2 rounded-lg">
-                          <Bed className="w-3.5 h-3.5 text-amber-400" />
-                          <span>{prop.bedrooms} Quartos</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 bg-slate-800/40 p-2 rounded-lg">
-                          <Bath className="w-3.5 h-3.5 text-amber-400" />
-                          <span>{prop.bathrooms} Banheiros</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 bg-slate-800/40 p-2 rounded-lg">
-                          <Car className="w-3.5 h-3.5 text-amber-400" />
-                          <span>{prop.parkingSpots} Vagas</span>
-                        </div>
-                        <div className="flex items-center gap-1.5 bg-slate-800/40 p-2 rounded-lg">
-                          <Maximize2 className="w-3.5 h-3.5 text-amber-400" />
-                          <span>{prop.areaM2} m²</span>
-                        </div>
-                      </div>
-
-                      {/* Info do Captador */}
-                      <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80 flex items-center justify-between">
-                        <div className="flex items-center gap-2.5">
-                          <img
-                            src={prop.broker.avatarUrl || "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400"}
-                            alt={prop.broker.name}
-                            className="w-8 h-8 rounded-full object-cover border border-slate-700"
-                          />
-                          <div>
-                            <div className="text-xs font-semibold text-white">{prop.broker.name}</div>
-                            <div className="text-[10px] text-slate-400">Captador Oficial • CRECI {prop.broker.creci}</div>
-                          </div>
-                        </div>
-                        <span className="text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
-                          <CheckCircle2 className="w-3 h-3" /> Verificado
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-
-                  {/* Ações de Co-corretagem */}
-                  <div className="p-5 pt-0 grid grid-cols-2 gap-3">
-                    <button
-                      onClick={() => setSelectedPropertyForWhiteLabel(prop)}
-                      className="flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs py-2.5 px-3 rounded-xl transition shadow-md shadow-amber-500/10"
-                    >
-                      <Share2 className="w-4 h-4" />
-                      Ficha White-Label
-                    </button>
-                    <button
-                      onClick={() => {
-                        setSelectedPropertyForTerm(prop);
-                        setActiveTab("dvp");
-                      }}
-                      className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs py-2.5 px-3 rounded-xl transition border border-slate-700"
-                    >
-                      <Stamp className="w-4 h-4 text-emerald-400" />
-                      Agendar Visita (DVP)
-                    </button>
-                  </div>
+            {propertyList.length === 0 ? (
+              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-12 text-center max-w-xl mx-auto space-y-4 shadow-2xl">
+                <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto">
+                  <Building2 className="w-8 h-8" />
                 </div>
-              ))}
-            </div>
+                <div className="space-y-1">
+                  <h3 className="text-lg font-bold text-white">Vitrine Pronta para Suas Captações</h3>
+                  <p className="text-xs text-slate-400">
+                    O banco de dados está limpo e zerado. Cadastre o seu primeiro imóvel blindado para inaugurar a rede de parcerias!
+                  </p>
+                </div>
+                <button
+                  onClick={() => setActiveTab("cadastrar")}
+                  className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs py-3 px-6 rounded-xl transition inline-flex items-center gap-2 shadow-lg shadow-amber-500/20"
+                >
+                  <PlusCircle className="w-4 h-4" />
+                  <span>Cadastrar 1º Imóvel na Rede</span>
+                </button>
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {propertyList.map((prop) => (
+                  <div
+                    key={prop.id}
+                    className="bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 hover:border-amber-500/40 transition duration-300 shadow-lg flex flex-col justify-between"
+                  >
+                    <div>
+                      {/* Imagem principal com badge 50/50 */}
+                      <div className="relative h-64 w-full bg-slate-950 overflow-hidden">
+                        <img
+                          src={prop.photos[0] || "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200"}
+                          alt={prop.title}
+                          className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
+                        />
+                        <div className="absolute top-3 left-3 flex gap-2">
+                          <span className="bg-amber-500 text-slate-950 text-xs font-black px-2.5 py-1 rounded-md shadow-lg flex items-center gap-1">
+                            🤝 Parceria {prop.splitPercentage}% / {100 - parseFloat(prop.splitPercentage)}%
+                          </span>
+                          <span className="bg-slate-900/80 backdrop-blur text-white text-xs font-medium px-2.5 py-1 rounded-md border border-slate-700">
+                            {prop.propertyType}
+                          </span>
+                        </div>
+
+                        <div className="absolute bottom-3 left-3 bg-slate-950/80 backdrop-blur px-3 py-1 rounded-lg border border-slate-800 text-xs flex items-center gap-1 text-slate-300">
+                          <Lock className="w-3.5 h-3.5 text-amber-400" />
+                          Endereço Blindado
+                        </div>
+                      </div>
+
+                      {/* Conteúdo */}
+                      <div className="p-5 space-y-4">
+                        <div className="flex items-start justify-between gap-2">
+                          <div>
+                            <div className="flex items-center gap-1.5 text-xs font-medium text-amber-400 mb-1">
+                              <MapPin className="w-3.5 h-3.5" />
+                              {prop.neighborhood}, {prop.city}
+                            </div>
+                            <h3 className="font-bold text-lg text-white leading-snug">{prop.title}</h3>
+                          </div>
+                          <div className="text-right">
+                            <div className="text-xl font-black text-amber-400">{formatBRL(prop.salePrice)}</div>
+                            {prop.condoFee && (
+                              <div className="text-xs text-slate-400">Cond: {formatBRL(prop.condoFee)}</div>
+                            )}
+                          </div>
+                        </div>
+
+                        <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">{prop.description}</p>
+
+                        {/* Características */}
+                        <div className="grid grid-cols-4 gap-2 pt-3 border-t border-slate-800/80 text-xs text-slate-300">
+                          <div className="flex items-center gap-1.5 bg-slate-800/40 p-2 rounded-lg">
+                            <Bed className="w-3.5 h-3.5 text-amber-400" />
+                            <span>{prop.bedrooms} Quartos</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 bg-slate-800/40 p-2 rounded-lg">
+                            <Bath className="w-3.5 h-3.5 text-amber-400" />
+                            <span>{prop.bathrooms} Banheiros</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 bg-slate-800/40 p-2 rounded-lg">
+                            <Car className="w-3.5 h-3.5 text-amber-400" />
+                            <span>{prop.parkingSpots} Vagas</span>
+                          </div>
+                          <div className="flex items-center gap-1.5 bg-slate-800/40 p-2 rounded-lg">
+                            <Maximize2 className="w-3.5 h-3.5 text-amber-400" />
+                            <span>{prop.areaM2} m²</span>
+                          </div>
+                        </div>
+
+                        {/* Info do Captador */}
+                        <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80 flex items-center justify-between">
+                          <div className="flex items-center gap-2.5">
+                            <img
+                              src={prop.broker.avatarUrl || "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400"}
+                              alt={prop.broker.name}
+                              className="w-8 h-8 rounded-full object-cover border border-slate-700"
+                            />
+                            <div>
+                              <div className="text-xs font-semibold text-white">{prop.broker.name}</div>
+                              <div className="text-[10px] text-slate-400">Captador Oficial • CRECI {prop.broker.creci}</div>
+                            </div>
+                          </div>
+                          <span className="text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" /> Verificado
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Ações de Co-corretagem */}
+                    <div className="p-5 pt-0 grid grid-cols-2 gap-3">
+                      <button
+                        onClick={() => setSelectedPropertyForWhiteLabel(prop)}
+                        className="flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs py-2.5 px-3 rounded-xl transition shadow-md shadow-amber-500/10"
+                      >
+                        <Share2 className="w-4 h-4" />
+                        Ficha White-Label
+                      </button>
+                      <button
+                        onClick={() => {
+                          setSelectedPropertyForTerm(prop);
+                          setActiveTab("dvp");
+                        }}
+                        className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs py-2.5 px-3 rounded-xl transition border border-slate-700"
+                      >
+                        <Stamp className="w-4 h-4 text-emerald-400" />
+                        Agendar Visita (DVP)
+                      </button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 

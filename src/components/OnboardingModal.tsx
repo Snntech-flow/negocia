@@ -44,6 +44,7 @@ export default function OnboardingModal({
     council?: string;
     message: string;
   } | null>(null);
+  const [registeredUser, setRegisteredUser] = useState<any>(null);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -128,7 +129,7 @@ export default function OnboardingModal({
 
   const handleFinishPayment = async () => {
     // Registra no banco PostgreSQL
-    await registerUserWithPix({
+    const res = await registerUserWithPix({
       name: formData.name,
       email: formData.email,
       whatsapp: formData.whatsapp,
@@ -138,6 +139,9 @@ export default function OnboardingModal({
       plan: formData.plan,
       monthlyFee: currentPrice.toFixed(2),
     });
+    if (res.user) {
+      setRegisteredUser(res.user);
+    }
     setStep(4);
   };
 
@@ -592,7 +596,7 @@ export default function OnboardingModal({
             <div className="space-y-2 pt-2">
               <button
                 onClick={() => {
-                  onComplete(formData);
+                  onComplete(registeredUser || formData);
                   onClose();
                 }}
                 className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 px-4 rounded-xl transition flex items-center justify-center gap-2 shadow-lg text-sm"

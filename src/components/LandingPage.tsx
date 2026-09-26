@@ -29,7 +29,7 @@ import OnboardingModal from "./OnboardingModal";
 export default function LandingPage({
   onAccessPlatform,
 }: {
-  onAccessPlatform: () => void;
+  onAccessPlatform: (userData?: any) => void;
 }) {
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
   const [openFaq, setOpenFaq] = useState<number | null>(null);
@@ -575,9 +575,9 @@ export default function LandingPage({
       <OnboardingModal
         isOpen={isOnboardingOpen}
         onClose={() => setIsOnboardingOpen(false)}
-        onComplete={() => {
+        onComplete={(userData) => {
           setIsOnboardingOpen(false);
-          onAccessPlatform();
+          onAccessPlatform(userData);
         }}
         initialPlan={selectedPlanForOnboarding}
       />
