@@ -142,15 +142,12 @@ export default function LandingPage({
           </nav>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            <button
-              onClick={() => {
-                setSelectedPlanForOnboarding("40");
-                setIsOnboardingOpen(true);
-              }}
+            <a
+              href="#planos"
               className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs sm:text-sm py-2 sm:py-2.5 px-3 sm:px-4 rounded-lg transition shadow-sm flex items-center gap-1.5"
             >
-              <span>Criar Minha Conta</span>
-            </button>
+              <span>Planos a partir de R$ 59,90</span>
+            </a>
             <button
               onClick={onAccessPlatform}
               className="border border-slate-300 hover:bg-slate-50 text-slate-700 font-semibold text-xs sm:text-sm py-2 sm:py-2.5 px-3 sm:px-4 rounded-lg transition flex items-center gap-1.5"
@@ -183,16 +180,13 @@ export default function LandingPage({
               </p>
 
               <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-                <button
-                  onClick={() => {
-                    setSelectedPlanForOnboarding("40");
-                    setIsOnboardingOpen(true);
-                  }}
+                <a
+                  href="#planos"
                   className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm sm:text-base py-3.5 px-7 rounded-xl transition shadow-md flex items-center justify-center gap-2 text-center"
                 >
-                  <span>Criar Minha Conta Master</span>
+                  <span>Ver Planos a partir de R$ 59,90</span>
                   <ArrowRight className="w-4 h-4 text-amber-400" />
-                </button>
+                </a>
                 <button
                   onClick={onAccessPlatform}
                   className="bg-white hover:bg-slate-50 text-slate-800 font-semibold text-sm sm:text-base py-3.5 px-6 rounded-xl transition border border-slate-300 flex items-center justify-center gap-2 shadow-sm"
