@@ -142,17 +142,20 @@ export default function LandingPage({
           </nav>
 
           <div className="flex items-center gap-2 sm:gap-3">
-            <a
-              href="#planos"
-              className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs sm:text-sm py-2 sm:py-2.5 px-3 sm:px-4 rounded-lg transition shadow-sm flex items-center gap-1.5"
+            <button
+              onClick={() => {
+                setSelectedPlanForOnboarding("40");
+                setIsOnboardingOpen(true);
+              }}
+              className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs sm:text-sm py-2 sm:py-2.5 px-3.5 sm:px-4 rounded-lg transition shadow-sm flex items-center gap-1.5"
             >
-              <span>Planos a partir de R$ 59,90</span>
-            </a>
+              <span>Criar Conta</span>
+            </button>
             <button
               onClick={onAccessPlatform}
               className="border border-slate-300 hover:bg-slate-50 text-slate-700 font-semibold text-xs sm:text-sm py-2 sm:py-2.5 px-3 sm:px-4 rounded-lg transition flex items-center gap-1.5"
             >
-              <span>Acessar</span>
+              <span>Acessar Plataforma</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
