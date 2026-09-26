@@ -147,15 +147,9 @@ export default function LandingPage({
                 setSelectedPlanForOnboarding("40");
                 setIsOnboardingOpen(true);
               }}
-              className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs sm:text-sm py-2 sm:py-2.5 px-3.5 sm:px-4 rounded-lg transition shadow-sm flex items-center gap-1.5"
+              className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs sm:text-sm py-2 sm:py-2.5 px-4 sm:px-5 rounded-lg transition shadow-sm flex items-center gap-1.5"
             >
-              <span>Criar Conta</span>
-            </button>
-            <button
-              onClick={onAccessPlatform}
-              className="border border-slate-300 hover:bg-slate-50 text-slate-700 font-semibold text-xs sm:text-sm py-2 sm:py-2.5 px-3 sm:px-4 rounded-lg transition flex items-center gap-1.5"
-            >
-              <span>Acessar Plataforma</span>
+              <span>Cadastrar / Entrar</span>
               <ArrowRight className="w-3.5 h-3.5" />
             </button>
           </div>
@@ -187,15 +181,18 @@ export default function LandingPage({
                   href="#planos"
                   className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm sm:text-base py-3.5 px-7 rounded-xl transition shadow-md flex items-center justify-center gap-2 text-center"
                 >
-                  <span>Ver Planos a partir de R$ 59,90</span>
+                  <span>Conhecer Planos & Preços</span>
                   <ArrowRight className="w-4 h-4 text-amber-400" />
                 </a>
                 <button
-                  onClick={onAccessPlatform}
+                  onClick={() => {
+                    setSelectedPlanForOnboarding("40");
+                    setIsOnboardingOpen(true);
+                  }}
                   className="bg-white hover:bg-slate-50 text-slate-800 font-semibold text-sm sm:text-base py-3.5 px-6 rounded-xl transition border border-slate-300 flex items-center justify-center gap-2 shadow-sm"
                 >
-                  <Building2 className="w-4 h-4 text-slate-500" />
-                  <span>Acessar Plataforma MLS</span>
+                  <ShieldCheck className="w-4 h-4 text-emerald-600" />
+                  <span>Cadastrar Corretor (CRECI)</span>
                 </button>
               </div>
 
@@ -510,10 +507,13 @@ export default function LandingPage({
               </p>
             </div>
             <button
-              onClick={onAccessPlatform}
-              className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs py-3 px-6 rounded-xl transition whitespace-nowrap"
+              onClick={() => {
+                setSelectedPlanForOnboarding("40");
+                setIsOnboardingOpen(true);
+              }}
+              className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs py-3 px-6 rounded-xl transition whitespace-nowrap shadow"
             >
-              Criar Conta Grátis
+              Criar Minha Conta
             </button>
           </div>
         </div>
