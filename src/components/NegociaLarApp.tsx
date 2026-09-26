@@ -41,7 +41,9 @@ import {
   ChevronDown,
   User,
   Hash,
+  UserPlus,
 } from "lucide-react";
+import OnboardingModal from "@/components/OnboardingModal";
 import {
   createProperty,
   updateUserStatus,
@@ -191,6 +193,7 @@ export default function NegociaLarApp({
   const [dvpEmitted, setDvpEmitted] = useState(false);
   const [userSearch, setUserSearch] = useState("");
   const [isUserSwitcherOpen, setIsUserSwitcherOpen] = useState(false);
+  const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false);
 
   // Notificações e Sininho da IA (Reais do Banco)
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -274,12 +277,16 @@ export default function NegociaLarApp({
   };
 
   const currentBroker = {
-    id: currentUser?.id || "anon",
-    name: currentUser?.name || "Mariana Costa Ramos",
-    creci: currentUser?.creci || "204112-F",
-    whatsapp: currentUser?.whatsapp || "(11) 99123-8877",
-    avatar: currentUser?.avatarUrl || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&auto=format&fit=crop&q=80",
-    role: currentUser?.role === "imobiliaria" ? "Imobiliária Parceira (CRECI-J)" : "Corretor(a) Parceiro(a)",
+    id: currentUser?.id || "",
+    name: currentUser?.name || (userList.length === 0 ? "Criar Usuário Master" : "Selecione um Corretor"),
+    creci: currentUser?.creci || (userList.length === 0 ? "CRECI Pendente" : "000000-F"),
+    whatsapp: currentUser?.whatsapp || "",
+    avatar: currentUser?.avatarUrl || "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80",
+    role: currentUser?.role === "admin"
+      ? "Master Admin (SNNtech)"
+      : currentUser?.role === "imobiliaria"
+      ? "Imobiliária Parceira (CRECI-J)"
+      : "Corretor(a) Parceiro(a)",
     plan: currentUser?.plan || "40",
   };
 
@@ -332,6 +339,25 @@ export default function NegociaLarApp({
 
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100">
+      {/* Top Banner quando não há usuário logado */}
+      {!currentUser && (
+        <div className="bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 px-4 py-2.5 font-medium text-xs sm:text-sm flex flex-col sm:flex-row items-center justify-between gap-2 shadow-inner">
+          <div className="flex items-center gap-2">
+            <Sparkles className="w-4 h-4 shrink-0 font-bold" />
+            <span>
+              <strong>Banco 100% Zerado:</strong> Crie seu <strong>Usuário Master</strong> com seu CRECI real para cadastrar imóveis blindados, testar o radar com IA e emitir certificados DVP!
+            </span>
+          </div>
+          <button
+            onClick={() => setIsOnboardingModalOpen(true)}
+            className="bg-slate-950 hover:bg-slate-900 text-white font-bold px-4 py-1.5 rounded-lg text-xs transition shrink-0 shadow-md flex items-center gap-1.5"
+          >
+            <UserPlus className="w-3.5 h-3.5 text-amber-400" />
+            <span>Criar Meu Usuário Master Agora</span>
+          </button>
+        </div>
+      )}
+
       {/* Top Header */}
       <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-40">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
@@ -468,7 +494,9 @@ export default function NegociaLarApp({
                     <span>{currentBroker.name}</span>
                     <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
                   </div>
-                  <div className="text-amber-400 font-mono text-[11px]">CRECI {currentBroker.creci}</div>
+                  <div className="text-amber-400 font-mono text-[11px]">
+                    {currentUser?.role === "admin" ? "⭐ MASTER ADMIN" : `CRECI ${currentBroker.creci}`}
+                  </div>
                 </div>
               </button>
 
@@ -480,47 +508,68 @@ export default function NegociaLarApp({
                       Corretor Ativo no Banco
                     </div>
                     <div className="text-sm font-bold text-white mt-0.5">{currentBroker.name}</div>
-                    <div className="text-xs text-slate-400">CRECI {currentBroker.creci} • Plano {currentBroker.plan.toUpperCase()}</div>
+                    <div className="text-xs text-slate-400">
+                      {currentUser?.role === "admin"
+                        ? "⭐ Usuário Master (SNNtech)"
+                        : `CRECI ${currentBroker.creci} • Plano ${currentBroker.plan.toUpperCase()}`}
+                    </div>
                   </div>
 
                   <div className="p-2 space-y-1">
                     <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 pt-1 pb-1">
-                      Alternar Perfil Cadastrado:
+                      {userList.length === 0 ? "Nenhum Usuário Cadastrado" : "Alternar Perfil Cadastrado:"}
                     </div>
-                    {userList.map((u) => (
-                      <button
-                        key={u.id}
-                        onClick={() => handleSelectBrokerSession(u)}
-                        className={`w-full flex items-center gap-2.5 p-2 rounded-xl text-left text-xs transition ${
-                          u.id === currentBroker.id
-                            ? "bg-amber-500/15 border border-amber-500/40 text-amber-300 font-bold"
-                            : "hover:bg-slate-800 text-slate-300"
-                        }`}
-                      >
-                        <img
-                          src={u.avatarUrl || "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400"}
-                          alt={u.name}
-                          className="w-7 h-7 rounded-full object-cover shrink-0"
-                        />
-                        <div className="truncate flex-1">
-                          <div className="font-semibold truncate">{u.name}</div>
-                          <div className="text-[10px] text-slate-400 font-mono">CRECI {u.creci}</div>
-                        </div>
-                        {u.id === currentBroker.id && <Check className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
-                      </button>
-                    ))}
+                    {userList.length === 0 ? (
+                      <div className="p-2.5 text-center text-xs text-slate-400 bg-slate-950/40 rounded-xl">
+                        Nenhum corretor cadastrado ainda.
+                      </div>
+                    ) : (
+                      userList.map((u) => (
+                        <button
+                          key={u.id}
+                          onClick={() => handleSelectBrokerSession(u)}
+                          className={`w-full flex items-center gap-2.5 p-2 rounded-xl text-left text-xs transition ${
+                            u.id === currentBroker.id
+                              ? "bg-amber-500/15 border border-amber-500/40 text-amber-300 font-bold"
+                              : "hover:bg-slate-800 text-slate-300"
+                          }`}
+                        >
+                          <img
+                            src={u.avatarUrl || "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400"}
+                            alt={u.name}
+                            className="w-7 h-7 rounded-full object-cover shrink-0"
+                          />
+                          <div className="truncate flex-1">
+                            <div className="font-semibold truncate">{u.name}</div>
+                            <div className="text-[10px] text-slate-400 font-mono">
+                              {u.role === "admin" ? "⭐ Master Admin" : `CRECI ${u.creci}`}
+                            </div>
+                          </div>
+                          {u.id === currentBroker.id && <Check className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+                        </button>
+                      ))
+                    )}
                   </div>
 
-                  <div className="p-2 border-t border-slate-800 bg-slate-950/40">
+                  <div className="p-2 border-t border-slate-800 bg-slate-950/40 space-y-1">
+                    <button
+                      onClick={() => {
+                        setIsUserSwitcherOpen(false);
+                        setIsOnboardingModalOpen(true);
+                      }}
+                      className="w-full py-2 px-3 text-xs font-bold text-center bg-amber-600 hover:bg-amber-700 text-white rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm"
+                    >
+                      <UserPlus className="w-3.5 h-3.5" />
+                      <span>{userList.length === 0 ? "Criar Meu Usuário Master" : "Cadastrar Novo Corretor"}</span>
+                    </button>
                     <button
                       onClick={() => {
                         setIsUserSwitcherOpen(false);
                         setCurrentView("landing");
                       }}
-                      className="w-full py-2 px-3 text-xs font-bold text-center text-amber-400 hover:bg-amber-500/10 rounded-xl transition flex items-center justify-center gap-1.5"
+                      className="w-full py-1.5 px-3 text-xs font-semibold text-center text-slate-400 hover:text-white rounded-xl transition flex items-center justify-center gap-1.5"
                     >
-                      <PlusCircle className="w-3.5 h-3.5" />
-                      <span>Cadastrar Novo Corretor / Plano</span>
+                      <span>Voltar para Landing Page</span>
                     </button>
                   </div>
                 </div>
@@ -1468,18 +1517,39 @@ export default function NegociaLarApp({
         {/* TAB 5: CADASTRAR CAPTAÇÃO BLINDADA */}
         {activeTab === "cadastrar" && (
           <div className="max-w-3xl mx-auto space-y-6">
-            <div>
-              <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <PlusCircle className="w-5 h-5 text-amber-500" />
-                Cadastrar Imóvel com Blindagem de Captação
-              </h2>
-              <p className="text-sm text-slate-400">
-                Os dados sensíveis (endereço exato e telefone do proprietário) ficam criptografados e acessíveis apenas a você.
-              </p>
-            </div>
+            {!currentUser ? (
+              <div className="bg-slate-900 border-2 border-dashed border-amber-500/40 rounded-3xl p-8 text-center space-y-4 shadow-xl">
+                <div className="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center mx-auto border border-amber-500/20">
+                  <UserPlus className="w-8 h-8" />
+                </div>
+                <div className="space-y-1">
+                  <h3 className="text-xl font-bold text-white">Crie seu Usuário Master para Cadastrar Imóveis</h3>
+                  <p className="text-xs text-slate-400 max-w-md mx-auto">
+                    Para registrar captações blindadas e ser o corretor titular do contrato 50/50, você precisa estar cadastrado com seu CRECI no banco de dados.
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsOnboardingModalOpen(true)}
+                  className="bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 px-6 rounded-xl text-sm transition shadow-lg inline-flex items-center gap-2"
+                >
+                  <UserPlus className="w-4 h-4" />
+                  <span>Criar Meu Usuário Master Agora</span>
+                </button>
+              </div>
+            ) : (
+              <>
+                <div>
+                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                    <PlusCircle className="w-5 h-5 text-amber-500" />
+                    Cadastrar Imóvel com Blindagem de Captação
+                  </h2>
+                  <p className="text-sm text-slate-400">
+                    Os dados sensíveis (endereço exato e telefone do proprietário) ficam criptografados e acessíveis apenas a você ({currentBroker.name}).
+                  </p>
+                </div>
 
-            <form
-              onSubmit={async (e) => {
+                <form
+                  onSubmit={async (e) => {
                 e.preventDefault();
                 const form = e.currentTarget;
                 const fd = new FormData(form);
@@ -1705,6 +1775,8 @@ export default function NegociaLarApp({
                 Salvar Captação com Blindagem Ativa
               </button>
             </form>
+            </>
+            )}
           </div>
         )}
       </main>
@@ -1830,6 +1902,19 @@ export default function NegociaLarApp({
           </button>
         </div>
       )}
+
+      {/* Modal de Onboarding Direto */}
+      <OnboardingModal
+        isOpen={isOnboardingModalOpen}
+        onClose={() => setIsOnboardingModalOpen(false)}
+        onComplete={(newUserData) => {
+          setCurrentUser(newUserData);
+          setUserList((prev) => [newUserData, ...prev.filter((u) => u.id !== newUserData.id)]);
+          setIsOnboardingModalOpen(false);
+          setToastMessage(`🎉 Usuário Master criado com sucesso! Bem-vindo(a), ${newUserData.name}.`);
+          setTimeout(() => setToastMessage(null), 6000);
+        }}
+      />
     </div>
   );
 }

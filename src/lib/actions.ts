@@ -487,6 +487,9 @@ export async function registerUserWithPix(userData: {
   plan: string;
   monthlyFee: string;
 }) {
+  const existingUsers = await db.select({ id: users.id }).from(users).limit(1);
+  const isMasterAdmin = existingUsers.length === 0;
+
   const [newUser] = await db
     .insert(users)
     .values({
@@ -496,6 +499,7 @@ export async function registerUserWithPix(userData: {
       creci: userData.creci,
       state: userData.state,
       city: userData.city,
+      role: isMasterAdmin ? "admin" : userData.plan === "imobiliaria" ? "imobiliaria" : "corretor",
       isVerified: true,
       verificationStatus: "aprovado",
       plan: userData.plan,
