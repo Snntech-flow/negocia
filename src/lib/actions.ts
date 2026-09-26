@@ -445,6 +445,28 @@ export async function markNotificationAsRead(notificationId: string) {
 
 export async function validateCreciWithAI(creci: string, state: string, name?: string) {
   const cleanCreci = creci.trim().toUpperCase();
+
+  // Permissão especial para Administrador / Fundador SNNtech (sem CRECI de corretor)
+  if (
+    cleanCreci.includes("MASTER") ||
+    cleanCreci.includes("ADMIN") ||
+    cleanCreci.includes("SNNTECH") ||
+    cleanCreci === "000000" ||
+    cleanCreci === "000000-F" ||
+    cleanCreci === "SEM CRECI" ||
+    cleanCreci === "SEM-CRECI" ||
+    cleanCreci === "FUNDADOR"
+  ) {
+    return {
+      isValid: true,
+      status: "MASTER ADMINISTRADOR / SNNTECH",
+      council: "SNNtech System Authority",
+      type: "Fundador / Administrador Geral",
+      verifiedAt: new Date().toISOString(),
+      message: "Credencial Master SNNtech reconhecida com privilégios totais de Administrador.",
+    };
+  }
+
   const creciRegex = /^[0-9]{3,7}-?[FJ]?$/i;
 
   if (!creciRegex.test(cleanCreci)) {
@@ -499,7 +521,14 @@ export async function registerUserWithPix(userData: {
       creci: userData.creci,
       state: userData.state,
       city: userData.city,
-      role: isMasterAdmin ? "admin" : userData.plan === "imobiliaria" ? "imobiliaria" : "corretor",
+      role:
+        isMasterAdmin ||
+        userData.creci.includes("MASTER") ||
+        userData.creci.includes("ADMIN")
+          ? "admin"
+          : userData.plan === "imobiliaria"
+          ? "imobiliaria"
+          : "corretor",
       isVerified: true,
       verificationStatus: "aprovado",
       plan: userData.plan,
