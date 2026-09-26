@@ -38,8 +38,44 @@ import {
   Filter,
   ArrowUpRight,
   Bell,
+  ChevronDown,
+  User,
+  Hash,
 } from "lucide-react";
-import { createProperty, updateUserStatus } from "@/lib/actions";
+import {
+  createProperty,
+  updateUserStatus,
+  createBuyerProfile,
+  createDvpCertificate,
+  markNotificationAsRead,
+  switchBrokerSession,
+} from "@/lib/actions";
+
+interface NotificationItem {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  type: "ai_match" | "dvp" | "parceria" | "sistema";
+  read: boolean;
+  propertyId: string | null;
+  createdAt: Date;
+}
+
+interface DvpCertificateItem {
+  id: string;
+  certificateHash: string;
+  propertyId: string;
+  captorBrokerId: string;
+  partnerBrokerId: string;
+  clientName: string;
+  clientCpfPartial: string;
+  visitDate: Date;
+  lockExpirationDate: Date;
+  commissionSplit: string;
+  status: string;
+  createdAt: Date;
+}
 
 interface Property {
   id: string;
@@ -102,6 +138,7 @@ interface UserItem {
   plan: string;
   subscriptionStatus: string;
   monthlyFee: string;
+  role?: string;
   trustScore: number;
   successfulDeals: number;
   bypassReports: number;
@@ -127,81 +164,123 @@ export default function NegociaLarApp({
   initialRadar,
   initialUsers,
   initialTransactions,
+  initialCurrentUser,
+  initialNotifications = [],
+  initialDvpList = [],
 }: {
   initialProperties: Property[];
   initialRadar: BuyerProfile[];
   initialUsers: UserItem[];
   initialTransactions: TransactionItem[];
+  initialCurrentUser?: UserItem | null;
+  initialNotifications?: NotificationItem[];
+  initialDvpList?: DvpCertificateItem[];
 }) {
   const [currentView, setCurrentView] = useState<"app" | "landing">("landing");
   const [activeTab, setActiveTab] = useState<"vitrine" | "radar" | "cadastrar" | "termo" | "dvp" | "admin">("vitrine");
   const [userList, setUserList] = useState<UserItem[]>(initialUsers);
+  const [currentUser, setCurrentUser] = useState<UserItem | null>(
+    initialCurrentUser || initialUsers[0] || null
+  );
+  const [propertyList, setPropertyList] = useState<Property[]>(initialProperties);
+  const [radarList, setRadarList] = useState<BuyerProfile[]>(initialRadar);
   const [selectedPropertyForWhiteLabel, setSelectedPropertyForWhiteLabel] = useState<Property | null>(null);
   const [selectedPropertyForTerm, setSelectedPropertyForTerm] = useState<Property | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [termSigned, setTermSigned] = useState(false);
   const [dvpEmitted, setDvpEmitted] = useState(false);
   const [userSearch, setUserSearch] = useState("");
+  const [isUserSwitcherOpen, setIsUserSwitcherOpen] = useState(false);
 
-  // Notificações e Sininho da IA
+  // Notificações e Sininho da IA (Reais do Banco)
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [naturalLanguageQuery, setNaturalLanguageQuery] = useState("");
   const [isSearchingAI, setIsSearchingAI] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
 
-  const [notifications, setNotifications] = useState<Array<{
-    id: string;
-    title: string;
-    message: string;
-    time: string;
-    read: boolean;
-    type: "ai_match" | "dvp" | "parceria";
-    property?: Property;
-  }>>([
-    {
-      id: "notif-1",
-      title: "🤖 IA Match: Moema Pássaros",
-      message: "Encontramos 1 Apartamento de 3 Quartos em Moema compatível com o perfil do seu cliente Dr. Marcelo! Captado por Carlos Eduardo com 50/50 de parceria.",
-      time: "Há 12 min",
-      read: false,
-      type: "ai_match",
-      property: initialProperties[0],
-    },
-  ]);
+  const [notifications, setNotifications] = useState<NotificationItem[]>(initialNotifications);
+  const [dvpList, setDvpList] = useState<DvpCertificateItem[]>(initialDvpList);
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  const handleNaturalLanguageSearch = (e: React.FormEvent) => {
+  const handleSelectBrokerSession = async (user: UserItem) => {
+    await switchBrokerSession(user.id);
+    setCurrentUser(user);
+    setIsUserSwitcherOpen(false);
+  };
+
+  const handleNotificationClick = async (notif: NotificationItem) => {
+    if (!notif.read) {
+      await markNotificationAsRead(notif.id);
+      setNotifications((prev) =>
+        prev.map((n) => (n.id === notif.id ? { ...n, read: true } : n))
+      );
+    }
+    if (notif.propertyId) {
+      const prop = propertyList.find((p) => p.id === notif.propertyId);
+      if (prop) setSelectedPropertyForWhiteLabel(prop);
+    }
+    setIsNotificationsOpen(false);
+  };
+
+  const handleNaturalLanguageSearch = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!naturalLanguageQuery.trim()) return;
 
     setIsSearchingAI(true);
-    setTimeout(() => {
+    try {
+      const res = await createBuyerProfile({
+        clientInternalName: `Procura: ${naturalLanguageQuery.slice(0, 32)}`,
+        propertyType: naturalLanguageQuery.toLowerCase().includes("casa") ? "Casa em Condomínio" : "Apartamento",
+        city: "São Paulo",
+        neighborhoods: ["Moema", "Jardins", "Pinheiros", "Centro"],
+        maxBudget: "1600000",
+        minBedrooms: naturalLanguageQuery.includes("3") ? 3 : naturalLanguageQuery.includes("2") ? 2 : 1,
+        minParkingSpots: 1,
+        notes: naturalLanguageQuery,
+        brokerId: currentBroker.id,
+      });
+
+      if (res.success && res.profile) {
+        setRadarList((prev) => [
+          {
+            id: res.profile.id,
+            clientInternalName: res.profile.clientInternalName,
+            propertyType: res.profile.propertyType,
+            city: res.profile.city,
+            neighborhoods: (res.profile.neighborhoods as string[]) || [],
+            maxBudget: res.profile.maxBudget,
+            minBedrooms: res.profile.minBedrooms,
+            minParkingSpots: res.profile.minParkingSpots,
+            notes: res.profile.notes,
+            broker: {
+              id: currentBroker.id,
+              name: currentBroker.name,
+              creci: currentBroker.creci,
+              whatsapp: currentBroker.whatsapp,
+            },
+          },
+          ...prev,
+        ]);
+        setToastMessage(`🔔 Registrado no banco de dados! A IA já cruzou sua busca com o estoque da rede.`);
+        setTimeout(() => setToastMessage(null), 6000);
+        setNaturalLanguageQuery("");
+      }
+    } catch (err) {
+      console.error("Erro na busca por IA:", err);
+    } finally {
       setIsSearchingAI(false);
-
-      const newNotif = {
-        id: `notif-${Date.now()}`,
-        title: `🤖 IA Match: "${naturalLanguageQuery}"`,
-        message: `A IA localizou imóveis compatíveis com sua procura ("${naturalLanguageQuery}") na rede de parceiros! Clique para visualizar a ficha.`,
-        time: "Agora",
-        read: false,
-        type: "ai_match" as const,
-        property: initialProperties[0],
-      };
-
-      setNotifications((prev) => [newNotif, ...prev]);
-      setToastMessage(`🔔 A IA encontrou imóveis para "${naturalLanguageQuery}"! Notificação enviada para o seu sininho.`);
-      setTimeout(() => setToastMessage(null), 6000);
-      setNaturalLanguageQuery("");
-    }, 1000);
+    }
   };
 
   const currentBroker = {
-    name: "Mariana Costa Ramos",
-    creci: "204112-F",
-    whatsapp: "(11) 99123-8877",
-    avatar: "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&auto=format&fit=crop&q=80",
-    role: "Corretora Parceira / Divulgadora",
+    id: currentUser?.id || "anon",
+    name: currentUser?.name || "Mariana Costa Ramos",
+    creci: currentUser?.creci || "204112-F",
+    whatsapp: currentUser?.whatsapp || "(11) 99123-8877",
+    avatar: currentUser?.avatarUrl || "https://images.unsplash.com/photo-1573496359142-b8d87734a5a2?w=400&auto=format&fit=crop&q=80",
+    role: currentUser?.role === "imobiliaria" ? "Imobiliária Parceira (CRECI-J)" : "Corretor(a) Parceiro(a)",
+    plan: currentUser?.plan || "40",
   };
 
   const formatBRL = (val: string | number) => {
@@ -321,45 +400,121 @@ export default function NegociaLarApp({
                   </div>
 
                   <div className="max-h-80 overflow-y-auto divide-y divide-slate-800/60">
-                    {notifications.map((notif) => (
-                      <div
-                        key={notif.id}
-                        className={`p-3.5 space-y-1.5 transition ${notif.read ? "bg-slate-900/60" : "bg-amber-950/20"}`}
-                      >
-                        <div className="flex items-center justify-between">
-                          <span className="text-xs font-bold text-white">{notif.title}</span>
-                          <span className="text-[10px] text-slate-400 font-mono">{notif.time}</span>
-                        </div>
-                        <p className="text-xs text-slate-300 leading-relaxed">{notif.message}</p>
-                        {notif.property && (
-                          <div className="pt-1">
-                            <button
-                              onClick={() => {
-                                setSelectedPropertyForWhiteLabel(notif.property!);
-                                setIsNotificationsOpen(false);
-                              }}
-                              className="text-[11px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1"
-                            >
-                              <span>Ver Ficha White-Label</span>
-                              <ArrowRight className="w-3 h-3" />
-                            </button>
-                          </div>
-                        )}
+                    {notifications.length === 0 ? (
+                      <div className="p-6 text-center text-xs text-slate-500">
+                        Nenhuma notificação no momento.
                       </div>
-                    ))}
+                    ) : (
+                      notifications.map((notif) => (
+                        <div
+                          key={notif.id}
+                          onClick={() => handleNotificationClick(notif)}
+                          className={`p-3.5 space-y-1.5 transition cursor-pointer hover:bg-slate-800/50 ${
+                            notif.read ? "bg-slate-900/60 opacity-75" : "bg-amber-950/20 border-l-2 border-amber-500"
+                          }`}
+                        >
+                          <div className="flex items-center justify-between">
+                            <span className="text-xs font-bold text-white flex items-center gap-1.5">
+                              {!notif.read && <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>}
+                              {notif.title}
+                            </span>
+                            <span className="text-[10px] text-slate-400 font-mono">
+                              {notif.createdAt
+                                ? new Date(notif.createdAt).toLocaleTimeString("pt-BR", {
+                                    hour: "2-digit",
+                                    minute: "2-digit",
+                                  })
+                                : "Hoje"}
+                            </span>
+                          </div>
+                          <p className="text-xs text-slate-300 leading-relaxed">{notif.message}</p>
+                          {notif.propertyId && (
+                            <div className="pt-1">
+                              <span className="text-[11px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1">
+                                <span>Ver Imóvel / Ficha White-Label</span>
+                                <ArrowRight className="w-3 h-3" />
+                              </span>
+                            </div>
+                          )}
+                        </div>
+                      ))
+                    )}
                   </div>
                 </div>
               )}
             </div>
 
-            <div className="flex items-center gap-3 pl-3 border-l border-slate-800">
-              <div className="w-9 h-9 rounded-full overflow-hidden border border-amber-500/50">
-                <img src={currentBroker.avatar} alt={currentBroker.name} className="w-full h-full object-cover" />
-              </div>
-              <div className="text-right text-xs hidden sm:block">
-                <div className="font-semibold text-white">{currentBroker.name}</div>
-                <div className="text-amber-400 font-mono">CRECI {currentBroker.creci}</div>
-              </div>
+            {/* Perfil Ativo com Seletor de Sessão Real */}
+            <div className="relative">
+              <button
+                onClick={() => setIsUserSwitcherOpen(!isUserSwitcherOpen)}
+                className="flex items-center gap-2.5 pl-3 border-l border-slate-800 hover:bg-slate-800/50 p-1.5 rounded-xl transition"
+              >
+                <div className="w-9 h-9 rounded-full overflow-hidden border border-amber-500/50 shrink-0">
+                  <img src={currentBroker.avatar} alt={currentBroker.name} className="w-full h-full object-cover" />
+                </div>
+                <div className="text-right text-xs hidden sm:block">
+                  <div className="font-semibold text-white flex items-center gap-1">
+                    <span>{currentBroker.name}</span>
+                    <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                  </div>
+                  <div className="text-amber-400 font-mono text-[11px]">CRECI {currentBroker.creci}</div>
+                </div>
+              </button>
+
+              {/* Dropdown de Troca de Corretor / Perfil */}
+              {isUserSwitcherOpen && (
+                <div className="absolute right-0 mt-2 w-72 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95">
+                  <div className="p-3 bg-slate-950 border-b border-slate-800">
+                    <div className="text-[11px] font-bold text-amber-400 uppercase tracking-wider">
+                      Corretor Ativo no Banco
+                    </div>
+                    <div className="text-sm font-bold text-white mt-0.5">{currentBroker.name}</div>
+                    <div className="text-xs text-slate-400">CRECI {currentBroker.creci} • Plano {currentBroker.plan.toUpperCase()}</div>
+                  </div>
+
+                  <div className="p-2 space-y-1">
+                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 pt-1 pb-1">
+                      Alternar Perfil Cadastrado:
+                    </div>
+                    {userList.map((u) => (
+                      <button
+                        key={u.id}
+                        onClick={() => handleSelectBrokerSession(u)}
+                        className={`w-full flex items-center gap-2.5 p-2 rounded-xl text-left text-xs transition ${
+                          u.id === currentBroker.id
+                            ? "bg-amber-500/15 border border-amber-500/40 text-amber-300 font-bold"
+                            : "hover:bg-slate-800 text-slate-300"
+                        }`}
+                      >
+                        <img
+                          src={u.avatarUrl || "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400"}
+                          alt={u.name}
+                          className="w-7 h-7 rounded-full object-cover shrink-0"
+                        />
+                        <div className="truncate flex-1">
+                          <div className="font-semibold truncate">{u.name}</div>
+                          <div className="text-[10px] text-slate-400 font-mono">CRECI {u.creci}</div>
+                        </div>
+                        {u.id === currentBroker.id && <Check className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="p-2 border-t border-slate-800 bg-slate-950/40">
+                    <button
+                      onClick={() => {
+                        setIsUserSwitcherOpen(false);
+                        setCurrentView("landing");
+                      }}
+                      className="w-full py-2 px-3 text-xs font-bold text-center text-amber-400 hover:bg-amber-500/10 rounded-xl transition flex items-center justify-center gap-1.5"
+                    >
+                      <PlusCircle className="w-3.5 h-3.5" />
+                      <span>Cadastrar Novo Corretor / Plano</span>
+                    </button>
+                  </div>
+                </div>
+              )}
             </div>
           </div>
         </div>
@@ -973,6 +1128,47 @@ export default function NegociaLarApp({
                 </button>
               </div>
             </div>
+
+            {/* LISTA DE PROCURAS REAIS CADASTRADAS NO BANCO */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center gap-2">
+                  <Users className="w-4 h-4 text-amber-500" />
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                    Demandas Reais no Banco de Dados ({radarList.length})
+                  </h3>
+                </div>
+                <span className="text-xs text-slate-400">Cruzamento contínuo via PostgreSQL</span>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {radarList.map((bp) => (
+                  <div key={bp.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-bold text-white">{bp.clientInternalName}</span>
+                      <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full">
+                        Ativo no Radar
+                      </span>
+                    </div>
+                    <div className="text-xs text-slate-400 space-y-1">
+                      <div><strong className="text-slate-300">Tipo:</strong> {bp.propertyType} • {bp.city}</div>
+                      <div>
+                        <strong className="text-slate-300">Orçamento:</strong>{" "}
+                        <span className="text-amber-400 font-mono font-bold">{formatBRL(bp.maxBudget)}</span>
+                      </div>
+                      <div>
+                        <strong className="text-slate-300">Mínimo:</strong> {bp.minBedrooms} quartos, {bp.minParkingSpots} vagas
+                      </div>
+                      {bp.notes && <div className="text-[11px] text-slate-400 italic bg-slate-900/60 p-2 rounded-lg border border-slate-800/60">"{bp.notes}"</div>}
+                    </div>
+                    <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
+                      <span>Corretor: <span className="text-white font-medium">{bp.broker.name}</span></span>
+                      <span className="font-mono text-amber-400">CRECI {bp.broker.creci}</span>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           </div>
         )}
 
@@ -1065,7 +1261,52 @@ export default function NegociaLarApp({
               </p>
             </div>
 
-            <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6 space-y-6 shadow-xl">
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                const form = e.currentTarget;
+                const fd = new FormData(form);
+                const clientName = fd.get("clientName") as string;
+                const clientPhone = fd.get("clientPhone") as string;
+                const clientCpf = fd.get("clientCpf") as string;
+                const visitDate = (fd.get("visitDate") as string) || new Date().toISOString();
+
+                const res = await createDvpCertificate({
+                  propertyId: activeProperty.id,
+                  captorBrokerId: activeProperty.broker.id,
+                  partnerBrokerId: currentBroker.id,
+                  clientName,
+                  clientPhone,
+                  clientCpfPartial: clientCpf,
+                  visitDate,
+                  commissionSplit: activeProperty.splitPercentage || "50.00",
+                });
+
+                if (res.success && res.certificate) {
+                  setDvpList((prev) => [
+                    {
+                      id: res.certificate.id,
+                      certificateHash: res.certificate.certificateHash,
+                      propertyId: res.certificate.propertyId,
+                      captorBrokerId: res.certificate.captorBrokerId,
+                      partnerBrokerId: res.certificate.partnerBrokerId,
+                      clientName: res.certificate.clientName,
+                      clientCpfPartial: res.certificate.clientCpfPartial,
+                      visitDate: new Date(res.certificate.visitDate),
+                      lockExpirationDate: new Date(res.certificate.lockExpirationDate),
+                      commissionSplit: res.certificate.commissionSplit,
+                      status: res.certificate.status,
+                      createdAt: new Date(res.certificate.createdAt),
+                    },
+                    ...prev,
+                  ]);
+                  setDvpEmitted(true);
+                  setToastMessage(`📜 Certificado ${res.certificate.certificateHash} registrado no banco com trava de 180 dias!`);
+                  setTimeout(() => setToastMessage(null), 6000);
+                }
+              }}
+              className="bg-slate-900 rounded-2xl border border-slate-800 p-6 space-y-6 shadow-xl"
+            >
               <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30">
                 <div className="flex items-center gap-2 text-xs text-emerald-400 font-semibold">
                   <Fingerprint className="w-4 h-4" />
@@ -1076,41 +1317,119 @@ export default function NegociaLarApp({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
-                  <div className="text-xs text-slate-400">Imóvel da Visita:</div>
+                  <div className="text-xs text-slate-400">Imóvel Selecionado:</div>
                   <div className="text-sm font-bold text-white">{activeProperty?.title}</div>
                   <div className="text-xs text-amber-400">{activeProperty?.neighborhood}, {activeProperty?.city}</div>
+                  <div className="text-[11px] text-slate-500 pt-1">Captador: {activeProperty?.broker.name} (CRECI {activeProperty?.broker.creci})</div>
                 </div>
 
                 <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
-                  <div className="text-xs text-slate-400">Cliente Apresentado:</div>
-                  <div className="text-sm font-bold text-white">Dr. Marcelo de Oliveira</div>
-                  <div className="text-xs text-slate-400">CPF: ***.482.918-** (Registrado)</div>
+                  <div className="text-xs text-slate-400">Corretor Solicitante:</div>
+                  <div className="text-sm font-bold text-white">{currentBroker.name}</div>
+                  <div className="text-xs text-emerald-400">CRECI {currentBroker.creci} • Parceria 50/50</div>
+                </div>
+              </div>
+
+              {/* Dados do Cliente Visitante */}
+              <div className="space-y-4 pt-2 border-t border-slate-800">
+                <div className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                  <UserCheck className="w-4 h-4 text-emerald-400" />
+                  Dados do Cliente Apresentado para Registro
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">Nome Completo do Cliente</label>
+                    <input
+                      name="clientName"
+                      required
+                      placeholder="Ex: Dr. Roberto Silveira"
+                      defaultValue="Dr. Roberto Silveira"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">CPF (Parcial para Proteção LGPD)</label>
+                    <input
+                      name="clientCpf"
+                      required
+                      placeholder="***.382.910-**"
+                      defaultValue="***.382.910-**"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-medium text-slate-300 mb-1">WhatsApp do Cliente</label>
+                    <input
+                      name="clientPhone"
+                      placeholder="(11) 97777-6666"
+                      defaultValue="(11) 97777-6666"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                    />
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-slate-300 mb-1">Data e Hora da Visita</label>
+                  <input
+                    name="visitDate"
+                    type="datetime-local"
+                    defaultValue={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16)}
+                    className="w-full sm:w-64 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
+                  />
                 </div>
               </div>
 
               <div>
-                {dvpEmitted ? (
-                  <div className="bg-emerald-950/40 border border-emerald-500/50 p-4 rounded-xl flex items-center justify-between text-emerald-300 text-sm">
-                    <div className="flex items-center gap-3">
-                      <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0" />
-                      <div>
-                        <div className="font-bold">DVP Registrado com Sucesso na Rede!</div>
-                        <div className="text-xs text-emerald-400/80">
-                          Notificação enviada por WhatsApp para ambos os corretores e arquivado na blockchain local.
-                        </div>
+                <button
+                  type="submit"
+                  className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-slate-950 font-bold py-3.5 rounded-xl transition shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 text-xs sm:text-sm"
+                >
+                  <Stamp className="w-5 h-5" />
+                  Emitir e Gravar DVP Digital no Banco de Dados (180 Dias de Trava)
+                </button>
+              </div>
+            </form>
+
+            {/* LISTA DE CERTIFICADOS DVP REGISTRADOS NO BANCO */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+              <div className="flex items-center justify-between pb-3 border-b border-slate-800">
+                <div className="flex items-center gap-2">
+                  <Fingerprint className="w-4 h-4 text-emerald-400" />
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                    Certificados DVP Registrados no Banco ({dvpList.length})
+                  </h3>
+                </div>
+                <span className="text-xs text-slate-400">Proteção Ativa COFECI</span>
+              </div>
+
+              {dvpList.length === 0 ? (
+                <div className="p-6 text-center text-xs text-slate-500">
+                  Nenhum DVP emitido ainda. Preencha o formulário acima para registrar sua primeira visita blindada!
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {dvpList.map((dvp) => (
+                    <div key={dvp.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <span className="text-xs font-bold text-emerald-400 font-mono flex items-center gap-1.5">
+                          <Hash className="w-3.5 h-3.5" />
+                          {dvp.certificateHash}
+                        </span>
+                        <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-bold">
+                          Trava Ativa (180 dias)
+                        </span>
+                      </div>
+                      <div className="text-xs text-slate-300 grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                        <div><strong>Cliente:</strong> {dvp.clientName} (CPF: {dvp.clientCpfPartial})</div>
+                        <div><strong>Data da Visita:</strong> {new Date(dvp.visitDate).toLocaleDateString("pt-BR")}</div>
+                        <div><strong>Validade da Blindagem:</strong> até {new Date(dvp.lockExpirationDate).toLocaleDateString("pt-BR")}</div>
+                        <div><strong>Divisão de Comissão:</strong> {dvp.commissionSplit}% / {100 - parseFloat(dvp.commissionSplit)}%</div>
                       </div>
                     </div>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setDvpEmitted(true)}
-                    className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-slate-950 font-bold py-3.5 rounded-xl transition shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2"
-                  >
-                    <Stamp className="w-5 h-5" />
-                    Emitir DVP Digital com Trava de Anterioridade (180 Dias)
-                  </button>
-                )}
-              </div>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -1133,11 +1452,13 @@ export default function NegociaLarApp({
                 e.preventDefault();
                 const form = e.currentTarget;
                 const fd = new FormData(form);
-                await createProperty({
+                const res = await createProperty({
+                  brokerId: currentBroker.id,
                   title: fd.get("title") as string,
                   propertyType: fd.get("propertyType") as string,
                   salePrice: fd.get("salePrice") as string,
                   condoFee: fd.get("condoFee") as string,
+                  iptu: fd.get("iptu") as string,
                   city: fd.get("city") as string,
                   neighborhood: fd.get("neighborhood") as string,
                   bedrooms: parseInt(fd.get("bedrooms") as string || "1"),
@@ -1155,8 +1476,26 @@ export default function NegociaLarApp({
                   acceptsPartnership: true,
                   splitPercentage: "50.00",
                 });
-                alert("Imóvel cadastrado com sucesso e blindado no banco de dados!");
-                setActiveTab("vitrine");
+
+                if (res.success && res.property) {
+                  setPropertyList((prev) => [
+                    {
+                      ...res.property,
+                      broker: {
+                        id: currentBroker.id,
+                        name: currentBroker.name,
+                        creci: currentBroker.creci,
+                        whatsapp: currentBroker.whatsapp,
+                        avatarUrl: currentBroker.avatar,
+                        city: res.property.city,
+                      },
+                    },
+                    ...prev,
+                  ]);
+                  setToastMessage("🏠 Imóvel cadastrado no banco de dados e blindado com sucesso!");
+                  setTimeout(() => setToastMessage(null), 5000);
+                  setActiveTab("vitrine");
+                }
               }}
               className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-6"
             >

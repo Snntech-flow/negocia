@@ -100,3 +100,31 @@ export const transactions = pgTable("transactions", {
   description: text("description").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+export const notifications = pgTable("notifications", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  title: text("title").notNull(),
+  message: text("message").notNull(),
+  type: text("type").default("ai_match").notNull(), // 'ai_match', 'dvp', 'parceria', 'sistema'
+  read: boolean("read").default(false).notNull(),
+  propertyId: uuid("property_id").references(() => properties.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const dvpCertificates = pgTable("dvp_certificates", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  certificateHash: text("certificate_hash").notNull().unique(),
+  propertyId: uuid("property_id").references(() => properties.id, { onDelete: "cascade" }).notNull(),
+  captorBrokerId: uuid("captor_broker_id").references(() => users.id).notNull(),
+  partnerBrokerId: uuid("partner_broker_id").references(() => users.id).notNull(),
+  clientName: text("client_name").notNull(),
+  clientPhone: text("client_phone"),
+  clientCpfPartial: text("client_cpf_partial").notNull(), // ex: ***.456.789-**
+  visitDate: timestamp("visit_date").notNull(),
+  lockExpirationDate: timestamp("lock_expiration_date").notNull(), // 180 dias de trava jurídica
+  commissionSplit: numeric("commission_split", { precision: 5, scale: 2 }).default("50.00").notNull(),
+  status: text("status").default("ativo").notNull(), // 'ativo', 'fechado', 'expirado', 'contestado'
+  legalClausesAccepted: boolean("legal_clauses_accepted").default(true).notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});

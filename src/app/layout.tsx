@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
+  metadataBase: new URL("https://negocialar.com.br"),
   title: "Negocia Lar — Plataforma MLS B2B de Parcerias Imobiliárias Blindadas",
   description:
     "A maior rede de co-corretagem e parcerias seguras do Brasil. Blindagem jurídica DVP 180 dias contra atravessamento, radar com inteligência artificial e fichas white-label. Um produto SNNtech.",
