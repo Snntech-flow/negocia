@@ -46,6 +46,49 @@ export const properties = pgTable("properties", {
   description: text("description").notNull(),
   photos: jsonb("photos").$type<string[]>().default([]).notNull(),
   
+  // Finalidade do Negócio (Venda / Aluguel / Temporada)
+  purpose: text("purpose").default("venda").notNull(), // 'venda', 'aluguel', 'temporada'
+  acceptsTrade: boolean("accepts_trade").default(false).notNull(), // Aceita permuta
+  tradeDetails: text("trade_details"), // Detalhes da permuta
+  
+  // Condição da Obra (Novo / Usado / Em Construção / Na Planta)
+  condition: text("condition").default("usado").notNull(), // 'novo', 'usado', 'em_construcao', 'na_planta'
+  hotelRoomsCount: integer("hotel_rooms_count"), // Nº de quartos para Hotel ou Pousada
+  
+  // Áreas & Dimensões Detalhadas
+  usefulAreaM2: numeric("useful_area_m2", { precision: 8, scale: 2 }), // Área útil
+  totalAreaM2: numeric("total_area_m2", { precision: 8, scale: 2 }), // Área total
+  
+  // Posição Solar e Vista
+  solarPosition: text("solar_position"), // 'nascente', 'norte_sul', 'poente'
+  viewType: text("view_type"), // 'frente', 'fundos', 'lagoa', 'av_principal'
+  propertyAge: integer("property_age"), // Idade do imóvel (anos)
+  iptuPeriod: text("iptu_period").default("anual"), // 'anual', 'mensal'
+  
+  // Situação Jurídica e Financiamento
+  documentationStatus: text("documentation_status"), // 'escriturado', 'promessa_compra_venda', 'inventario'
+  acceptsFinancing: boolean("accepts_financing").default(true).notNull(), // Pode ser financiado por todos os bancos?
+  
+  // Itens Privativos do Imóvel & Estrutura do Condomínio
+  privateAmenities: jsonb("private_amenities").$type<string[]>().default([]).notNull(),
+  condoAmenities: jsonb("condo_amenities").$type<string[]>().default([]).notNull(),
+  garageType: text("garage_type").default("coberta"), // 'coberta', 'descoberta'
+  
+  // Localização & Blindagem de Rua
+  cep: text("cep"),
+  state: text("state"),
+  street: text("street"),
+  streetNumber: text("street_number"),
+  block: text("block"),
+  floor: text("floor"),
+  condoName: text("condo_name"),
+  hideStreet: boolean("hide_street").default(false).notNull(), // Ocultar rua para cliente final (Blindagem!)
+  
+  // Mídias
+  videoUrl: text("video_url"), // Link do vídeo (YouTube/Vimeo)
+  coverPhoto: text("cover_photo"),
+  floorPlanPhotos: jsonb("floor_plan_photos").$type<string[]>().default([]).notNull(),
+  
   // Regras de Co-corretagem
   acceptsPartnership: boolean("accepts_partnership").default(true).notNull(),
   splitPercentage: numeric("split_percentage", { precision: 5, scale: 2 }).default("50.00").notNull(),

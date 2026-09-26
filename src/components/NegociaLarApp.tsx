@@ -42,6 +42,16 @@ import {
   User,
   Hash,
   UserPlus,
+  Home,
+  Video,
+  Image as ImageIcon,
+  Layers,
+  Sun,
+  Compass,
+  Eye,
+  Trash2,
+  CheckSquare,
+  Square,
 } from "lucide-react";
 import OnboardingModal from "@/components/OnboardingModal";
 import {
@@ -84,17 +94,43 @@ interface Property {
   title: string;
   propertyType: string;
   salePrice: string;
+  purpose?: string;
+  acceptsTrade?: boolean;
+  tradeDetails?: string | null;
+  condition?: string;
+  hotelRoomsCount?: number | null;
   condoFee: string | null;
   iptu: string | null;
+  iptuPeriod?: string | null;
   city: string;
   neighborhood: string;
+  cep?: string | null;
+  street?: string | null;
+  streetNumber?: string | null;
+  block?: string | null;
+  floor?: string | null;
+  condoName?: string | null;
+  hideStreet?: boolean;
   bedrooms: number;
   suites: number;
   bathrooms: number;
   parkingSpots: number;
+  garageType?: string | null;
   areaM2: string;
+  usefulAreaM2?: string | null;
+  totalAreaM2?: string | null;
+  solarPosition?: string | null;
+  viewType?: string | null;
+  propertyAge?: number | null;
+  documentationStatus?: string | null;
+  acceptsFinancing?: boolean;
+  privateAmenities?: string[];
+  condoAmenities?: string[];
   description: string;
+  videoUrl?: string | null;
+  coverPhoto?: string | null;
   photos: string[];
+  floorPlanPhotos?: string[];
   acceptsPartnership: boolean;
   splitPercentage: string;
   status: string;
@@ -161,6 +197,96 @@ interface TransactionItem {
 
 import LandingPage from "./LandingPage";
 
+export const PROPERTY_TYPES = [
+  "Apartamento",
+  "Casa em Condomínio",
+  "Casa Solta",
+  "Cobertura",
+  "Comercial",
+  "Duplex",
+  "Terreno",
+  "Chácara",
+  "Sítio",
+  "Fazenda",
+  "Hotel",
+  "Pousada",
+  "Loft",
+  "Apart-Hotel",
+];
+
+export const PRIVATE_AMENITIES_LIST = [
+  "Ar-condicionado",
+  "Armário embutido / Closet",
+  "Box blindex",
+  "Cozinha americana",
+  "Cozinha planejada",
+  "Churrasqueira privativa",
+  "Despensa",
+  "Dependência de empregada (DCE)",
+  "Escritório / Home office",
+  "Lavabo",
+  "Mezanino",
+  "Internet / Wi-Fi",
+  "TV a cabo instalada",
+  "Sofá retrátil / Mobiliado",
+  "Piscina privativa",
+  "Sacada / Sacada gourmet",
+  "Varanda / Varanda gourmet",
+  "Ofurô / Hidromassagem",
+  "Sauna privativa",
+  "Ventilador de teto",
+];
+
+export const CONDO_AMENITIES_GROUPS = [
+  {
+    category: "Lazer & Convivência",
+    items: [
+      "Piscina adulto",
+      "Piscina infantil",
+      "Piscina aquecida / coberta",
+      "Deck molhado",
+      "Sauna",
+      "Spa / Hidromassagem",
+      "Espaço gourmet",
+      "Salão de festas",
+      "Churrasqueira coletiva",
+      "Salão de jogos",
+      "Cinema / Home theater",
+      "Espaço kids / Brinquedoteca",
+      "Playground",
+      "Coworking / Sala de reunião",
+      "Pista de cooper / caminhada",
+      "Área verde / Bosque preservado",
+      "Pet place / Pet care",
+      "Haras / Hípica",
+      "Heliponto",
+    ],
+  },
+  {
+    category: "Esportes & Saúde",
+    items: [
+      "Academia completa (Fitness)",
+      "Quadra poliesportiva",
+      "Quadra de tênis",
+      "Quadra de beach tennis",
+      "Campo de futebol",
+    ],
+  },
+  {
+    category: "Segurança, Tecnologia & Infraestrutura",
+    items: [
+      "Portaria 24 horas",
+      "Portaria remota / virtual",
+      "Reconhecimento facial / Biometria",
+      "Câmeras CFTV 24h",
+      "Gerador de energia",
+      "Elevador social e de serviço",
+      "Mini-mercado 24h",
+      "Carregador para carro elétrico",
+    ],
+  },
+];
+
 export default function NegociaLarApp({
   initialProperties,
   initialRadar,
@@ -203,6 +329,133 @@ export default function NegociaLarApp({
 
   const [notifications, setNotifications] = useState<NotificationItem[]>(initialNotifications);
   const [dvpList, setDvpList] = useState<DvpCertificateItem[]>(initialDvpList);
+
+  // Filtros da Vitrine MLS
+  const [propertyFilterPurpose, setPropertyFilterPurpose] = useState<string>("todos");
+  const [propertyFilterType, setPropertyFilterType] = useState<string>("todos");
+  const [propertyFilterSearch, setPropertyFilterSearch] = useState<string>("");
+
+  // Formulário Completo de Cadastro de Imóvel (4 Páginas das Imobiliárias)
+  const [formPurpose, setFormPurpose] = useState<"venda" | "aluguel" | "temporada">("venda");
+  const [formAcceptsTrade, setFormAcceptsTrade] = useState(false);
+  const [formPropertyType, setFormPropertyType] = useState("Apartamento");
+  const [formCondition, setFormCondition] = useState<"novo" | "usado" | "em_construcao" | "na_planta">("usado");
+  const [formBedrooms, setFormBedrooms] = useState(2);
+  const [formSuites, setFormSuites] = useState(1);
+  const [formBathrooms, setFormBathrooms] = useState(2);
+  const [formParkingSpots, setFormParkingSpots] = useState(1);
+  const [formGarageType, setFormGarageType] = useState<"coberta" | "descoberta">("coberta");
+  const [formSolarPosition, setFormSolarPosition] = useState<"nascente" | "norte_sul" | "poente">("nascente");
+  const [formViewType, setFormViewType] = useState<"frente" | "fundos" | "lagoa" | "av_principal">("frente");
+  const [formIptuPeriod, setFormIptuPeriod] = useState<"anual" | "mensal">("anual");
+  const [formDocumentationStatus, setFormDocumentationStatus] = useState<"escriturado" | "promessa_compra_venda" | "inventario">("escriturado");
+  const [formAcceptsFinancing, setFormAcceptsFinancing] = useState(true);
+  const [formHideStreet, setFormHideStreet] = useState(true);
+  
+  const [formPrivateAmenities, setFormPrivateAmenities] = useState<string[]>([
+    "Ar-condicionado",
+    "Armário embutido / Closet",
+    "Cozinha planejada",
+    "Varanda / Varanda gourmet",
+  ]);
+  const [formCondoAmenities, setFormCondoAmenities] = useState<string[]>([
+    "Piscina adulto",
+    "Espaço gourmet",
+    "Salão de festas",
+    "Academia completa (Fitness)",
+    "Portaria 24 horas",
+    "Elevador social e de serviço",
+  ]);
+
+  // Endereço e Busca Inteligente via CEP
+  const [formCep, setFormCep] = useState("");
+  const [formCity, setFormCity] = useState("São Paulo");
+  const [formState, setFormState] = useState("SP");
+  const [formNeighborhood, setFormNeighborhood] = useState("");
+  const [formStreet, setFormStreet] = useState("");
+  const [isSearchingCep, setIsSearchingCep] = useState(false);
+
+  // Mídias
+  const [formCoverPhoto, setFormCoverPhoto] = useState("https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&auto=format&fit=crop&q=80");
+  const [formGalleryPhotos, setFormGalleryPhotos] = useState<string[]>([
+    "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&auto=format&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1600596542815-ffad4c1539a9?w=1200&auto=format&fit=crop&q=80",
+    "https://images.unsplash.com/photo-1600566753190-17f0baa2a6c3?w=1200&auto=format&fit=crop&q=80"
+  ]);
+  const [formFloorPlans, setFormFloorPlans] = useState<string[]>([]);
+  const [newPhotoInput, setNewPhotoInput] = useState("");
+  const [newFloorPlanInput, setNewFloorPlanInput] = useState("");
+
+  const handleCepLookup = async (rawCep?: string) => {
+    const cepToSearch = (rawCep !== undefined ? rawCep : formCep).replace(/\D/g, "");
+    if (!cepToSearch) return;
+
+    let formattedCep = cepToSearch;
+    if (cepToSearch.length > 5) {
+      formattedCep = `${cepToSearch.slice(0, 5)}-${cepToSearch.slice(5, 8)}`;
+    }
+    setFormCep(formattedCep);
+
+    if (cepToSearch.length === 8) {
+      setIsSearchingCep(true);
+      try {
+        const res = await fetch(`https://viacep.com.br/ws/${cepToSearch}/json/`);
+        const data = await res.json();
+        if (!data.erro) {
+          if (data.localidade) setFormCity(data.localidade);
+          if (data.uf) setFormState(data.uf);
+          if (data.bairro) setFormNeighborhood(data.bairro);
+          if (data.logradouro) setFormStreet(data.logradouro);
+          setToastMessage(`📍 Endereço preenchido: ${data.logradouro || "Logradouro"}, ${data.bairro || ""} - ${data.localidade}/${data.uf}`);
+          setTimeout(() => setToastMessage(null), 4000);
+        } else {
+          setToastMessage("⚠️ CEP não encontrado. Preencha os campos manualmente.");
+          setTimeout(() => setToastMessage(null), 3000);
+        }
+      } catch (err) {
+        console.error("Erro na busca de CEP:", err);
+      } finally {
+        setIsSearchingCep(false);
+      }
+    }
+  };
+
+  const togglePrivateAmenity = (item: string) => {
+    setFormPrivateAmenities((prev) =>
+      prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]
+    );
+  };
+
+  const toggleCondoAmenity = (item: string) => {
+    setFormCondoAmenities((prev) =>
+      prev.includes(item) ? prev.filter((i) => i !== item) : [...prev, item]
+    );
+  };
+
+  const handleAddPhoto = () => {
+    if (!newPhotoInput.trim()) return;
+    if (formGalleryPhotos.length >= 30) {
+      setToastMessage("Limite de 30 fotos atingido!");
+      setTimeout(() => setToastMessage(null), 3000);
+      return;
+    }
+    setFormGalleryPhotos((prev) => [...prev, newPhotoInput.trim()]);
+    setNewPhotoInput("");
+  };
+
+  const handleRemovePhoto = (index: number) => {
+    setFormGalleryPhotos((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handleAddFloorPlan = () => {
+    if (!newFloorPlanInput.trim()) return;
+    setFormFloorPlans((prev) => [...prev, newFloorPlanInput.trim()]);
+    setNewFloorPlanInput("");
+  };
+
+  const handleRemoveFloorPlan = (index: number) => {
+    setFormFloorPlans((prev) => prev.filter((_, idx) => idx !== index));
+  };
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
@@ -322,6 +575,24 @@ export default function NegociaLarApp({
       u.creci.toLowerCase().includes(userSearch.toLowerCase()) ||
       u.city.toLowerCase().includes(userSearch.toLowerCase())
   );
+
+  const filteredProperties = propertyList.filter((prop) => {
+    if (propertyFilterPurpose !== "todos" && prop.purpose && prop.purpose !== propertyFilterPurpose) {
+      return false;
+    }
+    if (propertyFilterType !== "todos" && prop.propertyType !== propertyFilterType) {
+      return false;
+    }
+    if (propertyFilterSearch.trim()) {
+      const q = propertyFilterSearch.toLowerCase();
+      const matchTitle = prop.title?.toLowerCase().includes(q);
+      const matchCity = prop.city?.toLowerCase().includes(q);
+      const matchNeigh = prop.neighborhood?.toLowerCase().includes(q);
+      const matchCondo = prop.condoName?.toLowerCase().includes(q);
+      if (!matchTitle && !matchCity && !matchNeigh && !matchCondo) return false;
+    }
+    return true;
+  });
 
   if (currentView === "landing") {
     return (
@@ -942,53 +1213,145 @@ export default function NegociaLarApp({
               </div>
             </div>
 
-            {propertyList.length === 0 ? (
+            {/* BARRA DE FILTROS DA VITRINE MLS */}
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-lg">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                {/* Filtro por Finalidade */}
+                <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
+                  {[
+                    { id: "todos", label: "Todos" },
+                    { id: "venda", label: "🏷️ Venda" },
+                    { id: "aluguel", label: "🔑 Aluguel" },
+                    { id: "temporada", label: "🏖️ Temporada" },
+                  ].map((tab) => (
+                    <button
+                      key={tab.id}
+                      onClick={() => setPropertyFilterPurpose(tab.id)}
+                      className={`px-3 py-1.5 rounded-lg font-semibold transition ${
+                        propertyFilterPurpose === tab.id
+                          ? "bg-amber-500 text-slate-950 shadow-sm"
+                          : "text-slate-400 hover:text-white"
+                      }`}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Filtro por Tipo de Imóvel */}
+                <div className="flex items-center gap-2">
+                  <select
+                    value={propertyFilterType}
+                    onChange={(e) => setPropertyFilterType(e.target.value)}
+                    className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500"
+                  >
+                    <option value="todos">Todos os 14 Tipos</option>
+                    {PROPERTY_TYPES.map((t) => (
+                      <option key={t} value={t}>
+                        {t}
+                      </option>
+                    ))}
+                  </select>
+
+                  {/* Busca Rápida */}
+                  <div className="relative">
+                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
+                    <input
+                      type="text"
+                      value={propertyFilterSearch}
+                      onChange={(e) => setPropertyFilterSearch(e.target.value)}
+                      placeholder="Bairro, condomínio, cidade..."
+                      className="bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 w-44 sm:w-56"
+                    />
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {filteredProperties.length === 0 ? (
               <div className="bg-slate-900 border border-slate-800 rounded-3xl p-12 text-center max-w-xl mx-auto space-y-4 shadow-2xl">
                 <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto">
                   <Building2 className="w-8 h-8" />
                 </div>
                 <div className="space-y-1">
-                  <h3 className="text-lg font-bold text-white">Vitrine Pronta para Suas Captações</h3>
+                  <h3 className="text-lg font-bold text-white">Nenhum Imóvel Encontrado</h3>
                   <p className="text-xs text-slate-400">
-                    O banco de dados está limpo e zerado. Cadastre o seu primeiro imóvel blindado para inaugurar a rede de parcerias!
+                    {propertyList.length === 0
+                      ? "O banco de dados está limpo e zerado. Cadastre o seu primeiro imóvel blindado para inaugurar a rede de parcerias!"
+                      : "Nenhum imóvel corresponde aos filtros selecionados. Tente alterar o tipo ou a finalidade."}
                   </p>
                 </div>
-                <button
-                  onClick={() => setActiveTab("cadastrar")}
-                  className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs py-3 px-6 rounded-xl transition inline-flex items-center gap-2 shadow-lg shadow-amber-500/20"
-                >
-                  <PlusCircle className="w-4 h-4" />
-                  <span>Cadastrar 1º Imóvel na Rede</span>
-                </button>
+                {propertyList.length === 0 ? (
+                  <button
+                    onClick={() => setActiveTab("cadastrar")}
+                    className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs py-3 px-6 rounded-xl transition inline-flex items-center gap-2 shadow-lg shadow-amber-500/20"
+                  >
+                    <PlusCircle className="w-4 h-4" />
+                    <span>Cadastrar 1º Imóvel na Rede</span>
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => {
+                      setPropertyFilterPurpose("todos");
+                      setPropertyFilterType("todos");
+                      setPropertyFilterSearch("");
+                    }}
+                    className="text-amber-400 hover:underline text-xs font-semibold"
+                  >
+                    Limpar todos os filtros
+                  </button>
+                )}
               </div>
             ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {propertyList.map((prop) => (
+                {filteredProperties.map((prop) => (
                   <div
                     key={prop.id}
                     className="bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 hover:border-amber-500/40 transition duration-300 shadow-lg flex flex-col justify-between"
                   >
                     <div>
-                      {/* Imagem principal com badge 50/50 */}
+                      {/* Imagem principal com badges */}
                       <div className="relative h-64 w-full bg-slate-950 overflow-hidden">
                         <img
-                          src={prop.photos[0] || "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200"}
+                          src={prop.coverPhoto || prop.photos[0] || "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200"}
                           alt={prop.title}
                           className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
                         />
-                        <div className="absolute top-3 left-3 flex gap-2">
+                        <div className="absolute top-3 left-3 flex flex-wrap gap-1.5 max-w-[85%]">
                           <span className="bg-amber-500 text-slate-950 text-xs font-black px-2.5 py-1 rounded-md shadow-lg flex items-center gap-1">
                             🤝 Parceria {prop.splitPercentage}% / {100 - parseFloat(prop.splitPercentage)}%
                           </span>
-                          <span className="bg-slate-900/80 backdrop-blur text-white text-xs font-medium px-2.5 py-1 rounded-md border border-slate-700">
+                          <span className="bg-slate-900/90 backdrop-blur text-white text-xs font-medium px-2.5 py-1 rounded-md border border-slate-700">
                             {prop.propertyType}
                           </span>
+                          {prop.purpose && prop.purpose !== "venda" && (
+                            <span className="bg-blue-600/90 backdrop-blur text-white text-[11px] font-bold px-2 py-0.5 rounded-md uppercase">
+                              {prop.purpose}
+                            </span>
+                          )}
+                          {prop.acceptsTrade && (
+                            <span className="bg-purple-600/90 backdrop-blur text-white text-[11px] font-bold px-2 py-0.5 rounded-md">
+                              🔄 Aceita Permuta
+                            </span>
+                          )}
+                          {prop.condition && prop.condition !== "usado" && (
+                            <span className="bg-emerald-600/90 backdrop-blur text-white text-[11px] font-bold px-2 py-0.5 rounded-md capitalize">
+                              {prop.condition.replace("_", " ")}
+                            </span>
+                          )}
                         </div>
 
                         <div className="absolute bottom-3 left-3 bg-slate-950/80 backdrop-blur px-3 py-1 rounded-lg border border-slate-800 text-xs flex items-center gap-1 text-slate-300">
                           <Lock className="w-3.5 h-3.5 text-amber-400" />
-                          Endereço Blindado
+                          {prop.hideStreet ? "Rua Ocultada (Blindagem Ativa)" : "Endereço Blindado"}
                         </div>
+
+                        {prop.photos && prop.photos.length > 1 && (
+                          <div className="absolute bottom-3 right-3 bg-slate-950/80 backdrop-blur px-2.5 py-1 rounded-lg border border-slate-800 text-[11px] text-slate-300 flex items-center gap-1 font-mono">
+                            <ImageIcon className="w-3 h-3 text-amber-400" />
+                            {prop.photos.length} fotos
+                          </div>
+                        )}
                       </div>
 
                       {/* Conteúdo */}
@@ -997,13 +1360,14 @@ export default function NegociaLarApp({
                           <div>
                             <div className="flex items-center gap-1.5 text-xs font-medium text-amber-400 mb-1">
                               <MapPin className="w-3.5 h-3.5" />
+                              {prop.condoName ? `${prop.condoName} • ` : ""}
                               {prop.neighborhood}, {prop.city}
                             </div>
                             <h3 className="font-bold text-lg text-white leading-snug">{prop.title}</h3>
                           </div>
-                          <div className="text-right">
+                          <div className="text-right shrink-0">
                             <div className="text-xl font-black text-amber-400">{formatBRL(prop.salePrice)}</div>
-                            {prop.condoFee && (
+                            {prop.condoFee && parseFloat(prop.condoFee) > 0 && (
                               <div className="text-xs text-slate-400">Cond: {formatBRL(prop.condoFee)}</div>
                             )}
                           </div>
@@ -1027,9 +1391,28 @@ export default function NegociaLarApp({
                           </div>
                           <div className="flex items-center gap-1.5 bg-slate-800/40 p-2 rounded-lg">
                             <Maximize2 className="w-3.5 h-3.5 text-amber-400" />
-                            <span>{prop.areaM2} m²</span>
+                            <span>{prop.usefulAreaM2 || prop.areaM2} m²</span>
                           </div>
                         </div>
+
+                        {/* Comodidades em destaque (se houver) */}
+                        {prop.privateAmenities && prop.privateAmenities.length > 0 && (
+                          <div className="flex flex-wrap gap-1 pt-1">
+                            {prop.privateAmenities.slice(0, 3).map((am) => (
+                              <span
+                                key={am}
+                                className="text-[10px] bg-slate-800/60 text-slate-300 border border-slate-700/60 px-2 py-0.5 rounded-md"
+                              >
+                                {am}
+                              </span>
+                            ))}
+                            {prop.privateAmenities.length > 3 && (
+                              <span className="text-[10px] text-amber-400 font-semibold px-1 py-0.5">
+                                +{prop.privateAmenities.length - 3} itens
+                              </span>
+                            )}
+                          </div>
+                        )}
 
                         {/* Info do Captador */}
                         <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80 flex items-center justify-between">
@@ -1538,244 +1921,1041 @@ export default function NegociaLarApp({
               </div>
             ) : (
               <>
-                <div>
-                  <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                    <PlusCircle className="w-5 h-5 text-amber-500" />
-                    Cadastrar Imóvel com Blindagem de Captação
-                  </h2>
-                  <p className="text-sm text-slate-400">
-                    Os dados sensíveis (endereço exato e telefone do proprietário) ficam criptografados e acessíveis apenas a você ({currentBroker.name}).
-                  </p>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+                  <div>
+                    <h2 className="text-xl font-bold text-white flex items-center gap-2">
+                      <PlusCircle className="w-5 h-5 text-amber-500" />
+                      Cadastrar Imóvel com Blindagem de Captação
+                    </h2>
+                    <p className="text-sm text-slate-400">
+                      Formulário completo com 14 tipos, 20 comodidades privativas, 32 itens de condomínio e blindagem MLS.
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 text-xs text-amber-400 bg-amber-950/30 border border-amber-500/30 px-3 py-1.5 rounded-xl">
+                    <Lock className="w-3.5 h-3.5" />
+                    <span>Captador Oficial: {currentBroker.name}</span>
+                  </div>
                 </div>
 
                 <form
                   onSubmit={async (e) => {
-                e.preventDefault();
-                const form = e.currentTarget;
-                const fd = new FormData(form);
-                const res = await createProperty({
-                  brokerId: currentBroker.id,
-                  title: fd.get("title") as string,
-                  propertyType: fd.get("propertyType") as string,
-                  salePrice: fd.get("salePrice") as string,
-                  condoFee: fd.get("condoFee") as string,
-                  iptu: fd.get("iptu") as string,
-                  city: fd.get("city") as string,
-                  neighborhood: fd.get("neighborhood") as string,
-                  bedrooms: parseInt(fd.get("bedrooms") as string || "1"),
-                  suites: parseInt(fd.get("suites") as string || "0"),
-                  bathrooms: parseInt(fd.get("bathrooms") as string || "1"),
-                  parkingSpots: parseInt(fd.get("parkingSpots") as string || "0"),
-                  areaM2: fd.get("areaM2") as string,
-                  description: fd.get("description") as string,
-                  photos: [
-                    "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&auto=format&fit=crop&q=80",
-                  ],
-                  confidentialAddress: fd.get("confidentialAddress") as string,
-                  ownerName: fd.get("ownerName") as string,
-                  ownerPhone: fd.get("ownerPhone") as string,
-                  acceptsPartnership: true,
-                  splitPercentage: "50.00",
-                });
+                    e.preventDefault();
+                    const form = e.currentTarget;
+                    const fd = new FormData(form);
 
-                if (res.success && res.property) {
-                  setPropertyList((prev) => [
-                    {
-                      ...res.property,
-                      broker: {
-                        id: currentBroker.id,
-                        name: currentBroker.name,
-                        creci: currentBroker.creci,
-                        whatsapp: currentBroker.whatsapp,
-                        avatarUrl: currentBroker.avatar,
-                        city: res.property.city,
-                      },
-                    },
-                    ...prev,
-                  ]);
-                  setToastMessage("🏠 Imóvel cadastrado no banco de dados e blindado com sucesso!");
-                  setTimeout(() => setToastMessage(null), 5000);
-                  setActiveTab("vitrine");
-                }
-              }}
-              className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-6"
-            >
-              {/* DADOS PÚBLICOS NA REDE */}
-              <div className="space-y-4">
-                <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-slate-800 pb-2">
-                  <Building2 className="w-4 h-4 text-amber-500" />
-                  1. Informações Públicas (Visíveis a todos os corretores)
-                </h3>
+                    const title = (fd.get("title") as string)?.trim() || `${formPropertyType} em ${formNeighborhood || formCity}`;
+                    const salePrice = (fd.get("salePrice") as string)?.trim();
+                    const ownerName = (fd.get("ownerName") as string)?.trim();
+                    const ownerPhone = (fd.get("ownerPhone") as string)?.trim();
 
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">Título do Anúncio</label>
-                  <input
-                    name="title"
-                    required
-                    placeholder="Ex: Apartamento Amplo com Varanda Gourmet em Moema"
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
-                  />
-                </div>
+                    if (!salePrice || !ownerName || !ownerPhone) {
+                      setToastMessage("Por favor, preencha o valor do imóvel e os dados de contato do proprietário.");
+                      setTimeout(() => setToastMessage(null), 5000);
+                      return;
+                    }
 
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">Tipo de Imóvel</label>
-                    <select
-                      name="propertyType"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
-                    >
-                      <option value="Apartamento">Apartamento</option>
-                      <option value="Casa em Condomínio">Casa em Condomínio</option>
-                      <option value="Cobertura">Cobertura</option>
-                      <option value="Casa de Rua">Casa de Rua</option>
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">Valor de Venda (R$)</label>
-                    <input
-                      name="salePrice"
-                      required
-                      type="number"
-                      placeholder="950000"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">Condomínio (R$/mês)</label>
-                    <input
-                      name="condoFee"
-                      type="number"
-                      placeholder="950"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-                </div>
+                    const usefulArea = (fd.get("usefulAreaM2") as string) || (fd.get("areaM2") as string) || "80";
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">Cidade</label>
-                    <input
-                      name="city"
-                      required
-                      defaultValue="São Paulo"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">Bairro (Público)</label>
-                    <input
-                      name="neighborhood"
-                      required
-                      placeholder="Ex: Moema"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-                </div>
+                    try {
+                      const res = await createProperty({
+                        brokerId: currentBroker.id,
+                        title,
+                        purpose: formPurpose,
+                        salePrice,
+                        acceptsTrade: formAcceptsTrade,
+                        tradeDetails: (fd.get("tradeDetails") as string) || undefined,
+                        propertyType: formPropertyType,
+                        hotelRoomsCount:
+                          formPropertyType === "Hotel" || formPropertyType === "Pousada"
+                            ? parseInt((fd.get("hotelRoomsCount") as string) || "0")
+                            : undefined,
+                        condition: formCondition,
+                        bedrooms: formBedrooms,
+                        suites: formSuites,
+                        bathrooms: formBathrooms,
+                        parkingSpots: formParkingSpots,
+                        garageType: formGarageType,
+                        usefulAreaM2: usefulArea,
+                        totalAreaM2: (fd.get("totalAreaM2") as string) || undefined,
+                        areaM2: usefulArea,
+                        solarPosition: formSolarPosition,
+                        viewType: formViewType,
+                        propertyAge: fd.get("propertyAge") ? parseInt(fd.get("propertyAge") as string) : undefined,
+                        condoFee: (fd.get("condoFee") as string) || "0",
+                        iptu: (fd.get("iptu") as string) || "0",
+                        iptuPeriod: formIptuPeriod,
+                        acceptsFinancing: formAcceptsFinancing,
+                        documentationStatus: formDocumentationStatus,
+                        privateAmenities: formPrivateAmenities,
+                        condoAmenities: formCondoAmenities,
+                        cep: formCep,
+                        state: formState,
+                        city: formCity,
+                        neighborhood: formNeighborhood || "Bairro Não Informado",
+                        street: formStreet,
+                        hideStreet: formHideStreet,
+                        condoName: (fd.get("condoName") as string) || undefined,
+                        streetNumber: (fd.get("streetNumber") as string) || undefined,
+                        block: (fd.get("block") as string) || undefined,
+                        floor: (fd.get("floor") as string) || undefined,
+                        confidentialAddress: `${formStreet || "Rua Confidencial"}, ${fd.get("streetNumber") || "S/N"} - Bloco ${fd.get("block") || "-"} Andar ${fd.get("floor") || "-"}`,
+                        videoUrl: (fd.get("videoUrl") as string) || undefined,
+                        coverPhoto: formCoverPhoto,
+                        photos: formGalleryPhotos.length > 0 ? formGalleryPhotos : [formCoverPhoto],
+                        floorPlanPhotos: formFloorPlans,
+                        description: (fd.get("description") as string) || "Excelente oportunidade de negócio com divisão garantida.",
+                        ownerName,
+                        ownerPhone,
+                        acceptsPartnership: true,
+                        splitPercentage: "50.00",
+                      });
 
-                <div className="grid grid-cols-4 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">Quartos</label>
-                    <input
-                      name="bedrooms"
-                      type="number"
-                      defaultValue="2"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">Suítes</label>
-                    <input
-                      name="suites"
-                      type="number"
-                      defaultValue="1"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">Vagas</label>
-                    <input
-                      name="parkingSpots"
-                      type="number"
-                      defaultValue="2"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">Área (m²)</label>
-                    <input
-                      name="areaM2"
-                      type="number"
-                      defaultValue="85"
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
-                    />
-                  </div>
-                </div>
-
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">Descrição Comercial</label>
-                  <textarea
-                    name="description"
-                    rows={3}
-                    placeholder="Descreva os diferenciais do imóvel..."
-                    className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
-                  />
-                </div>
-              </div>
-
-              {/* SEÇÃO BLINDADA */}
-              <div className="p-4 rounded-xl bg-amber-950/20 border-2 border-amber-500/50 space-y-4">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <Lock className="w-5 h-5 text-amber-400" />
-                    <h3 className="text-sm font-bold text-amber-400 uppercase tracking-wider">
-                      2. Campos Blindados (Sigilo Absoluto)
+                      if (res && res.property) {
+                        setPropertyList((prev) => [
+                          {
+                            ...res.property,
+                            broker: {
+                              id: currentBroker.id,
+                              name: currentBroker.name,
+                              creci: currentBroker.creci,
+                              whatsapp: currentBroker.whatsapp,
+                              avatarUrl: currentBroker.avatar,
+                              city: res.property.city,
+                            },
+                          },
+                          ...prev,
+                        ]);
+                        setToastMessage("🏠 Imóvel cadastrado com sucesso e publicado na Vitrine MLS!");
+                        setTimeout(() => setToastMessage(null), 5000);
+                        setActiveTab("vitrine");
+                      }
+                    } catch (err: any) {
+                      setToastMessage(err?.message || "Erro ao salvar o imóvel.");
+                      setTimeout(() => setToastMessage(null), 5000);
+                    }
+                  }}
+                  className="space-y-6"
+                >
+                  {/* SEÇÃO 1: FINALIDADE, VALORES & CONDIÇÕES (PÁGINA 1) */}
+                  <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-5 shadow-lg">
+                    <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-slate-800 pb-3">
+                      <DollarSign className="w-4 h-4 text-amber-500" />
+                      1. Finalidade, Valores & Condições de Negócio
                     </h3>
-                  </div>
-                  <span className="text-[11px] bg-amber-500/20 text-amber-300 font-semibold px-2 py-0.5 rounded-full border border-amber-500/30">
-                    Apenas Você Enxerga
-                  </span>
-                </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-slate-300 mb-1">Endereço Exato</label>
-                  <input
-                    name="confidentialAddress"
-                    required
-                    placeholder="Ex: Alameda dos Arapanés, nº 842, Apto 112"
-                    className="w-full bg-slate-950 border border-amber-500/30 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-400"
-                  />
-                </div>
+                    {/* Finalidade Buttons */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-2">Finalidade do Imóvel</label>
+                      <div className="grid grid-cols-3 gap-2">
+                        {[
+                          { id: "venda", label: "🏷️ Venda" },
+                          { id: "aluguel", label: "🔑 Aluguel" },
+                          { id: "temporada", label: "🏖️ Temporada" },
+                        ].map((p) => (
+                          <button
+                            key={p.id}
+                            type="button"
+                            onClick={() => setFormPurpose(p.id as any)}
+                            className={`py-2.5 px-3 rounded-xl text-xs font-bold border transition ${
+                              formPurpose === p.id
+                                ? "bg-amber-500 text-slate-950 border-amber-400 shadow-md shadow-amber-500/10"
+                                : "bg-slate-950 text-slate-400 border-slate-800 hover:text-white"
+                            }`}
+                          >
+                            {p.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">Nome do Proprietário</label>
-                    <input
-                      name="ownerName"
-                      required
-                      placeholder="Ex: Carlos de Souza"
-                      className="w-full bg-slate-950 border border-amber-500/30 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-400"
-                    />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">Telefone do Proprietário</label>
-                    <input
-                      name="ownerPhone"
-                      required
-                      placeholder="(11) 98888-7777"
-                      className="w-full bg-slate-950 border border-amber-500/30 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-400"
-                    />
-                  </div>
-                </div>
-              </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">
+                          Valor {formPurpose === "venda" ? "de Venda" : formPurpose === "aluguel" ? "do Aluguel" : "da Diária"} (R$) *
+                        </label>
+                        <input
+                          name="salePrice"
+                          required
+                          type="number"
+                          placeholder="Ex: 850000"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">Condomínio (R$/mês)</label>
+                        <input
+                          name="condoFee"
+                          type="number"
+                          placeholder="Ex: 650"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">IPTU (R$)</label>
+                        <div className="flex gap-2">
+                          <input
+                            name="iptu"
+                            type="number"
+                            placeholder="Ex: 180"
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
+                          />
+                          <select
+                            value={formIptuPeriod}
+                            onChange={(e) => setFormIptuPeriod(e.target.value as any)}
+                            className="bg-slate-950 border border-slate-800 rounded-xl px-2 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                          >
+                            <option value="anual">Anual</option>
+                            <option value="mensal">Mensal</option>
+                          </select>
+                        </div>
+                      </div>
+                    </div>
 
-              <button
-                type="submit"
-                className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold py-3 rounded-xl transition shadow-lg shadow-amber-500/20"
-              >
-                Salvar Captação com Blindagem Ativa
-              </button>
-            </form>
-            </>
+                    {/* Aceita Permuta */}
+                    <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <div className="text-xs font-bold text-white">Aceita Permuta?</div>
+                          <div className="text-[11px] text-slate-400">Aceita veículos, imóveis de menor valor, etc.</div>
+                        </div>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setFormAcceptsTrade(false)}
+                            className={`px-3 py-1 rounded-lg text-xs font-bold border transition ${
+                              !formAcceptsTrade
+                                ? "bg-slate-800 text-white border-slate-700"
+                                : "text-slate-500 border-transparent hover:text-white"
+                            }`}
+                          >
+                            Não
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFormAcceptsTrade(true)}
+                            className={`px-3 py-1 rounded-lg text-xs font-bold border transition ${
+                              formAcceptsTrade
+                                ? "bg-purple-600 text-white border-purple-500 shadow"
+                                : "text-slate-500 border-transparent hover:text-white"
+                            }`}
+                          >
+                            Sim, Aceita
+                          </button>
+                        </div>
+                      </div>
+                      {formAcceptsTrade && (
+                        <div>
+                          <label className="block text-[11px] font-medium text-slate-300 mb-1">
+                            Detalhes da Permuta Aceita
+                          </label>
+                          <input
+                            name="tradeDetails"
+                            placeholder="Ex: Aceita automóvel até R$ 100 mil ou apartamento até 50% do valor"
+                            className="w-full bg-slate-900 border border-purple-500/40 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-purple-400"
+                          />
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Financiamento & Documentação */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-1">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">
+                          Aceita Financiamento Bancário?
+                        </label>
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={() => setFormAcceptsFinancing(true)}
+                            className={`flex-1 py-2 rounded-xl text-xs font-bold border transition ${
+                              formAcceptsFinancing
+                                ? "bg-emerald-600/30 text-emerald-300 border-emerald-500"
+                                : "bg-slate-950 text-slate-400 border-slate-800"
+                            }`}
+                          >
+                            ✓ Sim, Financia
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFormAcceptsFinancing(false)}
+                            className={`flex-1 py-2 rounded-xl text-xs font-bold border transition ${
+                              !formAcceptsFinancing
+                                ? "bg-red-600/30 text-red-300 border-red-500"
+                                : "bg-slate-950 text-slate-400 border-slate-800"
+                            }`}
+                          >
+                            ✕ Somente à Vista
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">
+                          Situação da Documentação
+                        </label>
+                        <select
+                          value={formDocumentationStatus}
+                          onChange={(e) => setFormDocumentationStatus(e.target.value as any)}
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                        >
+                          <option value="escriturado">Escriturado e Registrado (100% Regular)</option>
+                          <option value="promessa_compra_venda">Promessa de Compra e Venda / Cessão</option>
+                          <option value="inventario">Inventário / Em Regularização</option>
+                        </select>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SEÇÃO 2: TIPO DE IMÓVEL & CARACTERÍSTICAS DA PLANTA (PÁGINAS 1 & 2) */}
+                  <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-5 shadow-lg">
+                    <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-slate-800 pb-3">
+                      <Building2 className="w-4 h-4 text-amber-500" />
+                      2. Tipo do Imóvel & Detalhes da Estrutura
+                    </h3>
+
+                    {/* 14 Tipos de Imóvel */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-2">
+                        Tipo de Imóvel (14 Categorias das Imobiliárias)
+                      </label>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-7 gap-2">
+                        {PROPERTY_TYPES.map((type) => (
+                          <button
+                            key={type}
+                            type="button"
+                            onClick={() => setFormPropertyType(type)}
+                            className={`py-2 px-2 rounded-xl text-[11px] font-semibold text-center border transition truncate ${
+                              formPropertyType === type
+                                ? "bg-amber-500 text-slate-950 border-amber-400 font-bold shadow-sm"
+                                : "bg-slate-950 text-slate-400 border-slate-800 hover:text-white hover:border-slate-700"
+                            }`}
+                          >
+                            {type}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Se for Hotel ou Pousada */}
+                    {(formPropertyType === "Hotel" || formPropertyType === "Pousada") && (
+                      <div className="bg-amber-950/20 border border-amber-500/40 p-3 rounded-xl flex items-center gap-3">
+                        <Building2 className="w-5 h-5 text-amber-400 shrink-0" />
+                        <div className="flex-1">
+                          <label className="block text-xs font-semibold text-amber-300 mb-1">
+                            Número de Quartos / Suítes do {formPropertyType}
+                          </label>
+                          <input
+                            name="hotelRoomsCount"
+                            type="number"
+                            defaultValue="12"
+                            placeholder="Ex: 24"
+                            className="w-full bg-slate-950 border border-amber-500/40 rounded-lg px-3 py-1.5 text-xs text-white focus:outline-none"
+                          />
+                        </div>
+                      </div>
+                    )}
+
+                    {/* Condição da Obra */}
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-300 mb-2">Condição do Imóvel</label>
+                      <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                        {[
+                          { id: "novo", label: "✨ Novo / Pronto" },
+                          { id: "usado", label: "🏡 Usado" },
+                          { id: "em_construcao", label: "🏗️ Em Construção" },
+                          { id: "na_planta", label: "📐 Na Planta" },
+                        ].map((c) => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => setFormCondition(c.id as any)}
+                            className={`py-2 px-2.5 rounded-xl text-xs font-semibold border transition ${
+                              formCondition === c.id
+                                ? "bg-slate-800 text-amber-400 border-amber-500 shadow-sm"
+                                : "bg-slate-950 text-slate-400 border-slate-800 hover:text-white"
+                            }`}
+                          >
+                            {c.label}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Cômodos com seletores numéricos rápidos */}
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 pt-1">
+                      {/* Quartos */}
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1.5">Quartos</label>
+                        <div className="flex gap-1">
+                          {[1, 2, 3, 4, 5].map((num) => (
+                            <button
+                              key={num}
+                              type="button"
+                              onClick={() => setFormBedrooms(num)}
+                              className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition ${
+                                formBedrooms === num
+                                  ? "bg-amber-500 text-slate-950 border-amber-400"
+                                  : "bg-slate-950 text-slate-400 border-slate-800"
+                              }`}
+                            >
+                              {num === 5 ? "5+" : num}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Suítes */}
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1.5">Suítes</label>
+                        <div className="flex gap-1">
+                          {[0, 1, 2, 3, 4].map((num) => (
+                            <button
+                              key={num}
+                              type="button"
+                              onClick={() => setFormSuites(num)}
+                              className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition ${
+                                formSuites === num
+                                  ? "bg-amber-500 text-slate-950 border-amber-400"
+                                  : "bg-slate-950 text-slate-400 border-slate-800"
+                              }`}
+                            >
+                              {num === 4 ? "4+" : num}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Banheiros */}
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1.5">Banheiros</label>
+                        <div className="flex gap-1">
+                          {[1, 2, 3, 4, 5].map((num) => (
+                            <button
+                              key={num}
+                              type="button"
+                              onClick={() => setFormBathrooms(num)}
+                              className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition ${
+                                formBathrooms === num
+                                  ? "bg-amber-500 text-slate-950 border-amber-400"
+                                  : "bg-slate-950 text-slate-400 border-slate-800"
+                              }`}
+                            >
+                              {num === 5 ? "5+" : num}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      {/* Vagas */}
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1.5">Vagas de Garagem</label>
+                        <div className="flex gap-1">
+                          {[0, 1, 2, 3, 4].map((num) => (
+                            <button
+                              key={num}
+                              type="button"
+                              onClick={() => setFormParkingSpots(num)}
+                              className={`flex-1 py-1.5 rounded-lg text-xs font-bold border transition ${
+                                formParkingSpots === num
+                                  ? "bg-amber-500 text-slate-950 border-amber-400"
+                                  : "bg-slate-950 text-slate-400 border-slate-800"
+                              }`}
+                            >
+                              {num === 4 ? "4+" : num}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Vaga coberta / descoberta + Áreas */}
+                    <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">Tipo de Vaga</label>
+                        <div className="flex gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => setFormGarageType("coberta")}
+                            className={`flex-1 py-2 rounded-xl text-xs font-bold border transition ${
+                              formGarageType === "coberta"
+                                ? "bg-slate-800 text-white border-amber-500"
+                                : "bg-slate-950 text-slate-400 border-slate-800"
+                            }`}
+                          >
+                            Coberta
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setFormGarageType("descoberta")}
+                            className={`flex-1 py-2 rounded-xl text-xs font-bold border transition ${
+                              formGarageType === "descoberta"
+                                ? "bg-slate-800 text-white border-amber-500"
+                                : "bg-slate-950 text-slate-400 border-slate-800"
+                            }`}
+                          >
+                            Descoberta
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">Área Útil Privativa (m²)</label>
+                        <input
+                          name="usefulAreaM2"
+                          type="number"
+                          placeholder="Ex: 85"
+                          defaultValue="85"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">Área Total / Terreno (m²)</label>
+                        <input
+                          name="totalAreaM2"
+                          type="number"
+                          placeholder="Ex: 120"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">Idade do Imóvel (anos)</label>
+                        <input
+                          name="propertyAge"
+                          type="number"
+                          placeholder="Ex: 5"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Posição Solar e Vista */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1 flex items-center gap-1.5">
+                          <Sun className="w-3.5 h-3.5 text-amber-400" />
+                          Posição Solar
+                        </label>
+                        <div className="grid grid-cols-3 gap-1.5">
+                          {[
+                            { id: "nascente", label: "Nascente (Sol Manhã)" },
+                            { id: "norte_sul", label: "Norte / Sul" },
+                            { id: "poente", label: "Poente (Sol Tarde)" },
+                          ].map((pos) => (
+                            <button
+                              key={pos.id}
+                              type="button"
+                              onClick={() => setFormSolarPosition(pos.id as any)}
+                              className={`py-2 px-1 text-center rounded-xl text-[11px] font-semibold border transition ${
+                                formSolarPosition === pos.id
+                                  ? "bg-amber-500/20 text-amber-300 border-amber-500"
+                                  : "bg-slate-950 text-slate-400 border-slate-800"
+                              }`}
+                            >
+                              {pos.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1 flex items-center gap-1.5">
+                          <Eye className="w-3.5 h-3.5 text-amber-400" />
+                          Tipo de Vista
+                        </label>
+                        <div className="grid grid-cols-4 gap-1.5">
+                          {[
+                            { id: "frente", label: "Frente" },
+                            { id: "fundos", label: "Fundos" },
+                            { id: "lagoa", label: "Lagoa / Mar" },
+                            { id: "av_principal", label: "Av. Principal" },
+                          ].map((v) => (
+                            <button
+                              key={v.id}
+                              type="button"
+                              onClick={() => setFormViewType(v.id as any)}
+                              className={`py-2 px-1 text-center rounded-xl text-[11px] font-semibold border transition ${
+                                formViewType === v.id
+                                  ? "bg-amber-500/20 text-amber-300 border-amber-500"
+                                  : "bg-slate-950 text-slate-400 border-slate-800"
+                              }`}
+                            >
+                              {v.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SEÇÃO 3: COMODIDADES PRIVATIVAS (20 ITENS - PÁGINAS 2 & 3) */}
+                  <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-4 shadow-lg">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <div>
+                        <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                          <Home className="w-4 h-4 text-amber-500" />
+                          3. Comodidades Privativas (20 Itens do Imóvel)
+                        </h3>
+                        <p className="text-[11px] text-slate-400">
+                          Selecione todos os itens instalados dentro da unidade privativa.
+                        </p>
+                      </div>
+                      <span className="text-xs font-mono font-bold text-amber-400 bg-amber-950/40 border border-amber-500/30 px-2.5 py-1 rounded-lg">
+                        {formPrivateAmenities.length} selecionados
+                      </span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {PRIVATE_AMENITIES_LIST.map((item) => {
+                        const isSelected = formPrivateAmenities.includes(item);
+                        return (
+                          <button
+                            key={item}
+                            type="button"
+                            onClick={() => togglePrivateAmenity(item)}
+                            className={`p-2.5 rounded-xl text-left text-xs font-medium border flex items-center gap-2 transition ${
+                              isSelected
+                                ? "bg-amber-500/15 border-amber-500 text-amber-300 font-bold"
+                                : "bg-slate-950 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700"
+                            }`}
+                          >
+                            {isSelected ? (
+                              <CheckSquare className="w-4 h-4 text-amber-400 shrink-0" />
+                            ) : (
+                              <Square className="w-4 h-4 text-slate-600 shrink-0" />
+                            )}
+                            <span className="truncate">{item}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* SEÇÃO 4: ESTRUTURA DO CONDOMÍNIO (32 ITENS - PÁGINA 3) */}
+                  <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-5 shadow-lg">
+                    <div className="flex items-center justify-between border-b border-slate-800 pb-3">
+                      <div>
+                        <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
+                          <Layers className="w-4 h-4 text-amber-500" />
+                          4. Estrutura & Lazer do Condomínio (32 Itens)
+                        </h3>
+                        <p className="text-[11px] text-slate-400">
+                          Itens de conveniência, segurança e entretenimento das áreas comuns.
+                        </p>
+                      </div>
+                      <span className="text-xs font-mono font-bold text-emerald-400 bg-emerald-950/40 border border-emerald-500/30 px-2.5 py-1 rounded-lg">
+                        {formCondoAmenities.length} selecionados
+                      </span>
+                    </div>
+
+                    <div className="space-y-4">
+                      {CONDO_AMENITIES_GROUPS.map((group) => (
+                        <div key={group.category} className="space-y-2">
+                          <div className="text-xs font-bold text-slate-300 uppercase tracking-wider">
+                            {group.category}
+                          </div>
+                          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                            {group.items.map((item) => {
+                              const isSelected = formCondoAmenities.includes(item);
+                              return (
+                                <button
+                                  key={item}
+                                  type="button"
+                                  onClick={() => toggleCondoAmenity(item)}
+                                  className={`p-2 rounded-xl text-left text-[11px] font-medium border flex items-center gap-2 transition ${
+                                    isSelected
+                                      ? "bg-emerald-500/15 border-emerald-500 text-emerald-300 font-bold"
+                                      : "bg-slate-950 border-slate-800 text-slate-400 hover:text-white hover:border-slate-700"
+                                  }`}
+                                >
+                                  {isSelected ? (
+                                    <CheckSquare className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                                  ) : (
+                                    <Square className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+                                  )}
+                                  <span className="truncate">{item}</span>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* SEÇÃO 5: LOCALIZAÇÃO & BLINDAGEM MLS (PÁGINA 4) */}
+                  <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-5 shadow-lg">
+                    <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-slate-800 pb-3">
+                      <MapPin className="w-4 h-4 text-amber-500" />
+                      5. Localização & Blindagem de Endereço MLS
+                    </h3>
+
+                    {/* Busca Inteligente por CEP */}
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1 flex items-center justify-between">
+                          <span>CEP (Busca Automática)</span>
+                          {isSearchingCep && <span className="text-[10px] text-amber-400 font-bold animate-pulse">Buscando...</span>}
+                        </label>
+                        <div className="flex gap-1.5">
+                          <input
+                            value={formCep}
+                            onChange={(e) => handleCepLookup(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === "Enter") {
+                                e.preventDefault();
+                                handleCepLookup();
+                              }
+                            }}
+                            placeholder="00000-000"
+                            maxLength={9}
+                            className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500 font-mono"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleCepLookup()}
+                            disabled={isSearchingCep}
+                            className="bg-amber-600 hover:bg-amber-500 text-white px-3 py-2 rounded-xl text-xs font-bold transition flex items-center gap-1 shrink-0 shadow"
+                          >
+                            <Search className="w-3.5 h-3.5" />
+                            <span>Buscar</span>
+                          </button>
+                        </div>
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">Cidade</label>
+                        <input
+                          value={formCity}
+                          onChange={(e) => setFormCity(e.target.value)}
+                          required
+                          placeholder="São Paulo"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">Estado (UF)</label>
+                        <input
+                          value={formState}
+                          onChange={(e) => setFormState(e.target.value)}
+                          required
+                          maxLength={2}
+                          placeholder="SP"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white uppercase focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">
+                          Bairro (Visível no MLS) *
+                        </label>
+                        <input
+                          value={formNeighborhood}
+                          onChange={(e) => setFormNeighborhood(e.target.value)}
+                          required
+                          placeholder="Ex: Moema"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">
+                          Nome do Condomínio / Edifício
+                        </label>
+                        <input
+                          name="condoName"
+                          placeholder="Ex: Edifício Terraços de Moema"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Rua e Blindagem */}
+                    <div>
+                      <label className="block text-xs font-medium text-slate-300 mb-1">Rua / Logradouro</label>
+                      <input
+                        value={formStreet}
+                        onChange={(e) => setFormStreet(e.target.value)}
+                        placeholder="Ex: Alameda dos Arapanés"
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+
+                    {/* BLINDAGEM TOGGLE */}
+                    <div
+                      onClick={() => setFormHideStreet(!formHideStreet)}
+                      className={`p-4 rounded-xl border-2 cursor-pointer transition flex items-start gap-3 ${
+                        formHideStreet
+                          ? "bg-amber-950/20 border-amber-500 text-amber-300"
+                          : "bg-slate-950 border-slate-800 text-slate-400"
+                      }`}
+                    >
+                      <div className="mt-0.5">
+                        {formHideStreet ? (
+                          <CheckSquare className="w-5 h-5 text-amber-400" />
+                        ) : (
+                          <Square className="w-5 h-5 text-slate-600" />
+                        )}
+                      </div>
+                      <div className="space-y-1">
+                        <div className="text-xs font-bold text-white flex items-center gap-1.5">
+                          <span>[x] Ocultar Rua do Cliente Final (Blindagem MLS Ativa)</span>
+                          <Lock className="w-3.5 h-3.5 text-amber-400" />
+                        </div>
+                        <p className="text-[11px] leading-relaxed text-slate-300">
+                          Recomendado! Os corretores parceiros e compradores veem apenas o Bairro e a Cidade na vitrine e na ficha white-label. O nome da rua e o número só são revelados após a assinatura do DVP Digital de 180 dias.
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Campos confidenciais de unidade */}
+                    <div className="grid grid-cols-3 gap-3 pt-1">
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-400 mb-1">Número (Confidencial)</label>
+                        <input
+                          name="streetNumber"
+                          placeholder="842"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-400 mb-1">Bloco / Torre</label>
+                        <input
+                          name="block"
+                          placeholder="Torre B"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[11px] font-medium text-slate-400 mb-1">Andar / Unidade</label>
+                        <input
+                          name="floor"
+                          placeholder="12º andar, Apto 122"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SEÇÃO 6: FOTOS & MÍDIAS (PÁGINA 4) */}
+                  <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-5 shadow-lg">
+                    <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-slate-800 pb-3">
+                      <ImageIcon className="w-4 h-4 text-amber-500" />
+                      6. Mídias, Fotos (até 30 fotos), Planta Baixa & Vídeo Tour
+                    </h3>
+
+                    {/* Foto de Capa */}
+                    <div>
+                      <label className="block text-xs font-medium text-slate-300 mb-1">
+                        URL da Foto de Capa (Principal) *
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          value={formCoverPhoto}
+                          onChange={(e) => setFormCoverPhoto(e.target.value)}
+                          placeholder="https://exemplo.com/foto-capa.jpg"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                    </div>
+
+                    {/* Galeria de Fotos (até 30 fotos) */}
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <label className="text-xs font-medium text-slate-300">
+                          Galeria de Fotos do Imóvel ({formGalleryPhotos.length}/30 fotos)
+                        </label>
+                        <span className="text-[11px] text-slate-500">Insira a URL de cada foto</span>
+                      </div>
+
+                      <div className="flex gap-2">
+                        <input
+                          value={newPhotoInput}
+                          onChange={(e) => setNewPhotoInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleAddPhoto();
+                            }
+                          }}
+                          placeholder="Cole a URL da foto e clique em Adicionar..."
+                          className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAddPhoto}
+                          className="bg-amber-600 hover:bg-amber-500 text-white px-4 py-2 rounded-xl text-xs font-bold transition"
+                        >
+                          Adicionar Foto
+                        </button>
+                      </div>
+
+                      {/* Miniaturas da Galeria */}
+                      <div className="grid grid-cols-2 sm:grid-cols-4 md:grid-cols-6 gap-2 pt-2">
+                        {formGalleryPhotos.map((url, idx) => (
+                          <div
+                            key={idx}
+                            className="relative group h-20 rounded-xl overflow-hidden border border-slate-800 bg-slate-950"
+                          >
+                            <img src={url} alt={`Foto ${idx + 1}`} className="w-full h-full object-cover" />
+                            <div className="absolute inset-0 bg-black/60 opacity-0 group-hover:opacity-100 transition flex items-center justify-center">
+                              <button
+                                type="button"
+                                onClick={() => handleRemovePhoto(idx)}
+                                className="bg-red-600 text-white p-1 rounded-md text-xs"
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </button>
+                            </div>
+                            <span className="absolute bottom-1 left-1 bg-slate-950/80 text-[9px] px-1 py-0.5 rounded text-white font-mono">
+                              #{idx + 1}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+
+                    {/* Fotos da Planta Baixa */}
+                    <div className="space-y-2 pt-2 border-t border-slate-800">
+                      <label className="block text-xs font-medium text-slate-300">
+                        Fotos da Planta Baixa (Opcional)
+                      </label>
+                      <div className="flex gap-2">
+                        <input
+                          value={newFloorPlanInput}
+                          onChange={(e) => setNewFloorPlanInput(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter") {
+                              e.preventDefault();
+                              handleAddFloorPlan();
+                            }
+                          }}
+                          placeholder="URL da foto da planta..."
+                          className="flex-1 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                        />
+                        <button
+                          type="button"
+                          onClick={handleAddFloorPlan}
+                          className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-2 rounded-xl text-xs font-bold transition"
+                        >
+                          Adicionar Planta
+                        </button>
+                      </div>
+
+                      {formFloorPlans.length > 0 && (
+                        <div className="flex gap-2 pt-1">
+                          {formFloorPlans.map((url, idx) => (
+                            <div
+                              key={idx}
+                              className="relative group h-16 w-24 rounded-lg overflow-hidden border border-slate-800 bg-slate-950"
+                            >
+                              <img src={url} alt="Planta" className="w-full h-full object-cover" />
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveFloorPlan(idx)}
+                                className="absolute top-1 right-1 bg-red-600 text-white p-0.5 rounded opacity-0 group-hover:opacity-100 transition"
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Vídeo Tour */}
+                    <div className="pt-2 border-t border-slate-800">
+                      <label className="block text-xs font-medium text-slate-300 mb-1 flex items-center gap-1.5">
+                        <Video className="w-3.5 h-3.5 text-amber-400" />
+                        Link do Vídeo Tour (YouTube, Vimeo ou Tour 360)
+                      </label>
+                      <input
+                        name="videoUrl"
+                        placeholder="Ex: https://youtube.com/watch?v=..."
+                        className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-amber-500"
+                      />
+                    </div>
+
+                    {/* Título & Descrição Comercial */}
+                    <div className="space-y-3 pt-2 border-t border-slate-800">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">Título do Anúncio</label>
+                        <input
+                          name="title"
+                          placeholder="Ex: Apartamento Amplo com Varanda Gourmet em Moema"
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">Descrição Comercial</label>
+                        <textarea
+                          name="description"
+                          rows={3}
+                          placeholder="Descreva os diferenciais, acabamento, vista e condições especiais do imóvel..."
+                          className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-500"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* SEÇÃO 7: BLINDAGEM DO CAPTADOR (PROPRIETÁRIO CONFIDENCIAL) */}
+                  <div className="p-5 rounded-2xl bg-amber-950/20 border-2 border-amber-500/50 space-y-4 shadow-xl">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Lock className="w-5 h-5 text-amber-400" />
+                        <h3 className="text-sm font-bold text-amber-400 uppercase tracking-wider">
+                          7. Blindagem do Captador (Sigilo Absoluto do Proprietário)
+                        </h3>
+                      </div>
+                      <span className="text-[11px] bg-amber-500/20 text-amber-300 font-semibold px-2.5 py-0.5 rounded-full border border-amber-500/30">
+                        Criptografado no Banco
+                      </span>
+                    </div>
+
+                    <p className="text-xs text-slate-300 leading-relaxed">
+                      Estes dados nunca são compartilhados na vitrine, na ficha white-label nem com corretores parceiros. Apenas você ({currentBroker.name}) tem acesso a estas informações.
+                    </p>
+
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">
+                          Nome Completo do Proprietário *
+                        </label>
+                        <input
+                          name="ownerName"
+                          required
+                          placeholder="Ex: Carlos de Souza"
+                          className="w-full bg-slate-950 border border-amber-500/40 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-400"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-slate-300 mb-1">
+                          Telefone / WhatsApp do Proprietário *
+                        </label>
+                        <input
+                          name="ownerPhone"
+                          required
+                          placeholder="(11) 98888-7777"
+                          className="w-full bg-slate-950 border border-amber-500/40 rounded-xl px-3 py-2 text-sm text-white focus:outline-none focus:border-amber-400"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <button
+                    type="submit"
+                    className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black py-4 rounded-2xl transition shadow-xl shadow-amber-500/20 text-sm flex items-center justify-center gap-2"
+                  >
+                    <PlusCircle className="w-5 h-5" />
+                    <span>Publicar Imóvel com Blindagem Ativa na Rede Negocia Lar</span>
+                  </button>
+                </form>
+              </>
             )}
           </div>
         )}

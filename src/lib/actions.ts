@@ -50,6 +50,32 @@ export async function getMarketplaceData() {
         areaM2: properties.areaM2,
         description: properties.description,
         photos: properties.photos,
+        purpose: properties.purpose,
+        acceptsTrade: properties.acceptsTrade,
+        tradeDetails: properties.tradeDetails,
+        condition: properties.condition,
+        hotelRoomsCount: properties.hotelRoomsCount,
+        usefulAreaM2: properties.usefulAreaM2,
+        totalAreaM2: properties.totalAreaM2,
+        solarPosition: properties.solarPosition,
+        viewType: properties.viewType,
+        propertyAge: properties.propertyAge,
+        iptuPeriod: properties.iptuPeriod,
+        documentationStatus: properties.documentationStatus,
+        acceptsFinancing: properties.acceptsFinancing,
+        privateAmenities: properties.privateAmenities,
+        condoAmenities: properties.condoAmenities,
+        garageType: properties.garageType,
+        cep: properties.cep,
+        street: properties.street,
+        streetNumber: properties.streetNumber,
+        block: properties.block,
+        floor: properties.floor,
+        condoName: properties.condoName,
+        hideStreet: properties.hideStreet,
+        videoUrl: properties.videoUrl,
+        coverPhoto: properties.coverPhoto,
+        floorPlanPhotos: properties.floorPlanPhotos,
         acceptsPartnership: properties.acceptsPartnership,
         splitPercentage: properties.splitPercentage,
         status: properties.status,
@@ -201,17 +227,44 @@ export async function createProperty(formData: {
   title: string;
   propertyType: string;
   salePrice: string;
+  purpose?: string;
+  acceptsTrade?: boolean;
+  tradeDetails?: string;
+  condition?: string;
+  hotelRoomsCount?: number;
   condoFee?: string;
   iptu?: string;
+  iptuPeriod?: string;
   city: string;
+  state?: string;
   neighborhood: string;
+  cep?: string;
+  street?: string;
+  streetNumber?: string;
+  block?: string;
+  floor?: string;
+  condoName?: string;
+  hideStreet?: boolean;
   bedrooms: number;
   suites: number;
   bathrooms: number;
   parkingSpots: number;
+  garageType?: string;
   areaM2: string;
+  usefulAreaM2?: string;
+  totalAreaM2?: string;
+  solarPosition?: string;
+  viewType?: string;
+  propertyAge?: number;
+  documentationStatus?: string;
+  acceptsFinancing?: boolean;
+  privateAmenities?: string[];
+  condoAmenities?: string[];
   description: string;
+  videoUrl?: string;
+  coverPhoto?: string;
   photos: string[];
+  floorPlanPhotos?: string[];
   confidentialAddress: string;
   ownerName: string;
   ownerPhone: string;
@@ -236,22 +289,49 @@ export async function createProperty(formData: {
       title: formData.title,
       propertyType: formData.propertyType,
       salePrice: formData.salePrice,
+      purpose: formData.purpose || "venda",
+      acceptsTrade: formData.acceptsTrade ?? false,
+      tradeDetails: formData.tradeDetails || null,
+      condition: formData.condition || "usado",
+      hotelRoomsCount: formData.hotelRoomsCount || null,
       condoFee: formData.condoFee || "0",
       iptu: formData.iptu || "0",
+      iptuPeriod: formData.iptuPeriod || "anual",
       city: formData.city,
+      state: formData.state || "SP",
       neighborhood: formData.neighborhood,
+      cep: formData.cep || null,
+      street: formData.street || null,
+      streetNumber: formData.streetNumber || null,
+      block: formData.block || null,
+      floor: formData.floor || null,
+      condoName: formData.condoName || null,
+      hideStreet: formData.hideStreet ?? false,
       bedrooms: formData.bedrooms,
       suites: formData.suites,
       bathrooms: formData.bathrooms,
       parkingSpots: formData.parkingSpots,
+      garageType: formData.garageType || "coberta",
       areaM2: formData.areaM2,
+      usefulAreaM2: formData.usefulAreaM2 || null,
+      totalAreaM2: formData.totalAreaM2 || null,
+      solarPosition: formData.solarPosition || null,
+      viewType: formData.viewType || null,
+      propertyAge: formData.propertyAge || null,
+      documentationStatus: formData.documentationStatus || null,
+      acceptsFinancing: formData.acceptsFinancing ?? true,
+      privateAmenities: formData.privateAmenities || [],
+      condoAmenities: formData.condoAmenities || [],
       description: formData.description,
+      videoUrl: formData.videoUrl || null,
+      coverPhoto: formData.coverPhoto || null,
       photos:
         formData.photos && formData.photos.length > 0
           ? formData.photos
           : [
               "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&auto=format&fit=crop&q=80",
             ],
+      floorPlanPhotos: formData.floorPlanPhotos || [],
       confidentialAddress: formData.confidentialAddress,
       ownerName: formData.ownerName,
       ownerPhone: formData.ownerPhone,
