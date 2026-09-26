@@ -5,94 +5,105 @@ import { eq, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 
 export async function getMarketplaceData() {
-  const propertyList = await db
-    .select({
-      id: properties.id,
-      title: properties.title,
-      propertyType: properties.propertyType,
-      salePrice: properties.salePrice,
-      condoFee: properties.condoFee,
-      iptu: properties.iptu,
-      city: properties.city,
-      neighborhood: properties.neighborhood,
-      bedrooms: properties.bedrooms,
-      suites: properties.suites,
-      bathrooms: properties.bathrooms,
-      parkingSpots: properties.parkingSpots,
-      areaM2: properties.areaM2,
-      description: properties.description,
-      photos: properties.photos,
-      acceptsPartnership: properties.acceptsPartnership,
-      splitPercentage: properties.splitPercentage,
-      status: properties.status,
-      createdAt: properties.createdAt,
-      broker: {
-        id: users.id,
-        name: users.name,
-        creci: users.creci,
-        whatsapp: users.whatsapp,
-        avatarUrl: users.avatarUrl,
-        city: users.city,
-      },
-    })
-    .from(properties)
-    .innerJoin(users, eq(properties.brokerId, users.id))
-    .orderBy(desc(properties.createdAt));
+  try {
+    const propertyList = await db
+      .select({
+        id: properties.id,
+        title: properties.title,
+        propertyType: properties.propertyType,
+        salePrice: properties.salePrice,
+        condoFee: properties.condoFee,
+        iptu: properties.iptu,
+        city: properties.city,
+        neighborhood: properties.neighborhood,
+        bedrooms: properties.bedrooms,
+        suites: properties.suites,
+        bathrooms: properties.bathrooms,
+        parkingSpots: properties.parkingSpots,
+        areaM2: properties.areaM2,
+        description: properties.description,
+        photos: properties.photos,
+        acceptsPartnership: properties.acceptsPartnership,
+        splitPercentage: properties.splitPercentage,
+        status: properties.status,
+        createdAt: properties.createdAt,
+        broker: {
+          id: users.id,
+          name: users.name,
+          creci: users.creci,
+          whatsapp: users.whatsapp,
+          avatarUrl: users.avatarUrl,
+          city: users.city,
+        },
+      })
+      .from(properties)
+      .innerJoin(users, eq(properties.brokerId, users.id))
+      .orderBy(desc(properties.createdAt));
 
-  const radarList = await db
-    .select({
-      id: buyerProfiles.id,
-      clientInternalName: buyerProfiles.clientInternalName,
-      propertyType: buyerProfiles.propertyType,
-      city: buyerProfiles.city,
-      neighborhoods: buyerProfiles.neighborhoods,
-      maxBudget: buyerProfiles.maxBudget,
-      minBedrooms: buyerProfiles.minBedrooms,
-      minParkingSpots: buyerProfiles.minParkingSpots,
-      notes: buyerProfiles.notes,
-      broker: {
-        id: users.id,
-        name: users.name,
-        creci: users.creci,
-        whatsapp: users.whatsapp,
-      },
-    })
-    .from(buyerProfiles)
-    .innerJoin(users, eq(buyerProfiles.brokerId, users.id));
+    const radarList = await db
+      .select({
+        id: buyerProfiles.id,
+        clientInternalName: buyerProfiles.clientInternalName,
+        propertyType: buyerProfiles.propertyType,
+        city: buyerProfiles.city,
+        neighborhoods: buyerProfiles.neighborhoods,
+        maxBudget: buyerProfiles.maxBudget,
+        minBedrooms: buyerProfiles.minBedrooms,
+        minParkingSpots: buyerProfiles.minParkingSpots,
+        notes: buyerProfiles.notes,
+        broker: {
+          id: users.id,
+          name: users.name,
+          creci: users.creci,
+          whatsapp: users.whatsapp,
+        },
+      })
+      .from(buyerProfiles)
+      .innerJoin(users, eq(buyerProfiles.brokerId, users.id));
 
-  const partnershipList = await db
-    .select()
-    .from(partnerships)
-    .orderBy(desc(partnerships.createdAt));
+    const partnershipList = await db
+      .select()
+      .from(partnerships)
+      .orderBy(desc(partnerships.createdAt));
 
-  const allUsers = await db
-    .select()
-    .from(users)
-    .orderBy(desc(users.createdAt));
+    const allUsers = await db
+      .select()
+      .from(users)
+      .orderBy(desc(users.createdAt));
 
-  const allTransactions = await db
-    .select({
-      id: transactions.id,
-      amount: transactions.amount,
-      type: transactions.type,
-      paymentMethod: transactions.paymentMethod,
-      status: transactions.status,
-      description: transactions.description,
-      createdAt: transactions.createdAt,
-      userName: users.name,
-      userCreci: users.creci,
-    })
-    .from(transactions)
-    .innerJoin(users, eq(transactions.userId, users.id))
-    .orderBy(desc(transactions.createdAt));
+    const allTransactions = await db
+      .select({
+        id: transactions.id,
+        amount: transactions.amount,
+        type: transactions.type,
+        paymentMethod: transactions.paymentMethod,
+        status: transactions.status,
+        description: transactions.description,
+        createdAt: transactions.createdAt,
+        userName: users.name,
+        userCreci: users.creci,
+      })
+      .from(transactions)
+      .innerJoin(users, eq(transactions.userId, users.id))
+      .orderBy(desc(transactions.createdAt));
 
-  return {
-    properties: propertyList,
-    radarList,
-    partnershipList,
-    users: allUsers,
-    transactions: allTransactions,
-  };
+    return {
+      properties: propertyList,
+      radarList,
+      partnershipList,
+      users: allUsers,
+      transactions: allTransactions,
+    };
+  } catch (error) {
+    console.error("Erro ao carregar dados do banco:", error);
+    return {
+      properties: [],
+      radarList: [],
+      partnershipList: [],
+      users: [],
+      transactions: [],
+    };
+  }
 }
 
 export async function updateUserStatus(userId: string, newStatus: string) {
