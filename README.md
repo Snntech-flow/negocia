@@ -5,7 +5,6 @@ Protótipo de uma rede MLS para corretores. O repositório contém a interface i
 ## Estado atual
 
 - O cadastro exige senha e mantém a sessão em cookie assinado.
-- A versão do cookie de sessão pode ser incrementada para invalidar sessões antigas após mudanças de autenticação; o próximo acesso pede login novamente.
 - Novos cadastros ficam pendentes até uma pessoa autorizada verificar o CRECI e confirmar o pagamento.
 - Não há integração Pix, gateway, consulta automática ao CRECI ou assinatura eletrônica.
 - O registro de visita é um rascunho interno; não promete efeito jurídico nem trava de anterioridade.

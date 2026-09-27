@@ -32,8 +32,7 @@ function parseLeadDate(value?: string) {
   return date;
 }
 
-const SESSION_COOKIE = "negocialar_session_v2";
-const LEGACY_SESSION_COOKIE = "negocialar_session";
+const SESSION_COOKIE = "negocialar_session";
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
 
 function sessionSecret() {
@@ -54,7 +53,6 @@ function signUserId(userId: string, expiresAt: number) {
 
 async function setBrokerSession(userId: string) {
   const cookieStore = cookies();
-  cookieStore.delete(LEGACY_SESSION_COOKIE);
   const expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
   cookieStore.set(SESSION_COOKIE, `${userId}.${expiresAt}.${signUserId(userId, expiresAt)}`, {
     path: "/",
@@ -1123,7 +1121,6 @@ export async function loginUser(email: string, password: string) {
 export async function logoutUser() {
   const cookieStore = cookies();
   cookieStore.delete(SESSION_COOKIE);
-  cookieStore.delete(LEGACY_SESSION_COOKIE);
   revalidatePath("/");
   return { success: true };
 }
