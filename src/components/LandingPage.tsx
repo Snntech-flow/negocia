@@ -41,49 +41,47 @@ export default function LandingPage({
       name: "10 Anúncios",
       tagline: "Para o corretor que está iniciando sua carteira de parcerias",
       monthlyPrice: 59.9,
-      annualPrice: 49.9,
+      annualPrice: 54.91,
       highlight: false,
-      cta: "Assinar 10 Anúncios",
+      cta: "Criar cadastro",
       features: [
         "Até 10 anúncios ativos simultâneos",
-        "Acesso à vitrine de imóveis de todos os parceiros",
-        "Endereço e proprietário 100% blindados",
-        "Fichas White-Label para enviar a clientes",
-        "Termos de Co-corretagem 50/50 em 1 clique",
-        "Emissão de DVP Digital com Trava de 180 dias",
+        "Vitrine de imóveis em versão inicial",
+        "Dados de contato do proprietário restritos ao captador",
+        "Perfis de busca de compradores",
+        "Registro interno de visita em rascunho",
+        "CRECI e pagamento ainda aguardam validação manual",
       ],
     },
     {
       name: "20 Anúncios",
       tagline: "Para corretores atuantes que querem dobrar o giro de vendas",
       monthlyPrice: 89.9,
-      annualPrice: 74.9,
+      annualPrice: 82.41,
       highlight: false,
-      cta: "Assinar 20 Anúncios",
+      cta: "Criar cadastro",
       features: [
-        "Até 20 anúncios ativos simultâneos",
-        "Radar de Compradores (Match Reverso ativo)",
-        "Fichas White-Label ilimitadas (Web + WhatsApp)",
-        "Endereço e proprietário 100% blindados",
-        "Termos de Co-corretagem 50/50 e DVPs ilimitados",
-        "Alertas de novos imóveis compatíveis",
+        "Vitrine de imóveis em versão inicial",
+        "Dados de contato do proprietário restritos ao captador",
+        "Perfis de busca de compradores",
+        "Registro interno de visita em rascunho",
+        "CRECI e pagamento ainda aguardam validação manual",
       ],
     },
     {
       name: "40 Anúncios",
       tagline: "O plano favorito dos corretores de alta performance",
       monthlyPrice: 150.0,
-      annualPrice: 125.0,
+      annualPrice: 137.5,
       highlight: true,
       badge: "Mais Escolhido ⭐",
-      cta: "Assinar 40 Anúncios",
+      cta: "Criar cadastro",
       features: [
-        "Até 40 anúncios ativos simultâneos",
-        "Radar de Compradores prioritário com notificações",
-        "Fichas White-Label em Web e PDF com seu WhatsApp e CRECI",
-        "Selo de Corretor Verificado Negocia Lar",
-        "Termos 50/50 com Cláusula Penal de 100% anti-bypass",
-        "Suporte direto e prioritário via WhatsApp",
+        "Vitrine de imóveis em versão inicial",
+        "Dados de contato do proprietário restritos ao captador",
+        "Perfis de busca de compradores",
+        "Registro interno de visita em rascunho",
+        "CRECI e pagamento ainda aguardam validação manual",
       ],
     },
   ];
@@ -92,7 +90,7 @@ export default function LandingPage({
     <div className="min-h-screen bg-[#FDFDFD] text-slate-900 font-sans antialiased">
       {/* Barra Superior Institucional */}
       <div className="bg-slate-900 text-slate-300 text-xs py-2 px-4 border-b border-slate-800 text-center font-medium">
-        <span className="text-amber-400 font-bold">Atenção corretor:</span> Em conformidade com a Resolução COFECI nº 326/92 e Código Civil Brasileiro (Arts. 725-728).
+        <span className="text-amber-400 font-bold">Versão inicial:</span> cadastro sujeito a validação manual; pagamento e assinatura eletrônica ainda não estão integrados.
       </div>
 
       {/* Header Limpo & Autoritário */}
@@ -148,7 +146,7 @@ export default function LandingPage({
             <div className="lg:col-span-7 space-y-6 text-left">
               <div className="inline-flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold px-3 py-1 rounded-full">
                 <ShieldCheck className="w-4 h-4 text-amber-600" />
-                Blindagem Real Contra "Atravessadores"
+                Rede de parcerias em versão inicial
               </div>
 
               <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-950 tracking-tight leading-[1.15]">
@@ -156,7 +154,7 @@ export default function LandingPage({
               </h1>
 
               <p className="text-base sm:text-lg text-slate-600 leading-relaxed max-w-xl">
-                O <strong>Negocia Lar</strong> é a rede de parcerias onde você compartilha carteira com outros corretores com <strong>endereço e proprietário 100% blindados</strong>, links limpos para seus clientes e <strong>contrato 50/50 respaldado pelo COFECI</strong>.
+                O <strong>Negocia Lar</strong> está em desenvolvimento para ajudar corretores a organizar imóveis e oportunidades de parceria. Dados de contato do proprietário aparecem apenas para o corretor que cadastrou o imóvel; aceite eletrônico e pagamentos ainda não estão disponíveis.
               </p>
 
               <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
@@ -187,7 +185,7 @@ export default function LandingPage({
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Check className="w-4 h-4 text-emerald-600 font-bold" />
-                  Art. 727 Código Civil
+                  Plataforma em desenvolvimento
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Check className="w-4 h-4 text-emerald-600 font-bold" />
@@ -345,7 +343,7 @@ export default function LandingPage({
               </div>
               <h4 className="font-bold text-slate-900 text-sm">DVP Digital na Visita</h4>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Antes de entrar no imóvel, vocês emitem o DVP pelo celular com GPS e data/hora. A trava de anterioridade de 180 dias fica ativa.
+                O sistema registra os dados da visita em rascunho. O registro não coleta assinatura nem produz sozinho uma garantia jurídica.
               </p>
             </div>
 
@@ -353,9 +351,9 @@ export default function LandingPage({
               <div className="w-10 h-10 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center font-bold text-sm border border-amber-200">
                 4
               </div>
-              <h4 className="font-bold text-slate-900 text-sm">Honorários Garantidos</h4>
+              <h4 className="font-bold text-slate-900 text-sm">Formalização em desenvolvimento</h4>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Negócio fechado, comissão dividida 50/50 com termo registrado e validade jurídica plena (Art. 728 do Código Civil).
+                A divisão e os termos da parceria precisam ser acordados e formalizados pelas partes. O sistema ainda não produz esse contrato.
               </p>
             </div>
           </div>
@@ -392,7 +390,7 @@ export default function LandingPage({
               <span className={`text-xs font-semibold flex items-center gap-1.5 ${billingCycle === "annual" ? "text-slate-900" : "text-slate-500"}`}>
                 Anual
                 <span className="bg-emerald-100 text-emerald-800 text-[10px] font-bold px-2 py-0.5 rounded-full">
-                  -20% OFF
+                  1 Mês Grátis (Use 12, Pague 11)
                 </span>
               </span>
             </div>
@@ -402,6 +400,7 @@ export default function LandingPage({
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch max-w-5xl mx-auto">
             {plans.map((p, idx) => {
               const price = billingCycle === "monthly" ? p.monthlyPrice : p.annualPrice;
+              const annualTotal = (p.monthlyPrice * 11).toFixed(2).replace(".", ",");
               const formattedPrice = price % 1 === 0 ? price.toFixed(0) : price.toFixed(2).replace(".", ",");
               return (
                 <div
@@ -432,7 +431,7 @@ export default function LandingPage({
                       </div>
                       {billingCycle === "annual" && (
                         <div className="text-[10px] text-emerald-700 font-semibold mt-0.5">
-                          Cobrado anualmente (R$ {(price * 12).toFixed(2).replace(".", ",")}/ano)
+                          Cobrado anualmente: R$ {annualTotal}/ano (Usa 12, paga 11)
                         </div>
                       )}
                     </div>
@@ -512,7 +511,7 @@ export default function LandingPage({
             {[
               {
                 q: "Como o sistema garante que meu parceiro não vai direto ao proprietário?",
-                a: "O endereço exato e os dados do proprietário ficam criptografados e inacessíveis para os outros corretores. E antes de qualquer visita, vocês emitem o DVP Digital que gera a trava jurídica de 180 dias.",
+                a: "Os dados do proprietário são restritos ao corretor que cadastrou o imóvel. A versão atual não oferece assinatura eletrônica ou garantia jurídica automática; o registro de visita fica como rascunho.",
               },
               {
                 q: "O cliente final descobre quem é o captador do imóvel?",
