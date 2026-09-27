@@ -10,6 +10,9 @@ import {
 } from "./index";
 
 async function runSeed() {
+  if (process.env.NODE_ENV === "production" || process.env.ALLOW_DESTRUCTIVE_NEGOCIAR_LAR_SEED !== "yes") {
+    throw new Error("Seed destrutivo bloqueado. Em desenvolvimento, configure ALLOW_DESTRUCTIVE_NEGOCIAR_LAR_SEED=yes após confirmar o banco alvo.");
+  }
   console.log("🌱 Populando banco de dados com estrutura real, planos oficiais e blindagem...");
 
   // Limpeza de tabelas para um seed limpo
@@ -67,22 +70,44 @@ async function runSeed() {
   const [corretor3] = await db
     .insert(users)
     .values({
-      name: "Imobiliária Prime Jardins",
-      email: "contato@primejardins.com.br",
-      creci: "34980-J",
+      name: "Roberto Silveira Prado",
+      email: "roberto.prado@corretor.com.br",
+      creci: "178220-F",
       whatsapp: "(11) 97777-1122",
       city: "São Paulo",
       state: "SP",
       isVerified: true,
       verificationStatus: "aprovado",
-      role: "imobiliaria",
-      plan: "imobiliaria",
+      role: "corretor",
+      plan: "40",
       subscriptionStatus: "ativo",
-      monthlyFee: "499.00",
+      monthlyFee: "150.00",
       trustScore: 96,
       successfulDeals: 32,
       bypassReports: 0,
       avatarUrl: "https://images.unsplash.com/photo-1486406146926-c627a92ad1ab?w=400&auto=format&fit=crop&q=80",
+    })
+    .returning();
+
+  const [masterUser] = await db
+    .insert(users)
+    .values({
+      name: "Sidney Nunes",
+      email: "sidney@snntech.com.br",
+      creci: "MASTER-SNNTECH",
+      whatsapp: "(11) 98765-4321",
+      city: "São Paulo",
+      state: "SP",
+      isVerified: true,
+      verificationStatus: "aprovado",
+      role: "admin",
+      plan: "40",
+      subscriptionStatus: "ativo",
+      monthlyFee: "150.00",
+      trustScore: 100,
+      successfulDeals: 50,
+      bypassReports: 0,
+      avatarUrl: "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400&auto=format&fit=crop&q=80",
     })
     .returning();
 
@@ -128,15 +153,15 @@ async function runSeed() {
     })
     .returning();
 
-  // 2. Transações dos 4 Planos Pagos
+  // 2. Transações dos Planos Individuais Pagos
   await db.insert(transactions).values([
     {
       userId: corretor3.id,
-      amount: "499.00",
-      type: "mensalidade_imobiliaria",
+      amount: "150.00",
+      type: "mensalidade_pro",
       paymentMethod: "pix",
       status: "pago",
-      description: "Assinatura Plano Imobiliária (Até 5 corretores) via Pix Itaú",
+      description: "Assinatura Plano 40 Anúncios via Pix Itaú",
     },
     {
       userId: corretor1.id,
@@ -258,7 +283,7 @@ async function runSeed() {
     },
   ]);
 
-  // 5. Certificados DVP com Trava de 180 Dias
+  // 5. Registro de visita de demonstração (sem aceite contratual)
   const visitDate = new Date();
   const lockExpiration = new Date(Date.now() + 180 * 24 * 60 * 60 * 1000);
 
@@ -273,8 +298,8 @@ async function runSeed() {
     visitDate,
     lockExpirationDate: lockExpiration,
     commissionSplit: "50.00",
-    status: "ativo",
-    legalClausesAccepted: true,
+    status: "rascunho",
+    legalClausesAccepted: false,
   });
 
   // 6. Notificações do Sininho
@@ -289,8 +314,8 @@ async function runSeed() {
     },
     {
       userId: corretor1.id,
-      title: "📜 Novo DVP Emitido: Trava de 180 Dias Ativa",
-      message: `A corretora Mariana Costa agendou visita para o cliente Dr. Marcelo no seu imóvel em Moema. Certificado DVP-E8A731F49B02D5 gravado.`,
+      title: "Registro de visita em rascunho",
+      message: "Foi criado um registro demonstrativo de visita. Ele não tem aceite eletrônico nem efeito contratual.",
       type: "dvp",
       read: false,
       propertyId: prop1.id,
