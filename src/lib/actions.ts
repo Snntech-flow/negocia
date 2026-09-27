@@ -8,18 +8,22 @@ import {
   leads,
   leadActivities,
   partnerships,
+  partnershipActivities,
   transactions,
   notifications,
   dvpCertificates,
   authLoginAttempts,
 } from "./db";
 import { eq, desc, and, lte, gte, or, sql } from "drizzle-orm";
+import { alias } from "drizzle-orm/pg-core";
 import { revalidatePath } from "next/cache";
 import { cookies, headers } from "next/headers";
 import crypto from "crypto";
 
 const LEAD_STAGES = ["novo", "contato", "qualificado", "visita", "proposta", "negociacao", "fechado", "perdido"] as const;
 const LEAD_ACTIVITY_TYPES = ["ligacao", "mensagem", "visita", "proposta", "nota"] as const;
+const partnershipCaptor = alias(users, "partnership_captor");
+const partnershipPartner = alias(users, "partnership_partner");
 
 function normalizePhone(phone: string) {
   return phone.replace(/\D/g, "");
@@ -296,6 +300,49 @@ export async function getMarketplaceData() {
       .orderBy(desc(dvpCertificates.createdAt))
       : [];
 
+    const partnershipList = currentUser ? await db
+      .select({
+        id: partnerships.id,
+        propertyId: partnerships.propertyId,
+        propertyTitle: properties.title,
+        captorBrokerId: partnerships.captorBrokerId,
+        captorName: partnershipCaptor.name,
+        partnerBrokerId: partnerships.partnerBrokerId,
+        partnerName: partnershipPartner.name,
+        status: partnerships.status,
+        commissionSplit: partnerships.commissionSplit,
+        visitScheduledDate: partnerships.visitScheduledDate,
+        notes: partnerships.notes,
+        createdAt: partnerships.createdAt,
+        updatedAt: partnerships.updatedAt,
+      })
+      .from(partnerships)
+      .innerJoin(properties, eq(partnerships.propertyId, properties.id))
+      .innerJoin(partnershipCaptor, eq(partnerships.captorBrokerId, partnershipCaptor.id))
+      .innerJoin(partnershipPartner, eq(partnerships.partnerBrokerId, partnershipPartner.id))
+      .where(isAdmin ? undefined : or(eq(partnerships.captorBrokerId, currentUser.id), eq(partnerships.partnerBrokerId, currentUser.id)))
+      .orderBy(desc(partnerships.updatedAt))
+      .limit(200)
+      : [];
+
+    const partnershipActivityList = currentUser && partnershipList.length ? await db
+      .select({
+        id: partnershipActivities.id,
+        partnershipId: partnershipActivities.partnershipId,
+        actorUserId: partnershipActivities.actorUserId,
+        actorName: users.name,
+        previousStatus: partnershipActivities.previousStatus,
+        newStatus: partnershipActivities.newStatus,
+        note: partnershipActivities.note,
+        createdAt: partnershipActivities.createdAt,
+      })
+      .from(partnershipActivities)
+      .innerJoin(users, eq(partnershipActivities.actorUserId, users.id))
+      .where(or(...partnershipList.map((partnership) => eq(partnershipActivities.partnershipId, partnership.id))))
+      .orderBy(desc(partnershipActivities.createdAt))
+      .limit(500)
+      : [];
+
     const leadList = currentUser ? await db
       .select({
         id: leads.id,
@@ -347,6 +394,8 @@ export async function getMarketplaceData() {
       currentUser,
       notifications: userNotifications,
       dvpList,
+      partnerships: partnershipList,
+      partnershipActivities: partnershipActivityList,
       leads: leadList,
       leadActivities: leadActivityList,
     };
@@ -360,6 +409,8 @@ export async function getMarketplaceData() {
       currentUser: null,
       notifications: [],
       dvpList: [],
+      partnerships: [],
+      partnershipActivities: [],
       leads: [],
       leadActivities: [],
     };
@@ -930,7 +981,7 @@ export async function createDvpCertificate(data: {
       legalClausesAccepted: false,
     }).returning();
 
-    await tx.insert(partnerships).values({
+    const [partnership] = await tx.insert(partnerships).values({
       propertyId: data.propertyId,
       captorBrokerId: data.captorBrokerId,
       partnerBrokerId: data.partnerBrokerId,
@@ -938,7 +989,14 @@ export async function createDvpCertificate(data: {
       commissionSplit: data.commissionSplit,
       visitScheduledDate: visitDate,
       notes: `Registro interno de visita ${certificate.certificateHash}. Requer validação e aceite das partes antes de qualquer efeito contratual.`,
-    });
+    }).returning();
+    const [partnershipActivity] = await tx.insert(partnershipActivities).values({
+      partnershipId: partnership.id,
+      actorUserId: actor.id,
+      previousStatus: null,
+      newStatus: "visita_agendada",
+      note: `Visita registrada para ${visitDate.toLocaleString("pt-BR")}. DVP em rascunho, sem aceite eletrônico.`,
+    }).returning();
 
     await tx.insert(notifications).values({
       userId: data.captorBrokerId,
@@ -965,12 +1023,64 @@ export async function createDvpCertificate(data: {
         nextActionAt: visitDate,
         updatedAt: new Date(),
       }).where(and(eq(leads.id, lead.id), eq(leads.ownerUserId, actor.id))).returning({ stage: leads.stage, nextAction: leads.nextAction, nextActionAt: leads.nextActionAt, lastContactAt: leads.lastContactAt, updatedAt: leads.updatedAt });
-      return { certificate, activity, lead: updatedLead };
+      return { certificate, activity, lead: updatedLead, partnership, partnershipActivity };
     }
 
-    return { certificate, activity, lead: null };
+    return { certificate, activity, lead: null, partnership, partnershipActivity };
   });
 
+  revalidatePath("/");
+  return { success: true, ...result };
+}
+
+const PARTNERSHIP_TRANSITIONS: Record<string, string[]> = {
+  proposta: ["visita_agendada", "recusado"],
+  visita_agendada: ["em_negociacao", "recusado"],
+  em_negociacao: ["fechado", "recusado"],
+  fechado: [],
+  recusado: [],
+};
+
+export async function updatePartnershipStatus(partnershipId: string, newStatus: string, note?: string) {
+  const actor = await requireCurrentUser();
+  requireActiveBroker(actor);
+  const cleanNote = note?.trim() || null;
+  if (cleanNote && cleanNote.length > 500) throw new Error("A observação deve ter até 500 caracteres.");
+  if (!Object.values(PARTNERSHIP_TRANSITIONS).some((statuses) => statuses.includes(newStatus))) throw new Error("Etapa de parceria inválida.");
+
+  const result = await db.transaction(async (tx) => {
+    const [partnership] = await tx.select({
+      id: partnerships.id,
+      propertyId: partnerships.propertyId,
+      captorBrokerId: partnerships.captorBrokerId,
+      partnerBrokerId: partnerships.partnerBrokerId,
+      status: partnerships.status,
+    }).from(partnerships).where(and(
+      eq(partnerships.id, partnershipId),
+      or(eq(partnerships.captorBrokerId, actor.id), eq(partnerships.partnerBrokerId, actor.id)),
+    )).for("update").limit(1);
+    if (!partnership) throw new Error("Parceria não encontrada na sua carteira.");
+    if (!PARTNERSHIP_TRANSITIONS[partnership.status]?.includes(newStatus)) throw new Error("Esta mudança de etapa não é permitida.");
+
+    const [updated] = await tx.update(partnerships).set({ status: newStatus, updatedAt: new Date() })
+      .where(and(eq(partnerships.id, partnership.id), eq(partnerships.status, partnership.status))).returning();
+    const [activity] = await tx.insert(partnershipActivities).values({
+      partnershipId: partnership.id,
+      actorUserId: actor.id,
+      previousStatus: partnership.status,
+      newStatus,
+      note: cleanNote,
+    }).returning();
+    await tx.insert(notifications).values({
+      userId: actor.id === partnership.captorBrokerId ? partnership.partnerBrokerId : partnership.captorBrokerId,
+      title: "Parceria atualizada",
+      message: `A etapa da parceria foi alterada para ${newStatus.replaceAll("_", " ")}.${cleanNote ? ` Observação: ${cleanNote}` : ""} Esta atualização é operacional e não representa aceite contratual.`,
+      type: "parceria",
+      propertyId: partnership.propertyId,
+      read: false,
+    });
+    return { partnership: updated, activity };
+  });
   revalidatePath("/");
   return { success: true, ...result };
 }

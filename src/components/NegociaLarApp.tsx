@@ -61,6 +61,7 @@ import {
   updateUserStatus,
   createBuyerProfile,
   createDvpCertificate,
+  updatePartnershipStatus,
   markNotificationAsRead,
   logoutUser,
 } from "@/lib/actions";
@@ -88,6 +89,33 @@ interface DvpCertificateItem {
   lockExpirationDate: Date;
   commissionSplit: string;
   status: string;
+  createdAt: Date;
+}
+
+interface PartnershipItem {
+  id: string;
+  propertyId: string;
+  propertyTitle: string;
+  captorBrokerId: string;
+  captorName: string;
+  partnerBrokerId: string;
+  partnerName: string;
+  status: string;
+  commissionSplit: string;
+  visitScheduledDate: Date | null;
+  notes: string | null;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+interface PartnershipActivityItem {
+  id: string;
+  partnershipId: string;
+  actorUserId: string;
+  actorName: string;
+  previousStatus: string | null;
+  newStatus: string;
+  note: string | null;
   createdAt: Date;
 }
 
@@ -307,6 +335,8 @@ export default function NegociaLarApp({
   initialCurrentUser,
   initialNotifications = [],
   initialDvpList = [],
+  initialPartnerships = [],
+  initialPartnershipActivities = [],
   initialLeads = [],
   initialLeadActivities = [],
 }: {
@@ -317,6 +347,8 @@ export default function NegociaLarApp({
   initialCurrentUser?: UserItem | null;
   initialNotifications?: NotificationItem[];
   initialDvpList?: DvpCertificateItem[];
+  initialPartnerships?: PartnershipItem[];
+  initialPartnershipActivities?: PartnershipActivityItem[];
   initialLeads?: React.ComponentProps<typeof LeadCRM>["initialLeads"];
   initialLeadActivities?: React.ComponentProps<typeof LeadCRM>["initialActivities"];
 }) {
@@ -344,6 +376,8 @@ export default function NegociaLarApp({
 
   const [notifications, setNotifications] = useState<NotificationItem[]>(initialNotifications);
   const [dvpList, setDvpList] = useState<DvpCertificateItem[]>(initialDvpList);
+  const [partnershipList, setPartnershipList] = useState<PartnershipItem[]>(initialPartnerships);
+  const [partnershipActivityList, setPartnershipActivityList] = useState<PartnershipActivityItem[]>(initialPartnershipActivities);
 
   // Filtros da Vitrine MLS
   const [propertyFilterPurpose, setPropertyFilterPurpose] = useState<string>("todos");
@@ -574,6 +608,26 @@ export default function NegociaLarApp({
     setUserList((prev) =>
       prev.map((u) => (u.id === userId ? { ...u, verificationStatus: newStatus, isVerified: newStatus === "aprovado" } : u))
     );
+  };
+
+  const handlePartnershipStatus = async (partnership: PartnershipItem, newStatus: string) => {
+    const note = window.prompt("Observação para a linha do tempo (opcional):", "");
+    if (note === null) return;
+    try {
+      const result = await updatePartnershipStatus(partnership.id, newStatus, note);
+      setPartnershipList((items) => items.map((item) => item.id === partnership.id ? { ...item, ...result.partnership } : item));
+      setPartnershipActivityList((items) => [{
+        ...result.activity,
+        partnershipId: partnership.id,
+        actorUserId: currentUser?.id || "",
+        actorName: currentUser?.name || "Você",
+      }, ...items]);
+      setToastMessage("Etapa atualizada na linha do tempo. Esta mudança é operacional, sem aceite contratual.");
+      setTimeout(() => setToastMessage(null), 6000);
+    } catch (error) {
+      setToastMessage(error instanceof Error ? error.message : "Não foi possível atualizar a parceria.");
+      setTimeout(() => setToastMessage(null), 6000);
+    }
   };
 
   const activeProperty = selectedPropertyForTerm || initialProperties[0];
@@ -1699,6 +1753,20 @@ export default function NegociaLarApp({
                     },
                     ...prev,
                   ]);
+                  if (res.partnership && res.partnershipActivity) {
+                    setPartnershipList((prev) => [{
+                      ...res.partnership,
+                      propertyTitle: activeProperty.title,
+                      captorName: activeProperty.broker.name,
+                      partnerName: currentBroker.name,
+                    }, ...prev]);
+                    setPartnershipActivityList((prev) => [{
+                      ...res.partnershipActivity,
+                      partnershipId: res.partnership.id,
+                      actorUserId: currentBroker.id,
+                      actorName: currentBroker.name,
+                    }, ...prev]);
+                  }
                   setDvpEmitted(true);
                   setToastMessage(`Registro ${res.certificate.certificateHash} salvo como rascunho. Ele ainda não tem aceite eletrônico.`);
                   setTimeout(() => setToastMessage(null), 6000);
@@ -1827,6 +1895,32 @@ export default function NegociaLarApp({
                       </div>
                     </div>
                   ))}
+                </div>
+              )}
+            </div>
+
+            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+              <div className="flex items-center justify-between gap-3 border-b border-slate-800 pb-3">
+                <div><h3 className="text-sm font-bold uppercase tracking-wider text-white">Acompanhamento operacional de parcerias ({partnershipList.length})</h3><p className="mt-1 text-xs text-slate-400">Atualize o andamento e consulte quem fez cada alteração.</p></div>
+                <ArrowRight className="h-4 w-4 shrink-0 text-sky-300" />
+              </div>
+              <div className="rounded-lg border border-amber-500/25 bg-amber-950/20 p-3 text-[11px] leading-relaxed text-amber-100/80">As etapas e o histórico são controles internos. Alterá-los não significa aceite de parceria, assinatura eletrônica, garantia de comissão ou obrigação contratual.</div>
+              {partnershipList.length === 0 ? <p className="py-5 text-center text-xs text-slate-500">As parcerias relacionadas aos seus registros de visita aparecerão aqui.</p> : (
+                <div className="space-y-3">
+                  {partnershipList.map((partnership) => {
+                    const transitions: Record<string, string[]> = { proposta: ["visita_agendada", "recusado"], visita_agendada: ["em_negociacao", "recusado"], em_negociacao: ["fechado", "recusado"] };
+                    const labels: Record<string, string> = { proposta: "Proposta", visita_agendada: "Visita agendada", em_negociacao: "Em negociação", fechado: "Encerrada como fechada", recusado: "Recusada" };
+                    const nextStatuses = transitions[partnership.status] || [];
+                    const history = partnershipActivityList.filter((activity) => activity.partnershipId === partnership.id);
+                    return <article key={partnership.id} className="rounded-xl border border-slate-800 bg-slate-950 p-4">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0"><h4 className="truncate text-sm font-bold text-white">{partnership.propertyTitle}</h4><p className="mt-1 text-xs text-slate-400">Captador: {partnership.captorName} · Parceiro: {partnership.partnerName}</p><p className="mt-1 text-[11px] text-slate-500">Visita: {partnership.visitScheduledDate ? new Date(partnership.visitScheduledDate).toLocaleString("pt-BR") : "não agendada"} · divisão cadastrada {partnership.commissionSplit}% / {100 - Number(partnership.commissionSplit)}%</p></div>
+                        <span className="rounded-full border border-sky-500/25 bg-sky-500/10 px-2.5 py-1 text-[10px] font-bold text-sky-200">{labels[partnership.status] || partnership.status}</span>
+                      </div>
+                      {nextStatuses.length > 0 && (currentUser?.id === partnership.captorBrokerId || currentUser?.id === partnership.partnerBrokerId) && <div className="mt-3 flex flex-wrap gap-2">{nextStatuses.map((nextStatus) => <button key={nextStatus} type="button" onClick={() => { if (["fechado", "recusado"].includes(nextStatus) && !window.confirm(`Confirmar etapa “${labels[nextStatus]}”?`)) return; void handlePartnershipStatus(partnership, nextStatus); }} className={`rounded-lg border px-3 py-2 text-[11px] font-bold ${nextStatus === "recusado" ? "border-rose-500/25 text-rose-300 hover:bg-rose-500/10" : "border-emerald-500/25 text-emerald-300 hover:bg-emerald-500/10"}`}>{nextStatus === "recusado" ? "Recusar" : `Marcar: ${labels[nextStatus]}`}</button>)}</div>}
+                      <details className="mt-3 border-t border-slate-800 pt-3"><summary className="cursor-pointer text-[11px] font-semibold text-slate-300">Linha do tempo ({history.length})</summary><div className="mt-3 space-y-2">{history.length ? history.map((activity) => <div key={activity.id} className="border-l border-slate-700 pl-3 text-[11px]"><div className="flex flex-wrap items-center justify-between gap-2 text-slate-300"><span>{activity.actorName}: {labels[activity.newStatus] || activity.newStatus}</span><time className="text-slate-500">{new Date(activity.createdAt).toLocaleString("pt-BR")}</time></div>{activity.note && <p className="mt-1 whitespace-pre-wrap text-slate-500">{activity.note}</p>}</div>) : <p className="text-[11px] text-slate-500">Nenhum evento registrado.</p>}</div></details>
+                    </article>;
+                  })}
                 </div>
               )}
             </div>

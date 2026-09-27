@@ -182,6 +182,16 @@ export const partnerships = pgTable("partnerships", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const partnershipActivities = pgTable("partnership_activities", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  partnershipId: uuid("partnership_id").references(() => partnerships.id, { onDelete: "cascade" }).notNull(),
+  actorUserId: uuid("actor_user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  previousStatus: text("previous_status"),
+  newStatus: text("new_status").notNull(),
+  note: text("note"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({ partnershipTimelineIdx: index("partnership_activities_timeline_idx").on(table.partnershipId, table.createdAt) }));
+
 export const transactions = pgTable("transactions", {
   id: uuid("id").defaultRandom().primaryKey(),
   userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
