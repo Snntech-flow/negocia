@@ -30,6 +30,13 @@ export const users = pgTable("users", {
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
 
+export const authLoginAttempts = pgTable("auth_login_attempts", {
+  keyHash: text("key_hash").primaryKey(),
+  attempts: integer("attempts").default(0).notNull(),
+  blockedUntil: timestamp("blocked_until"),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+});
+
 export const properties = pgTable("properties", {
   id: uuid("id").defaultRandom().primaryKey(),
   brokerId: uuid("broker_id").references(() => users.id, { onDelete: "cascade" }).notNull(),

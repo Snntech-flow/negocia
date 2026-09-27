@@ -11,10 +11,11 @@ import {
   transactions,
   notifications,
   dvpCertificates,
+  authLoginAttempts,
 } from "./db";
 import { eq, desc, and, lte, gte, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
+import { cookies, headers } from "next/headers";
 import crypto from "crypto";
 
 const LEAD_STAGES = ["novo", "contato", "qualificado", "visita", "proposta", "negociacao", "fechado", "perdido"] as const;
@@ -432,6 +433,59 @@ export async function createLead(data: {
     if ((error as { code?: string }).code === "23505") throw new Error("Já existe um lead com este telefone na sua carteira.");
     throw error;
   }
+}
+
+export async function importLeadsCsv(rows: Array<{
+  fullName: string; phone: string; email?: string; leadType?: string; source?: string;
+  propertyType?: string; city?: string; neighborhoods?: string; maxBudget?: string;
+  minBedrooms?: string; notes?: string;
+}>) {
+  const actor = await requireCurrentUser();
+  requireActiveBroker(actor);
+  if (!Array.isArray(rows) || rows.length < 1 || rows.length > 100) {
+    throw new Error("Importe de 1 a 100 contatos por arquivo.");
+  }
+  const typeMap: Record<string, string> = { comprador: "comprador", proprietario: "proprietario", "proprietário": "proprietario", "proprietario / vendedor": "proprietario", "proprietário / vendedor": "proprietario", locatario: "locatario", "locatário": "locatario", parceiro: "parceiro", "corretor parceiro": "parceiro" };
+  const sourceMap: Record<string, string> = { indicacao: "indicacao", "indicação": "indicacao", whatsapp: "whatsapp", portal: "portal", "portal imobiliario": "portal", "portal imobiliário": "portal", site: "site", ligacao: "ligacao", "ligação": "ligacao", "rede social": "rede_social", rede_social: "rede_social", outro: "outro" };
+  const seen = new Set<string>();
+  const cleaned = rows.map((row, index) => {
+    const fullName = String(row.fullName || "").trim();
+    const phone = String(row.phone || "").trim();
+    const normalizedPhone = normalizePhone(phone);
+    const line = index + 2;
+    if (fullName.length < 2 || fullName.length > 120) throw new Error(`Linha ${line}: nome inválido.`);
+    if (normalizedPhone.length < 8 || normalizedPhone.length > 15) throw new Error(`Linha ${line}: telefone inválido (inclua DDD).`);
+    if (seen.has(normalizedPhone)) throw new Error(`Linha ${line}: telefone repetido no arquivo.`);
+    seen.add(normalizedPhone);
+    const email = String(row.email || "").trim().toLowerCase() || null;
+    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error(`Linha ${line}: e-mail inválido.`);
+    const leadTypeInput = String(row.leadType || "comprador").trim().toLowerCase();
+    const sourceInput = String(row.source || "outro").trim().toLowerCase();
+    const leadType = typeMap[leadTypeInput];
+    const source = sourceMap[sourceInput];
+    if (!leadType) throw new Error(`Linha ${line}: tipo deve ser comprador, proprietario, locatario ou parceiro.`);
+    if (!source) throw new Error(`Linha ${line}: origem inválida.`);
+    const maxBudget = String(row.maxBudget || "").trim().replace(/[R$\s]/g, "").replace(/\.(?=\d{3}(?:\D|$))/g, "").replace(",", ".") || null;
+    if (maxBudget && (!Number.isFinite(Number(maxBudget)) || Number(maxBudget) <= 0)) throw new Error(`Linha ${line}: orçamento inválido.`);
+    const minBedrooms = String(row.minBedrooms || "").trim() ? Number(row.minBedrooms) : null;
+    if (minBedrooms !== null && (!Number.isInteger(minBedrooms) || minBedrooms < 1 || minBedrooms > 20)) throw new Error(`Linha ${line}: quartos mínimos inválidos.`);
+    const notes = String(row.notes || "").trim() || null;
+    if (notes && notes.length > 3000) throw new Error(`Linha ${line}: observação acima de 3.000 caracteres.`);
+    return {
+      ownerUserId: actor.id, fullName, phone, normalizedPhone, email, leadType, source,
+      propertyType: String(row.propertyType || "").trim() || null,
+      city: String(row.city || "").trim() || null,
+      neighborhoods: String(row.neighborhoods || "").split(/[|,]/).map((part) => part.trim()).filter(Boolean).slice(0, 20),
+      maxBudget, minBedrooms, notes, stage: "novo" as const,
+    };
+  });
+  const result = await db.transaction(async (tx) => {
+    const inserted = await tx.insert(leads).values(cleaned).onConflictDoNothing({ target: [leads.ownerUserId, leads.normalizedPhone] }).returning();
+    const insertedActivities = inserted.length ? await tx.insert(leadActivities).values(inserted.map(({ id }) => ({ leadId: id, userId: actor.id, activityType: "cadastro", description: "Lead importado por arquivo CSV." }))).returning() : [];
+    return { imported: inserted.length, duplicates: rows.length - inserted.length, leads: inserted, activities: insertedActivities };
+  });
+  revalidatePath("/");
+  return { success: true, ...result };
 }
 
 export async function updateLead(leadId: string, data: Parameters<typeof createLead>[0]) {
@@ -1033,9 +1087,31 @@ export async function registerUserWithPix(userData: {
 
 export async function loginUser(email: string, password: string) {
   const cleanEmail = email.trim().toLowerCase();
+  if (cleanEmail.length > 254 || password.length > 200) throw new Error("E-mail ou senha incorretos.");
+  const requestHeaders = headers();
+  const remoteAddress = requestHeaders.get("x-vercel-forwarded-for")?.split(",")[0]?.trim()
+    || requestHeaders.get("x-real-ip")?.trim()
+    || "unknown";
+  const rateLimitKey = crypto.createHash("sha256").update(`${cleanEmail}\n${remoteAddress}`).digest("hex");
+  const [attemptState] = await db.select({ attempts: authLoginAttempts.attempts, blockedUntil: authLoginAttempts.blockedUntil, updatedAt: authLoginAttempts.updatedAt })
+    .from(authLoginAttempts).where(eq(authLoginAttempts.keyHash, rateLimitKey)).limit(1);
+  if (attemptState?.blockedUntil && attemptState.blockedUntil.getTime() > Date.now()) {
+    throw new Error("Muitas tentativas de acesso. Aguarde 15 minutos e tente novamente.");
+  }
   const [user] = await db.select().from(users).where(eq(users.email, cleanEmail)).limit(1);
-  if (!user || !verifyPassword(password, user.passwordHash)) throw new Error("E-mail ou senha incorretos.");
+  if (!user || !verifyPassword(password, user.passwordHash)) {
+    await db.insert(authLoginAttempts).values({ keyHash: rateLimitKey, attempts: 1, updatedAt: new Date() }).onConflictDoUpdate({
+      target: authLoginAttempts.keyHash,
+      set: {
+        attempts: sql`case when ${authLoginAttempts.updatedAt} < now() - interval '24 hours' or ${authLoginAttempts.blockedUntil} <= now() then 1 else ${authLoginAttempts.attempts} + 1 end`,
+        blockedUntil: sql`case when ${authLoginAttempts.updatedAt} < now() - interval '24 hours' or ${authLoginAttempts.blockedUntil} <= now() then null when ${authLoginAttempts.attempts} + 1 >= 5 then now() + interval '15 minutes' else null end`,
+        updatedAt: new Date(),
+      },
+    });
+    throw new Error("E-mail ou senha incorretos.");
+  }
   if (user.verificationStatus === "suspenso") throw new Error("Esta conta está suspensa.");
+  await db.delete(authLoginAttempts).where(eq(authLoginAttempts.keyHash, rateLimitKey));
   await setBrokerSession(user.id);
   const { passwordHash: _passwordHash, ...safeUser } = user;
   revalidatePath("/");

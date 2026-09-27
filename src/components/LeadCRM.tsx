@@ -1,8 +1,8 @@
 "use client";
 
 import React, { FormEvent, useMemo, useState } from "react";
-import { Building2, CalendarClock, CheckCircle2, Clock3, Download, MapPin, Pencil, Phone, Plus, Search, UserRound, X } from "lucide-react";
-import { addLeadActivity, completeLeadFollowUp, createDvpCertificate, createLead, updateLead, updateLeadStage } from "@/lib/actions";
+import { Building2, CalendarClock, CheckCircle2, Clock3, Download, FileUp, MapPin, Pencil, Phone, Plus, Search, UserRound, X } from "lucide-react";
+import { addLeadActivity, completeLeadFollowUp, createDvpCertificate, createLead, importLeadsCsv, updateLead, updateLeadStage } from "@/lib/actions";
 
 export interface LeadItem {
   id: string;
@@ -125,6 +125,44 @@ function csvCell(value: unknown) {
   return `"${text.replace(/"/g, '""')}"`;
 }
 
+type CsvLeadRow = { fullName: string; phone: string; email?: string; leadType?: string; source?: string; propertyType?: string; city?: string; neighborhoods?: string; maxBudget?: string; minBedrooms?: string; notes?: string };
+
+function parseCsv(text: string): CsvLeadRow[] {
+  const firstLine = text.split(/\r?\n/, 1)[0] || "";
+  const delimiter = (firstLine.match(/;/g) || []).length > (firstLine.match(/,/g) || []).length ? ";" : ",";
+  const rows: string[][] = [];
+  let row: string[] = [], cell = "", quoted = false;
+  for (let i = 0; i < text.length; i++) {
+    const char = text[i];
+    if (char === '"' && quoted && text[i + 1] === '"') { cell += '"'; i++; }
+    else if (char === '"') quoted = !quoted;
+    else if (char === delimiter && !quoted) { row.push(cell); cell = ""; }
+    else if ((char === "\n" || char === "\r") && !quoted) {
+      if (char === "\r" && text[i + 1] === "\n") i++;
+      row.push(cell); if (row.some((value) => value.trim())) rows.push(row);
+      row = []; cell = "";
+    } else cell += char;
+  }
+  row.push(cell); if (row.some((value) => value.trim())) rows.push(row);
+  if (rows.length < 2) throw new Error("O CSV precisa ter cabeçalho e pelo menos um contato.");
+  const normalize = (value: string) => value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+  const headers = rows[0].map(normalize);
+  const aliases: Record<string, string[]> = { fullName: ["nome", "nome_completo", "fullname"], phone: ["telefone", "celular", "phone"], email: ["email", "e_mail"], leadType: ["tipo", "tipo_de_lead", "leadtype"], source: ["origem", "source"], propertyType: ["tipo_de_imovel", "imovel", "propertytype"], city: ["cidade", "city"], neighborhoods: ["bairros", "bairro", "neighborhoods"], maxBudget: ["orcamento", "orcamento_maximo", "maxbudget"], minBedrooms: ["quartos", "quartos_minimos", "minbedrooms"], notes: ["observacoes", "notas", "notes"] };
+  const value = (values: string[], key: string) => {
+    const names = aliases[key] || [];
+    const index = headers.findIndex((header) => names.includes(header));
+    return index >= 0 ? values[index] || "" : "";
+  };
+  const mapped = rows.slice(1).map((values) => ({
+    fullName: value(values, "fullName"), phone: value(values, "phone"), email: value(values, "email"),
+    leadType: value(values, "leadType"), source: value(values, "source"), propertyType: value(values, "propertyType"),
+    city: value(values, "city"), neighborhoods: value(values, "neighborhoods"), maxBudget: value(values, "maxBudget"),
+    minBedrooms: value(values, "minBedrooms"), notes: value(values, "notes"),
+  }));
+  if (!headers.some((header) => aliases.fullName.includes(header)) || !headers.some((header) => aliases.phone.includes(header))) throw new Error("Inclua as colunas obrigatórias Nome e Telefone.");
+  return mapped;
+}
+
 function escapeIcsText(value: string) {
   return value.replace(/\\/g, "\\\\").replace(/\r\n|\n|\r/g, "\\n").replace(/([,;])/g, "\\$1");
 }
@@ -189,6 +227,7 @@ export default function LeadCRM({
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [csvImportOpen, setCsvImportOpen] = useState(false);
 
   const selectedLead = leads.find((lead) => lead.id === selectedLeadId) || null;
   const matchedProperties = useMemo(() => {
@@ -209,13 +248,22 @@ export default function LeadCRM({
         return true;
       })
       .map((property) => {
-        let score = 40;
+        const reasons: string[] = ["Imóvel disponível", expectedPurpose === "aluguel" ? "Finalidade: aluguel" : "Finalidade: venda"];
+        let score = 0;
+        let weight = 0;
         const propertyType = normalizeMatchText(property.propertyType);
-        if (type && (propertyType.includes(type) || type.includes(propertyType))) score += 25;
-        if (budget && Number(property.salePrice) <= budget) score += 20;
-        if (selectedLead.minBedrooms && property.bedrooms >= selectedLead.minBedrooms) score += 10;
-        if (neighborhoods.some((area) => normalizeMatchText(property.neighborhood).includes(area) || area.includes(normalizeMatchText(property.neighborhood)))) score += 20;
-        return { property, score: Math.min(100, score) };
+        const typeMatches = !type || propertyType.includes(type) || type.includes(propertyType);
+        if (type) { weight += 30; if (typeMatches) { score += 30; reasons.push(`Tipo compatível: ${property.propertyType}`); } }
+        if (budget) { weight += 30; score += 30; reasons.push(`Dentro do orçamento: ${money(property.salePrice)} de até ${money(selectedLead.maxBudget)}`); }
+        if (selectedLead.minBedrooms) { weight += 20; score += 20; reasons.push(`${property.bedrooms} quartos (mínimo ${selectedLead.minBedrooms})`); }
+        if (city) { weight += 10; score += 10; reasons.push(`Cidade: ${property.city}`); }
+        const neighborhoodMatches = neighborhoods.some((area) => normalizeMatchText(property.neighborhood).includes(area) || area.includes(normalizeMatchText(property.neighborhood)));
+        if (neighborhoods.length) {
+          weight += 10;
+          if (neighborhoodMatches) { score += 10; reasons.push(`Bairro de interesse: ${property.neighborhood}`); }
+        }
+        if (!weight) { weight = 1; score = 1; }
+        return { property, score: Math.round((score / weight) * 100), reasons, typeMatches, neighborhoodMatches };
       })
       .sort((a, b) => b.score - a.score || Number(a.property.salePrice) - Number(b.property.salePrice))
       .slice(0, 5);
@@ -502,6 +550,22 @@ export default function LeadCRM({
     window.setTimeout(() => setNotice(null), 5000);
   }
 
+  async function handleCsvFile(file?: File) {
+    if (!file) return;
+    setBusy(true); setError(null);
+    try {
+      if (file.size > 1_000_000) throw new Error("O arquivo deve ter até 1 MB.");
+      const rows = parseCsv(await file.text());
+      const result = await importLeadsCsv(rows);
+      setLeads((current) => [...result.leads.map((lead) => ({ ...lead, neighborhoods: (lead.neighborhoods as string[]) || [] })), ...current]);
+      setActivities((current) => [...result.activities, ...current]);
+      setNotice(`${result.imported} leads importados${result.duplicates ? `; ${result.duplicates} telefones duplicados foram ignorados` : ""}.`);
+      setCsvImportOpen(false);
+      window.setTimeout(() => setNotice(null), 7000);
+    } catch (err) { setError(err instanceof Error ? err.message : "Não foi possível importar o CSV."); }
+    finally { setBusy(false); }
+  }
+
   const selectClass = "rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-2 text-xs text-slate-200 focus:border-amber-500 focus:outline-none";
   const inputClass = "w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-amber-500 focus:outline-none";
 
@@ -513,9 +577,10 @@ export default function LeadCRM({
           <h2 className="mt-2 text-2xl font-extrabold text-white">Acompanhe cada oportunidade</h2>
           <p className="mt-1 text-sm text-slate-400">Seus contatos e histórico ficam privados na sua carteira.</p>
         </div>
-        <button onClick={() => { setError(null); setEditingLead(null); setIsCreateOpen(true); }} className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-bold text-slate-950 hover:bg-amber-400">
-          <Plus className="w-4 h-4" /> Novo lead
-        </button>
+        <div className="flex flex-wrap gap-2">
+          <button onClick={() => { setError(null); setCsvImportOpen(true); }} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 px-4 py-2.5 text-sm font-bold text-slate-200 hover:border-slate-500 hover:bg-slate-800"><FileUp className="h-4 w-4" /> Importar CSV</button>
+          <button onClick={() => { setError(null); setEditingLead(null); setIsCreateOpen(true); }} className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-bold text-slate-950 hover:bg-amber-400"><Plus className="w-4 h-4" /> Novo lead</button>
+        </div>
       </div>
 
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
@@ -608,7 +673,18 @@ export default function LeadCRM({
       </section>
 
       {notice && <div role="status" className="rounded-lg border border-emerald-500/30 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200">{notice}</div>}
-      {error && !isCreateOpen && !editingLead && !visitProperty && <div role="alert" className="rounded-lg border border-rose-500/30 bg-rose-950/40 px-4 py-3 text-sm text-rose-200">{error}</div>}
+      {error && !isCreateOpen && !editingLead && !visitProperty && !csvImportOpen && <div role="alert" className="rounded-lg border border-rose-500/30 bg-rose-950/40 px-4 py-3 text-sm text-rose-200">{error}</div>}
+
+      {csvImportOpen && <div className="fixed inset-0 z-[65] flex items-center justify-center bg-black/70 p-4">
+        <div className="w-full max-w-lg space-y-4 rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
+          <div className="flex items-start justify-between gap-3"><div><div className="text-xs font-bold uppercase tracking-wide text-amber-400">CRM · Importação</div><h3 className="mt-1 text-lg font-extrabold text-white">Importar contatos por CSV</h3></div><button type="button" onClick={() => setCsvImportOpen(false)} className="rounded-lg p-1 text-slate-400 hover:bg-slate-800" aria-label="Fechar"><X className="h-5 w-5" /></button></div>
+          <p className="text-xs leading-relaxed text-slate-400">Use um arquivo CSV separado por vírgula ou ponto e vírgula. Colunas obrigatórias: <b className="text-slate-200">Nome</b> e <b className="text-slate-200">Telefone</b>. Aceita também e-mail, tipo, origem, tipo de imóvel, cidade, bairros, orçamento, quartos e observações. Até 100 linhas; contatos repetidos pelo telefone serão ignorados.</p>
+          <button type="button" onClick={() => { const content = '\uFEFFNome;Telefone;E-mail;Tipo;Origem;Tipo de imóvel;Cidade;Bairros;Orçamento máximo;Quartos mínimos;Observações\r\nMaria Exemplo;(11) 99999-0000;maria@email.com;Comprador;Indicação;Apartamento;São Paulo;Moema|Pinheiros;850000;2;Prefere andar alto'; const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' })); const a = document.createElement('a'); a.href = url; a.download = 'modelo-importacao-negocia-lar.csv'; a.click(); URL.revokeObjectURL(url); }} className="text-xs font-semibold text-emerald-300 hover:text-emerald-200">Baixar modelo CSV</button>
+          <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-600 px-4 py-5 text-sm font-bold text-white hover:border-amber-400 hover:bg-slate-800 ${busy ? "pointer-events-none opacity-50" : ""}`}><FileUp className="h-4 w-4" />{busy ? "Importando e validando…" : "Selecionar arquivo .csv"}<input type="file" accept=".csv,text/csv" className="sr-only" disabled={busy} onChange={(event) => { void handleCsvFile(event.target.files?.[0]); event.currentTarget.value = ""; }} /></label>
+          {error && <p role="alert" className="rounded-lg border border-rose-500/30 bg-rose-950/40 p-3 text-xs text-rose-200">{error}</p>}
+          <div className="flex justify-end border-t border-slate-800 pt-3"><button type="button" onClick={() => setCsvImportOpen(false)} className="rounded-lg px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800">Fechar</button></div>
+        </div>
+      </div>}
 
       {leads.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/60 px-6 py-14 text-center">
@@ -759,13 +835,14 @@ export default function LeadCRM({
                     <h4 className="flex items-center gap-2 text-sm font-bold text-white"><Building2 className="h-4 w-4 text-amber-400" />Imóveis compatíveis</h4>
                     <span className="text-[11px] text-slate-500">Vitrine · até 5 resultados</span>
                   </div>
-                  {matchedProperties.length ? matchedProperties.map(({ property, score }) => (
+                  {matchedProperties.length ? matchedProperties.map(({ property, score, reasons, typeMatches, neighborhoodMatches }) => (
                     <article key={property.id} className="flex gap-3 rounded-xl border border-slate-800 bg-slate-900 p-3">
                       {property.coverPhoto ? <img src={property.coverPhoto} alt="" className="h-16 w-20 shrink-0 rounded-lg object-cover" /> : <div className="flex h-16 w-20 shrink-0 items-center justify-center rounded-lg bg-slate-800"><Building2 className="h-6 w-6 text-slate-500" /></div>}
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-xs font-bold text-white">{property.title}</div>
                         <div className="mt-1 flex items-center gap-1 text-[11px] text-slate-400"><MapPin className="h-3 w-3" />{property.neighborhood} · {property.city}</div>
-                        <div className="mt-1 text-[11px] font-semibold text-emerald-300">{money(property.salePrice)} · {property.bedrooms} quartos · compatibilidade {score}%</div>
+                        <div className="mt-1 text-[11px] font-semibold text-emerald-300">{money(property.salePrice)} · {property.bedrooms} quartos · critérios atendidos {score}%</div>
+                        <details className="mt-1.5 text-[10px] text-slate-400"><summary className="cursor-pointer font-semibold text-sky-300">Ver como calculamos</summary><ul className="mt-1 list-inside list-disc space-y-0.5">{reasons.map((reason) => <li key={reason}>{reason}</li>)}{selectedLead.propertyType && !typeMatches && <li>Tipo diferente do informado ({property.propertyType})</li>}{selectedLead.neighborhoods.length && !neighborhoodMatches ? <li>Fora dos bairros preferidos; cidade e demais critérios coincidem</li> : null}</ul><p className="mt-1">Compatibilidade é uma comparação simples das preferências preenchidas; confirme detalhes com o captador.</p></details>
                       </div>
                       <div className="flex shrink-0 flex-col gap-1.5 self-center">
                         <button type="button" onClick={() => onOpenProperty(property.id)} className="rounded-lg border border-slate-700 px-2.5 py-1.5 text-[10px] font-bold text-amber-300 hover:bg-slate-800">Abrir na Vitrine</button>

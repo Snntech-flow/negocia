@@ -9,8 +9,10 @@ Protótipo de uma rede MLS para corretores. O repositório contém a interface i
 - Não há integração Pix, gateway, consulta automática ao CRECI ou assinatura eletrônica.
 - O registro de visita é um rascunho interno; não promete efeito jurídico nem trava de anterioridade.
 - A navegação do painel usa menus suspensos compactos, e cada área explica seu objetivo e os limites dos recursos disponíveis. O termo é uma prévia e o DVP registra somente rascunhos, sem aceite eletrônico.
-- O CRM permite cadastrar e editar leads, filtrar por etapa, tipo, origem, cidade e retornos, exportar a seleção para CSV, acompanhar atividades, ver a agenda e concluir retornos, baixar os retornos em arquivo `.ics` para importar no calendário, usar uma lista de leads adaptada para celular, conferir sugestões de imóveis e iniciar DVPs em rascunho vinculados ao lead.
+- O CRM permite cadastrar e editar leads, importar até 100 contatos por CSV (com modelo e deduplicação por telefone), filtrar por etapa, tipo, origem, cidade e retornos, exportar a seleção para CSV, acompanhar atividades, ver a agenda e concluir retornos, baixar os retornos em arquivo `.ics` para importar no calendário, usar uma lista de leads adaptada para celular, conferir sugestões de imóveis com os critérios de compatibilidade explicados e iniciar DVPs em rascunho vinculados ao lead.
 - Dados de proprietário e endereço completo só são retornados ao corretor que cadastrou o imóvel. Dados de clientes são limitados à conta proprietária; perfis de busca são compartilhados anonimizados apenas com corretores aprovados.
+- As tabelas de usuários, imóveis, perfis, leads, atividades, parcerias, transações, notificações e DVPs têm RLS habilitada e acesso direto da API `anon`/`authenticated` revogado. O app consulta o banco apenas no servidor; as ações validam a sessão e filtram registros privados pelo dono ou participante. Em ambientes novos, aplique as migrações SQL de `supabase/migrations` em ordem cronológica.
+- Tentativas de login são limitadas por combinação de e-mail e origem da conexão; os contadores são guardados em tabela privada com RLS.
 
 Os fluxos completos de co-corretagem, planos e PDFs ainda precisam de implementação e revisão antes de serem oferecidos como serviço em produção.
 
