@@ -1,8 +1,8 @@
 "use client";
 
 import React, { FormEvent, useMemo, useState } from "react";
-import { Building2, CalendarClock, CheckCircle2, Clock3, MapPin, Pencil, Phone, Plus, Search, UserRound, X } from "lucide-react";
-import { addLeadActivity, createDvpCertificate, createLead, updateLead, updateLeadStage } from "@/lib/actions";
+import { Building2, CalendarClock, CheckCircle2, Clock3, Download, MapPin, Pencil, Phone, Plus, Search, UserRound, X } from "lucide-react";
+import { addLeadActivity, completeLeadFollowUp, createDvpCertificate, createLead, updateLead, updateLeadStage } from "@/lib/actions";
 
 export interface LeadItem {
   id: string;
@@ -119,6 +119,36 @@ function normalizeMatchText(value: string) {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim().toLocaleLowerCase("pt-BR");
 }
 
+function csvCell(value: unknown) {
+  let text = value == null ? "" : String(value);
+  if (/^[\s]*[=+\-@]/.test(text)) text = `'${text}`;
+  return `"${text.replace(/"/g, '""')}"`;
+}
+
+function escapeIcsText(value: string) {
+  return value.replace(/\\/g, "\\\\").replace(/\r\n|\n|\r/g, "\\n").replace(/([,;])/g, "\\$1");
+}
+
+function foldIcsLine(value: string) {
+  const parts: string[] = [];
+  let line = "";
+  let bytes = 0;
+  for (const character of value) {
+    const size = new TextEncoder().encode(character).length;
+    const limit = line.startsWith(" ") ? 74 : 75;
+    if (bytes + size > limit) {
+      parts.push(line);
+      line = ` ${character}`;
+      bytes = 1 + size;
+    } else {
+      line += character;
+      bytes += size;
+    }
+  }
+  parts.push(line);
+  return parts.join("\r\n");
+}
+
 function localDateTimeNow() {
   const now = new Date();
   return new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 16);
@@ -149,11 +179,16 @@ export default function LeadCRM({
   const [selectedLeadId, setSelectedLeadId] = useState<string | null>(null);
   const [search, setSearch] = useState("");
   const [stageFilter, setStageFilter] = useState("todos");
+  const [typeFilter, setTypeFilter] = useState("todos");
+  const [sourceFilter, setSourceFilter] = useState("todos");
+  const [cityFilter, setCityFilter] = useState("todas");
+  const [followUpFilter, setFollowUpFilter] = useState("todos");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<LeadItem | null>(null);
   const [visitProperty, setVisitProperty] = useState<LeadMatchProperty | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
 
   const selectedLead = leads.find((lead) => lead.id === selectedLeadId) || null;
   const matchedProperties = useMemo(() => {
@@ -189,16 +224,47 @@ export default function LeadCRM({
     const query = search.trim().toLocaleLowerCase("pt-BR");
     return leads.filter((lead) => {
       if (stageFilter !== "todos" && lead.stage !== stageFilter) return false;
+      if (typeFilter !== "todos" && lead.leadType !== typeFilter) return false;
+      if (sourceFilter !== "todos" && lead.source !== sourceFilter) return false;
+      if (cityFilter !== "todas" && normalizeMatchText(lead.city || "") !== normalizeMatchText(cityFilter)) return false;
+      const followUpTime = lead.nextActionAt ? new Date(lead.nextActionAt).getTime() : null;
+      if (followUpFilter === "atrasados" && (!followUpTime || followUpTime >= Date.now() || ["fechado", "perdido"].includes(lead.stage))) return false;
+      if (followUpFilter === "agendados" && (!followUpTime || followUpTime < Date.now())) return false;
+      if (followUpFilter === "sem_agenda" && followUpTime) return false;
       if (!query) return true;
       return [lead.fullName, lead.phone, lead.email || "", lead.city || "", ...(lead.neighborhoods || [])]
         .some((value) => value.toLocaleLowerCase("pt-BR").includes(query));
     });
-  }, [leads, search, stageFilter]);
+  }, [leads, search, stageFilter, typeFilter, sourceFilter, cityFilter, followUpFilter]);
+
+  const availableCities = Array.from(new Set(leads.map((lead) => lead.city?.trim()).filter((city): city is string => Boolean(city)))).sort((a, b) => a.localeCompare(b, "pt-BR"));
 
   const overdueCount = leads.filter((lead) =>
     lead.nextActionAt && new Date(lead.nextActionAt).getTime() < Date.now()
     && !["fechado", "perdido"].includes(lead.stage)
   ).length;
+  const closedCount = leads.filter((lead) => lead.stage === "fechado").length;
+  const lostCount = leads.filter((lead) => lead.stage === "perdido").length;
+  const resolvedCount = closedCount + lostCount;
+  const closeRate = resolvedCount ? Math.round((closedCount / resolvedCount) * 100) : 0;
+  const sourceDistribution = sources
+    .map(([key, label]) => ({ key, label, count: leads.filter((lead) => lead.source === key).length }))
+    .filter((item) => item.count > 0)
+    .sort((a, b) => b.count - a.count);
+  const agendaNow = Date.now();
+  const todayEnd = new Date();
+  todayEnd.setHours(23, 59, 59, 999);
+  const weekEnd = new Date();
+  weekEnd.setDate(weekEnd.getDate() + 7);
+  weekEnd.setHours(23, 59, 59, 999);
+  const agendaLeads = leads
+    .filter((lead) => lead.nextActionAt && !["fechado", "perdido"].includes(lead.stage))
+    .sort((a, b) => new Date(a.nextActionAt!).getTime() - new Date(b.nextActionAt!).getTime());
+  const followUpGroups = [
+    { key: "overdue", label: "Atrasados", tone: "text-rose-300", items: agendaLeads.filter((lead) => new Date(lead.nextActionAt!).getTime() < agendaNow) },
+    { key: "today", label: "Hoje", tone: "text-amber-300", items: agendaLeads.filter((lead) => new Date(lead.nextActionAt!).getTime() >= agendaNow && new Date(lead.nextActionAt!).getTime() <= todayEnd.getTime()) },
+    { key: "upcoming", label: "Próximos 7 dias", tone: "text-sky-300", items: agendaLeads.filter((lead) => new Date(lead.nextActionAt!).getTime() > todayEnd.getTime() && new Date(lead.nextActionAt!).getTime() <= weekEnd.getTime()) },
+  ];
 
   async function changeStage(lead: LeadItem, stage: string) {
     setError(null);
@@ -346,6 +412,96 @@ export default function LeadCRM({
     }
   }
 
+  async function completeFollowUp(lead: LeadItem) {
+    setBusy(true);
+    setError(null);
+    try {
+      const result = await completeLeadFollowUp(lead.id);
+      setLeads((current) => current.map((item) => item.id === lead.id ? { ...result.lead, neighborhoods: (result.lead.neighborhoods as string[]) || [] } : item));
+      setActivities((current) => [{ ...result.activity, leadId: lead.id }, ...current]);
+      setNotice(`Retorno de ${lead.fullName} concluído e salvo no histórico.`);
+      window.setTimeout(() => setNotice(null), 5000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Não foi possível concluir o retorno.");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  function exportVisibleLeads() {
+    const headers = ["Nome", "Telefone", "E-mail", "Tipo", "Etapa", "Origem", "Tipo de imóvel", "Cidade", "Bairros", "Orçamento máximo", "Quartos mínimos", "Próxima ação", "Data do retorno", "Último contato", "Observações", "Motivo da perda"];
+    const rows = visibleLeads.map((lead) => [
+      lead.fullName,
+      lead.phone,
+      lead.email,
+      LEAD_TYPE_LABELS[lead.leadType] || lead.leadType,
+      stages.find((stage) => stage.key === lead.stage)?.label || lead.stage,
+      LEAD_SOURCE_LABELS[lead.source] || lead.source,
+      lead.propertyType,
+      lead.city,
+      lead.neighborhoods.join(", "),
+      lead.maxBudget,
+      lead.minBedrooms,
+      lead.nextAction,
+      lead.nextActionAt ? new Date(lead.nextActionAt).toLocaleString("pt-BR") : "",
+      lead.lastContactAt ? new Date(lead.lastContactAt).toLocaleString("pt-BR") : "",
+      lead.notes,
+      lead.lostReason,
+    ]);
+    const csv = `\uFEFF${[headers, ...rows].map((row) => row.map(csvCell).join(";")).join("\r\n")}`;
+    const url = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `negocia-lar-leads-${new Date().toISOString().slice(0, 10)}.csv`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setNotice(`${visibleLeads.length} leads exportados para CSV.`);
+    window.setTimeout(() => setNotice(null), 5000);
+  }
+
+  function exportAgendaIcs() {
+    const stamp = new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+    const events = agendaLeads.map((lead) => {
+      const start = new Date(lead.nextActionAt!);
+      const end = new Date(start.getTime() + 30 * 60_000);
+      const formatUtc = (date: Date) => date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+      return [
+        "BEGIN:VEVENT",
+        `UID:${lead.id}-retorno@negocialar.com.br`,
+        `DTSTAMP:${stamp}`,
+        `DTSTART:${formatUtc(start)}`,
+        `DTEND:${formatUtc(end)}`,
+        `SUMMARY:${escapeIcsText(`Retorno: ${lead.fullName}`)}`,
+        `DESCRIPTION:${escapeIcsText(lead.nextAction || "Retorno de lead no Negocia Lar")}`,
+        "STATUS:CONFIRMED",
+        "END:VEVENT",
+      ];
+    }).flat();
+    const calendarLines = [
+      "BEGIN:VCALENDAR",
+      "VERSION:2.0",
+      "PRODID:-//Negocia Lar//CRM Retornos//PT-BR",
+      "CALSCALE:GREGORIAN",
+      "METHOD:PUBLISH",
+      "X-WR-CALNAME:Negocia Lar - Retornos CRM",
+      ...events,
+      "END:VCALENDAR",
+    ];
+    const contents = calendarLines.map(foldIcsLine).join("\r\n");
+    const url = URL.createObjectURL(new Blob([contents], { type: "text/calendar;charset=utf-8" }));
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `negocia-lar-retornos-${new Date().toISOString().slice(0, 10)}.ics`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+    setNotice(`${agendaLeads.length} retornos preparados para importar no seu calendário.`);
+    window.setTimeout(() => setNotice(null), 5000);
+  }
+
   const selectClass = "rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-2 text-xs text-slate-200 focus:border-amber-500 focus:outline-none";
   const inputClass = "w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white placeholder:text-slate-500 focus:border-amber-500 focus:outline-none";
 
@@ -362,24 +518,96 @@ export default function LeadCRM({
         </button>
       </div>
 
-      <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
         <div className="rounded-xl border border-slate-800 bg-slate-900 p-4"><div className="text-xs text-slate-400">Na carteira</div><div className="mt-1 text-2xl font-bold text-white">{leads.length}</div></div>
         <div className="rounded-xl border border-slate-800 bg-slate-900 p-4"><div className="text-xs text-slate-400">Em andamento</div><div className="mt-1 text-2xl font-bold text-amber-400">{leads.filter((lead) => !["fechado", "perdido"].includes(lead.stage)).length}</div></div>
         <div className="rounded-xl border border-slate-800 bg-slate-900 p-4"><div className="text-xs text-slate-400">Visitas</div><div className="mt-1 text-2xl font-bold text-sky-400">{leads.filter((lead) => lead.stage === "visita").length}</div></div>
+        <div className="rounded-xl border border-slate-800 bg-slate-900 p-4"><div className="text-xs text-slate-400">Fechados</div><div className="mt-1 text-2xl font-bold text-emerald-400">{closedCount}</div></div>
+        <div className="rounded-xl border border-slate-800 bg-slate-900 p-4"><div className="text-xs text-slate-400">Taxa entre encerrados</div><div className="mt-1 text-2xl font-bold text-emerald-300">{closeRate}%</div><div className="mt-1 text-[10px] text-slate-500">{closedCount} ganhos · {lostCount} perdidos</div></div>
         <div className="rounded-xl border border-slate-800 bg-slate-900 p-4"><div className="text-xs text-slate-400">Retornos atrasados</div><div className={`mt-1 text-2xl font-bold ${overdueCount ? "text-rose-400" : "text-emerald-400"}`}>{overdueCount}</div></div>
       </div>
 
-      <div className="flex flex-col gap-3 sm:flex-row">
+      <section className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 sm:p-5">
+        <div className="flex items-center justify-between gap-3"><div><h3 className="text-sm font-bold text-white">Leads por origem</h3><p className="mt-1 text-[11px] text-slate-500">Distribuição da sua carteira; a taxa usa leads fechados ou perdidos.</p></div><span className="text-[11px] text-slate-500">{leads.length} leads</span></div>
+        {sourceDistribution.length ? (
+          <div className="mt-4 grid gap-x-8 gap-y-3 sm:grid-cols-2">
+            {sourceDistribution.map((source) => (
+              <div key={source.key}>
+                <div className="mb-1 flex items-center justify-between gap-3 text-xs"><span className="text-slate-300">{source.label}</span><span className="text-slate-500">{source.count} · {Math.round((source.count / leads.length) * 100)}%</span></div>
+                <div className="h-1.5 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full bg-amber-500" style={{ width: `${Math.max(5, (source.count / leads.length) * 100)}%` }} /></div>
+              </div>
+            ))}
+          </div>
+        ) : <p className="mt-4 text-xs text-slate-500">Cadastre leads para acompanhar quais origens trazem mais oportunidades.</p>}
+      </section>
+
+      <div className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-3 sm:p-4">
         <label className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
           <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar nome, telefone, e-mail ou bairro" className={`${inputClass} pl-9`} />
         </label>
-        <select value={stageFilter} onChange={(event) => setStageFilter(event.target.value)} className={`${selectClass} sm:w-52`} aria-label="Filtrar etapa">
-          <option value="todos">Todas as etapas</option>
-          {stages.map((stage) => <option key={stage.key} value={stage.key}>{stage.label}</option>)}
-        </select>
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
+          <select value={stageFilter} onChange={(event) => setStageFilter(event.target.value)} className={selectClass} aria-label="Filtrar etapa">
+            <option value="todos">Todas as etapas</option>
+            {stages.map((stage) => <option key={stage.key} value={stage.key}>{stage.label}</option>)}
+          </select>
+          <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className={selectClass} aria-label="Filtrar tipo de lead">
+            <option value="todos">Todos os tipos</option>
+            {leadTypes.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+          <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className={selectClass} aria-label="Filtrar origem">
+            <option value="todos">Todas as origens</option>
+            {sources.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          </select>
+          <select value={cityFilter} onChange={(event) => setCityFilter(event.target.value)} className={selectClass} aria-label="Filtrar cidade">
+            <option value="todas">Todas as cidades</option>
+            {availableCities.map((city) => <option key={city} value={city}>{city}</option>)}
+          </select>
+          <select value={followUpFilter} onChange={(event) => setFollowUpFilter(event.target.value)} className={selectClass} aria-label="Filtrar retornos">
+            <option value="todos">Qualquer retorno</option>
+            <option value="atrasados">Retorno atrasado</option>
+            <option value="agendados">Retorno agendado</option>
+            <option value="sem_agenda">Sem retorno</option>
+          </select>
+        </div>
+        <div className="flex items-center justify-between gap-3 text-[11px] text-slate-500">
+          <span>Exibindo {visibleLeads.length} de {leads.length} leads</span>
+          <div className="flex flex-wrap items-center justify-end gap-3">
+            {visibleLeads.length > 0 && <button type="button" onClick={exportVisibleLeads} className="font-semibold text-emerald-300 hover:text-emerald-200">Exportar seleção CSV</button>}
+            {(search || stageFilter !== "todos" || typeFilter !== "todos" || sourceFilter !== "todos" || cityFilter !== "todas" || followUpFilter !== "todos") && <button type="button" onClick={() => { setSearch(""); setStageFilter("todos"); setTypeFilter("todos"); setSourceFilter("todos"); setCityFilter("todas"); setFollowUpFilter("todos"); }} className="font-semibold text-amber-300 hover:text-amber-200">Limpar filtros</button>}
+          </div>
+        </div>
       </div>
 
+      <section className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/70 p-4 sm:p-5">
+        <div className="flex items-center justify-between gap-3">
+          <div><h3 className="flex items-center gap-2 text-sm font-bold text-white"><CalendarClock className="h-4 w-4 text-amber-400" />Agenda de retornos</h3><p className="mt-1 text-[11px] text-slate-500">Ações agendadas nos seus leads; selecione uma para abrir o perfil.</p></div>
+          <div className="flex shrink-0 items-center gap-2">
+            <span className="rounded-full bg-slate-800 px-2.5 py-1 text-[11px] font-bold text-slate-300">{agendaLeads.length} agendados</span>
+            <button type="button" onClick={exportAgendaIcs} disabled={!agendaLeads.length} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-2.5 py-1.5 text-[11px] font-semibold text-slate-300 hover:border-slate-500 hover:text-white disabled:cursor-not-allowed disabled:opacity-40" title="Baixar agenda para importar no calendário"><Download className="h-3.5 w-3.5" /><span className="hidden sm:inline">Baixar .ics</span></button>
+          </div>
+        </div>
+        <div className="grid gap-3 lg:grid-cols-3">
+          {followUpGroups.map((group) => (
+            <div key={group.key} className="rounded-xl border border-slate-800 bg-slate-950/70 p-3">
+              <div className="mb-2 flex items-center justify-between"><h4 className={`text-xs font-bold ${group.tone}`}>{group.label}</h4><span className="text-[10px] text-slate-500">{group.items.length}</span></div>
+              <div className="max-h-56 space-y-2 overflow-y-auto">
+                {group.items.length ? group.items.map((lead) => (
+                  <div key={lead.id} className="flex items-center gap-1">
+                    <button type="button" onClick={() => { setSelectedLeadId(lead.id); setError(null); }} className="min-w-0 flex-1 rounded-lg border border-slate-800 px-2.5 py-2 text-left hover:border-slate-600 hover:bg-slate-900">
+                      <div className="flex items-center justify-between gap-2"><span className="truncate text-xs font-semibold text-slate-200">{lead.fullName}</span><time className="shrink-0 text-[10px] text-slate-500">{new Date(lead.nextActionAt!).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}</time></div>
+                      <p className="mt-1 truncate text-[11px] text-slate-400">{lead.nextAction || "Retorno agendado"}</p>
+                    </button>
+                    <button type="button" disabled={busy} onClick={() => completeFollowUp(lead)} className="rounded-lg border border-emerald-500/30 p-2 text-emerald-300 hover:bg-emerald-500/10 disabled:opacity-50" aria-label={`Concluir retorno de ${lead.fullName}`} title="Marcar retorno como concluído"><CheckCircle2 className="h-4 w-4" /></button>
+                  </div>
+                )) : <p className="rounded-lg border border-dashed border-slate-800 px-2.5 py-4 text-center text-[10px] text-slate-600">Nenhum retorno neste período.</p>}
+              </div>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {notice && <div role="status" className="rounded-lg border border-emerald-500/30 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200">{notice}</div>}
       {error && !isCreateOpen && !editingLead && !visitProperty && <div role="alert" className="rounded-lg border border-rose-500/30 bg-rose-950/40 px-4 py-3 text-sm text-rose-200">{error}</div>}
 
       {leads.length === 0 ? (
@@ -390,7 +618,28 @@ export default function LeadCRM({
           <button onClick={() => setIsCreateOpen(true)} className="mt-5 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-bold text-slate-950 hover:bg-amber-400"><Plus className="mr-1 inline h-4 w-4" /> Cadastrar primeiro lead</button>
         </div>
       ) : (
-        <div className="-mx-4 overflow-x-auto px-4 pb-3">
+        <>
+        <div className="space-y-2 lg:hidden">
+          {visibleLeads.length ? visibleLeads.map((lead) => {
+            const budget = money(lead.maxBudget);
+            const isOverdue = lead.nextActionAt && new Date(lead.nextActionAt).getTime() < Date.now() && !["fechado", "perdido"].includes(lead.stage);
+            return (
+              <article key={lead.id} className="rounded-xl border border-slate-800 bg-slate-900 p-3 shadow-sm">
+                <button type="button" onClick={() => { setSelectedLeadId(lead.id); setError(null); }} className="w-full text-left">
+                  <div className="flex items-start justify-between gap-2"><span className="min-w-0 truncate text-sm font-bold text-white">{lead.fullName}</span><span className="shrink-0 rounded bg-slate-800 px-2 py-0.5 text-[10px] text-slate-300">{stages.find((stage) => stage.key === lead.stage)?.label || lead.stage}</span></div>
+                  <div className="mt-1 flex items-center gap-1 text-xs text-slate-400"><Phone className="h-3 w-3" />{lead.phone}</div>
+                  {(lead.city || lead.neighborhoods?.length > 0) && <div className="mt-1 truncate text-[11px] text-slate-400">{[lead.neighborhoods?.join(", "), lead.city].filter(Boolean).join(" • ")}</div>}
+                  {budget && <div className="mt-1 text-xs font-semibold text-emerald-400">Até {budget}</div>}
+                  {lead.nextAction && <div className={`mt-2 flex items-start gap-1.5 border-t border-slate-800 pt-2 text-[11px] ${isOverdue ? "text-rose-300" : "text-amber-300"}`}><CalendarClock className="mt-0.5 h-3 w-3 shrink-0" /><span>{lead.nextAction} · {localDate(lead.nextActionAt)}</span></div>}
+                </button>
+                <select value={lead.stage} onChange={(event) => changeStage(lead, event.target.value)} disabled={busy} className="mt-3 w-full rounded-md border border-slate-800 bg-slate-950 px-2 py-2 text-xs text-slate-300 disabled:opacity-50" aria-label={`Etapa de ${lead.fullName}`}>
+                  {stages.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
+                </select>
+              </article>
+            );
+          }) : <p className="rounded-xl border border-dashed border-slate-700 px-4 py-8 text-center text-xs text-slate-500">Nenhum lead corresponde aos filtros selecionados.</p>}
+        </div>
+        <div className="hidden -mx-4 overflow-x-auto px-4 pb-3 lg:block">
           <div className="grid min-w-[1760px] grid-cols-8 gap-3">
             {stages.map((stage) => {
               const stageLeads = visibleLeads.filter((lead) => lead.stage === stage.key);
@@ -430,6 +679,7 @@ export default function LeadCRM({
             })}
           </div>
         </div>
+        </>
       )}
 
       {(isCreateOpen || editingLead) && (

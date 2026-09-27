@@ -541,6 +541,38 @@ export async function addLeadActivity(data: {
   return { success: true, activity };
 }
 
+export async function completeLeadFollowUp(leadId: string) {
+  const actor = await requireCurrentUser();
+  requireActiveBroker(actor);
+  const [lead] = await db.select({
+    id: leads.id,
+    stage: leads.stage,
+    nextAction: leads.nextAction,
+    nextActionAt: leads.nextActionAt,
+  }).from(leads).where(and(eq(leads.id, leadId), eq(leads.ownerUserId, actor.id))).limit(1);
+  if (!lead) throw new Error("Lead não encontrado na sua carteira.");
+  if (["fechado", "perdido"].includes(lead.stage)) throw new Error("Leads encerrados não têm retornos ativos.");
+  if (!lead.nextActionAt) throw new Error("Este lead não tem retorno agendado.");
+
+  const result = await db.transaction(async (tx) => {
+    const [updated] = await tx.update(leads).set({
+      nextAction: null,
+      nextActionAt: null,
+      lastContactAt: new Date(),
+      updatedAt: new Date(),
+    }).where(and(eq(leads.id, leadId), eq(leads.ownerUserId, actor.id))).returning();
+    const [activity] = await tx.insert(leadActivities).values({
+      leadId,
+      userId: actor.id,
+      activityType: "nota",
+      description: `Retorno concluído${lead.nextAction ? `: ${lead.nextAction}` : ""}.`,
+    }).returning();
+    return { lead: updated, activity };
+  });
+  revalidatePath("/");
+  return { success: true, ...result };
+}
+
 export async function updateUserStatus(userId: string, newStatus: string) {
   const actor = await requireCurrentUser();
   if (actor.role !== "admin") throw new Error("Ação restrita à administração.");
