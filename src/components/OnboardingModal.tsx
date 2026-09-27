@@ -21,6 +21,7 @@ interface OnboardingModalProps {
   onClose: () => void;
   onComplete: (userData: any) => void;
   initialPlan?: string;
+  initialMode?: "register" | "login";
 }
 
 export default function OnboardingModal({
@@ -28,6 +29,7 @@ export default function OnboardingModal({
   onClose,
   onComplete,
   initialPlan = "40",
+  initialMode = "register",
 }: OnboardingModalProps) {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [mode, setMode] = useState<"register" | "login">("register");
@@ -57,7 +59,7 @@ export default function OnboardingModal({
   useEffect(() => {
     if (!isOpen) return;
     setStep(1);
-    setMode("register");
+    setMode(initialMode);
     setActionError(null);
     setAiCreciResult(null);
     setRegisteredUser(null);
@@ -67,7 +69,7 @@ export default function OnboardingModal({
       state: "SP", city: "São Paulo", plan: initialPlan === "imobiliaria" ? "40" : initialPlan,
       billingCycle: "monthly",
     }));
-  }, [isOpen, initialPlan]);
+  }, [isOpen, initialPlan, initialMode]);
 
   if (!isOpen) return null;
 

@@ -6,16 +6,18 @@ export const users = pgTable("users", {
   email: text("email").notNull().unique(),
   creci: text("creci").notNull(),
   whatsapp: text("whatsapp").notNull(),
+  // Nullable for legacy/demo seed accounts; new accounts must authenticate with a password.
+  passwordHash: text("password_hash"),
   avatarUrl: text("avatar_url"),
   city: text("city").notNull(),
   state: text("state").default("SP").notNull(),
   role: text("role").default("corretor").notNull(), // 'corretor', 'admin', 'imobiliaria'
   isVerified: boolean("is_verified").default(false).notNull(),
-  verificationStatus: text("verification_status").default("aprovado").notNull(), // 'pendente', 'aprovado', 'suspenso'
+  verificationStatus: text("verification_status").default("pendente").notNull(), // 'pendente', 'aprovado', 'suspenso'
   
   // Dados de Faturamento / Assinatura
   plan: text("plan").default("pro").notNull(), // 'free', 'pro', 'enterprise'
-  subscriptionStatus: text("subscription_status").default("ativo").notNull(), // 'ativo', 'inadimplente', 'cancelado'
+  subscriptionStatus: text("subscription_status").default("pendente").notNull(), // 'pendente', 'ativo', 'inadimplente', 'cancelado'
   monthlyFee: numeric("monthly_fee", { precision: 10, scale: 2 }).default("149.00").notNull(),
   nextBillingDate: timestamp("next_billing_date"),
   
@@ -139,7 +141,7 @@ export const transactions = pgTable("transactions", {
   amount: numeric("amount", { precision: 10, scale: 2 }).notNull(),
   type: text("type").notNull(), // 'mensalidade_pro', 'taxa_plataforma_parceria', 'mensalidade_imobiliaria'
   paymentMethod: text("payment_method").notNull(), // 'pix', 'cartao_credito'
-  status: text("status").default("pago").notNull(), // 'pago', 'pendente', 'estornado'
+  status: text("status").default("pendente").notNull(), // 'pago', 'pendente', 'estornado'
   description: text("description").notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
@@ -165,9 +167,9 @@ export const dvpCertificates = pgTable("dvp_certificates", {
   clientPhone: text("client_phone"),
   clientCpfPartial: text("client_cpf_partial").notNull(), // ex: ***.456.789-**
   visitDate: timestamp("visit_date").notNull(),
-  lockExpirationDate: timestamp("lock_expiration_date").notNull(), // 180 dias de trava jurídica
+  lockExpirationDate: timestamp("lock_expiration_date").notNull(), // data calculada; só tem efeito após formalização válida
   commissionSplit: numeric("commission_split", { precision: 5, scale: 2 }).default("50.00").notNull(),
-  status: text("status").default("ativo").notNull(), // 'ativo', 'fechado', 'expirado', 'contestado'
-  legalClausesAccepted: boolean("legal_clauses_accepted").default(true).notNull(),
+  status: text("status").default("rascunho").notNull(), // 'rascunho', 'ativo', 'fechado', 'expirado', 'contestado'
+  legalClausesAccepted: boolean("legal_clauses_accepted").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });

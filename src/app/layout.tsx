@@ -3,16 +3,16 @@ import "./globals.css";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://negocialar.com.br"),
-  title: "Negocia Lar — Plataforma MLS B2B de Parcerias Imobiliárias Blindadas",
+  title: "Negocia Lar — Plataforma MLS B2B para Corretores",
   description:
-    "A maior rede de co-corretagem e parcerias seguras do Brasil. Blindagem jurídica DVP 180 dias contra atravessamento, radar com inteligência artificial e fichas white-label. Um produto SNNtech.",
+    "Plataforma em desenvolvimento para cadastro e parceria de imóveis, registro de visitas e organização de clientes. Um produto SNNtech.",
   keywords: [
     "co-corretagem",
     "parceria imobiliaria",
     "MLS Brasil",
     "corretor de imoveis",
     "CRECI",
-    "blindagem juridica",
+    "gestao de imoveis",
     "SNNtech",
   ],
   authors: [{ name: "SNNtech", url: "https://snntech.com.br" }],
@@ -21,9 +21,9 @@ export const metadata: Metadata = {
     apple: "/logo-negocialar.png",
   },
   openGraph: {
-    title: "Negocia Lar — Parcerias Imobiliárias Blindadas (MLS B2B)",
+    title: "Negocia Lar — Rede de Parcerias Imobiliárias (MLS B2B)",
     description:
-      "Faça parcerias 50/50 com total blindagem jurídica. Validação de CRECI por IA, Radar de Compradores e Fichas White-Label sem expor o captador. Um produto SNNtech.",
+      "Organize imóveis, clientes e potenciais parcerias em uma plataforma em desenvolvimento para corretores. Um produto SNNtech.",
     url: "https://negocialar.com.br",
     siteName: "Negocia Lar - SNNtech",
     images: [

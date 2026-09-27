@@ -60,7 +60,7 @@ import {
   createBuyerProfile,
   createDvpCertificate,
   markNotificationAsRead,
-  switchBrokerSession,
+  logoutUser,
 } from "@/lib/actions";
 
 interface NotificationItem {
@@ -459,10 +459,11 @@ export default function NegociaLarApp({
 
   const unreadCount = notifications.filter((n) => !n.read).length;
 
-  const handleSelectBrokerSession = async (user: UserItem) => {
-    await switchBrokerSession(user.id);
-    setCurrentUser(user);
-    setIsUserSwitcherOpen(false);
+  const handleLogout = async () => {
+    await logoutUser();
+    setCurrentUser(null);
+    setUserList([]);
+    setCurrentView("landing");
   };
 
   const handleNotificationClick = async (notif: NotificationItem) => {
@@ -494,7 +495,6 @@ export default function NegociaLarApp({
         minBedrooms: naturalLanguageQuery.includes("3") ? 3 : naturalLanguageQuery.includes("2") ? 2 : 1,
         minParkingSpots: 1,
         notes: naturalLanguageQuery,
-        brokerId: currentBroker.id,
       });
 
       if (res.success && res.profile) {
@@ -564,7 +564,9 @@ export default function NegociaLarApp({
   const activeProperty = selectedPropertyForTerm || initialProperties[0];
 
   // Métricas do Admin
-  const totalRevenue = initialTransactions.reduce((acc, t) => acc + parseFloat(t.amount), 0);
+  const totalRevenue = initialTransactions
+    .filter((transaction) => transaction.status === "pago")
+    .reduce((acc, t) => acc + parseFloat(t.amount), 0);
   const mrrEstimated = userList
     .filter((u) => u.subscriptionStatus === "ativo")
     .reduce((acc, u) => acc + parseFloat(u.monthlyFee || "0"), 0);
@@ -616,7 +618,7 @@ export default function NegociaLarApp({
           <div className="flex items-center gap-2">
             <Sparkles className="w-4 h-4 shrink-0 font-bold" />
             <span>
-              <strong>Banco 100% Zerado:</strong> Crie seu <strong>Usuário Master</strong> com seu CRECI real para cadastrar imóveis blindados, testar o radar com IA e emitir certificados DVP!
+              Faça login ou cadastre-se. Contas novas aguardam validação do CRECI.
             </span>
           </div>
           <button
@@ -624,7 +626,7 @@ export default function NegociaLarApp({
             className="bg-slate-950 hover:bg-slate-900 text-white font-bold px-4 py-1.5 rounded-lg text-xs transition shrink-0 shadow-md flex items-center gap-1.5"
           >
             <UserPlus className="w-3.5 h-3.5 text-amber-400" />
-            <span>Criar Meu Usuário Master Agora</span>
+            <span>Cadastrar / entrar</span>
           </button>
         </div>
       )}
@@ -661,7 +663,7 @@ export default function NegociaLarApp({
               <span>🌐 Ver Landing Page</span>
             </button>
 
-            <button
+            {currentUser?.role === "admin" && <button
               onClick={() => setActiveTab("admin")}
               className={`flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg border transition ${
                 activeTab === "admin"
@@ -671,7 +673,7 @@ export default function NegociaLarApp({
             >
               <TrendingUp className="w-3.5 h-3.5" />
               <span>Painel Admin & Faturamento</span>
-            </button>
+            </button>}
 
             {/* Sininho de Notificações com IA */}
             <div className="relative">
@@ -751,7 +753,7 @@ export default function NegociaLarApp({
               )}
             </div>
 
-            {/* Perfil Ativo com Seletor de Sessão Real */}
+            {/* Perfil autenticado; não permitir assumir a sessão de outro corretor. */}
             <div className="relative">
               <button
                 onClick={() => setIsUserSwitcherOpen(!isUserSwitcherOpen)}
@@ -771,12 +773,12 @@ export default function NegociaLarApp({
                 </div>
               </button>
 
-              {/* Dropdown de Troca de Corretor / Perfil */}
+              {/* Menu do perfil */}
               {isUserSwitcherOpen && (
                 <div className="absolute right-0 mt-2 w-72 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95">
                   <div className="p-3 bg-slate-950 border-b border-slate-800">
                     <div className="text-[11px] font-bold text-amber-400 uppercase tracking-wider">
-                      Corretor Ativo no Banco
+                      Minha conta
                     </div>
                     <div className="text-sm font-bold text-white mt-0.5">{currentBroker.name}</div>
                     <div className="text-xs text-slate-400">
@@ -786,41 +788,7 @@ export default function NegociaLarApp({
                     </div>
                   </div>
 
-                  <div className="p-2 space-y-1">
-                    <div className="text-[10px] font-bold text-slate-400 uppercase tracking-wider px-2 pt-1 pb-1">
-                      {userList.length === 0 ? "Nenhum Usuário Cadastrado" : "Alternar Perfil Cadastrado:"}
-                    </div>
-                    {userList.length === 0 ? (
-                      <div className="p-2.5 text-center text-xs text-slate-400 bg-slate-950/40 rounded-xl">
-                        Nenhum corretor cadastrado ainda.
-                      </div>
-                    ) : (
-                      userList.map((u) => (
-                        <button
-                          key={u.id}
-                          onClick={() => handleSelectBrokerSession(u)}
-                          className={`w-full flex items-center gap-2.5 p-2 rounded-xl text-left text-xs transition ${
-                            u.id === currentBroker.id
-                              ? "bg-amber-500/15 border border-amber-500/40 text-amber-300 font-bold"
-                              : "hover:bg-slate-800 text-slate-300"
-                          }`}
-                        >
-                          <img
-                            src={u.avatarUrl || "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400"}
-                            alt={u.name}
-                            className="w-7 h-7 rounded-full object-cover shrink-0"
-                          />
-                          <div className="truncate flex-1">
-                            <div className="font-semibold truncate">{u.name}</div>
-                            <div className="text-[10px] text-slate-400 font-mono">
-                              {u.role === "admin" ? "⭐ Master Admin" : `CRECI ${u.creci}`}
-                            </div>
-                          </div>
-                          {u.id === currentBroker.id && <Check className="w-3.5 h-3.5 text-amber-400 shrink-0" />}
-                        </button>
-                      ))
-                    )}
-                  </div>
+                  <div className="p-3 text-xs text-slate-300">{currentUser?.email}</div>
 
                   <div className="p-2 border-t border-slate-800 bg-slate-950/40 space-y-1">
                     <button
@@ -831,8 +799,9 @@ export default function NegociaLarApp({
                       className="w-full py-2 px-3 text-xs font-bold text-center bg-amber-600 hover:bg-amber-700 text-white rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm"
                     >
                       <UserPlus className="w-3.5 h-3.5" />
-                      <span>{userList.length === 0 ? "Criar Meu Usuário Master" : "Cadastrar Novo Corretor"}</span>
+                      <span>Cadastrar outro corretor</span>
                     </button>
+                    <button onClick={handleLogout} className="w-full py-2 px-3 text-xs font-semibold text-slate-300 hover:bg-slate-800 rounded-xl">Sair da conta</button>
                     <button
                       onClick={() => {
                         setIsUserSwitcherOpen(false);
@@ -897,7 +866,7 @@ export default function NegociaLarApp({
             }`}
           >
             <Stamp className="w-4 h-4 text-emerald-400" />
-            DVP Digital & Trava 180 Dias
+            Registro de Visita (DVP em desenvolvimento)
           </button>
 
           <button
@@ -912,7 +881,7 @@ export default function NegociaLarApp({
             Nova Captação Blindada
           </button>
 
-          <button
+          {currentUser?.role === "admin" && <button
             onClick={() => setActiveTab("admin")}
             className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition whitespace-nowrap border ${
               activeTab === "admin"
@@ -922,12 +891,17 @@ export default function NegociaLarApp({
           >
             <DollarSign className="w-4 h-4" />
             Gestão & Faturamento
-          </button>
+          </button>}
         </div>
       </header>
 
       {/* Main Content Area */}
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {currentUser && currentUser.verificationStatus !== "aprovado" && (
+          <div role="status" className="mb-6 rounded-xl border border-amber-500/40 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
+            Seu cadastro está pendente de verificação do CRECI e confirmação do pagamento. As ações de cadastro e parceria ficam bloqueadas até a aprovação.
+          </div>
+        )}
         {/* TAB ADMIN: PAINEL DE CONTROLE DE USUÁRIOS E FATURAMENTO */}
         {activeTab === "admin" && (
           <div className="space-y-8">
@@ -944,9 +918,9 @@ export default function NegociaLarApp({
               </div>
 
               <div className="flex items-center gap-3">
-                <span className="text-xs bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-3 py-1.5 rounded-xl font-medium flex items-center gap-1.5">
+                  <span className="text-xs bg-amber-500/10 text-amber-300 border border-amber-500/20 px-3 py-1.5 rounded-xl font-medium flex items-center gap-1.5">
                   <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
-                  Gateway de Pagamentos Ativo
+                  Pagamentos ainda não integrados
                 </span>
               </div>
             </div>
@@ -962,7 +936,7 @@ export default function NegociaLarApp({
                 </div>
                 <div className="text-2xl font-black text-white mt-2">{formatBRL(mrrEstimated)}</div>
                 <div className="flex items-center gap-1 text-[11px] text-emerald-400 mt-1">
-                  <ArrowUpRight className="w-3.5 h-3.5" /> +18.4% vs mês anterior
+                  <ArrowUpRight className="w-3.5 h-3.5" /> Assinaturas ativas cadastradas
                 </div>
               </div>
 
@@ -1205,7 +1179,7 @@ export default function NegociaLarApp({
                   <Building2 className="w-5 h-5 text-amber-500" />
                   Imóveis Disponíveis para Parceria
                 </h2>
-                <p className="text-sm text-slate-400">Imóveis captados por corretores verificados com divisão garantida</p>
+            <p className="text-sm text-slate-400">Imóveis cadastrados por corretores; condições de parceria devem ser confirmadas entre as partes</p>
               </div>
               <div className="flex items-center gap-2 text-xs text-slate-300 bg-slate-900 border border-slate-800 px-3 py-2 rounded-lg">
                 <ShieldCheck className="w-4 h-4 text-emerald-400" />
@@ -1577,7 +1551,7 @@ export default function NegociaLarApp({
               <div className="mt-6 pt-4 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3">
                 <div className="text-xs text-slate-400 flex items-center gap-2">
                   <Clock className="w-4 h-4 text-amber-400" />
-                  Match detectado há 12 minutos via trigger do PostgreSQL
+                  Exemplo demonstrativo com dados fictícios
                 </div>
                 <button
                   onClick={() => {
@@ -1644,7 +1618,7 @@ export default function NegociaLarApp({
                 Termo de Parceria com Cláusula Anti-Atravessamento (Anti-Bypass)
               </h2>
               <p className="text-sm text-slate-400">
-                Respaldo jurídico explícito baseado no Código de Ética dos Corretores e Código Civil.
+                Prévia demonstrativa de um futuro termo. Ainda não há aceite eletrônico nem contrato emitido pelo sistema.
               </p>
             </div>
 
@@ -1652,9 +1626,9 @@ export default function NegociaLarApp({
             <div className="bg-red-950/30 border border-red-500/40 p-4 rounded-2xl flex items-start gap-3">
               <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
               <div className="text-xs space-y-1 text-slate-300">
-                <span className="font-bold text-red-300">CLÁUSULA DE PROTEÇÃO RIGOROSA:</span>
+                  <span className="font-bold text-amber-300">MODELO DEMONSTRATIVO:</span>
                 <p>
-                  É expressamente vedado a qualquer dos corretores contatar o proprietário ou o cliente comprador sem a anuência prévia e por escrito do parceiro. Qualquer violação acarreta penalidade de <strong>100% dos honorários de corretagem</strong> e encaminhamento ao Tribunal de Ética do CRECI.
+                  Este texto de exemplo não foi aceito pelas partes e não gera obrigações. As condições da parceria precisam ser revisadas e formalizadas fora do sistema.
                 </p>
               </div>
             </div>
@@ -1663,23 +1637,23 @@ export default function NegociaLarApp({
               {/* Cabeçalho do Contrato */}
               <div className="text-center pb-4 border-b border-slate-800">
                 <div className="text-xs font-mono text-amber-400 uppercase tracking-widest font-bold">
-                  INSTRUMENTO PARTICULAR DE CO-CORRETAGEM IMOBILIÁRIA E BLINDAGEM DE CLIENTE
+                  RASCUNHO DE TERMO DE PARCERIA — SEM VALIDADE CONTRATUAL
                 </div>
                 <div className="text-xs text-slate-400 mt-1">
-                  Fundamento: Resolução COFECI nº 326/1992, art. 6º | Código Civil Brasileiro, arts. 725, 727 e 728
+                  Prévia demonstrativa. Consulte assessoria jurídica para definir cláusulas aplicáveis.
                 </div>
               </div>
 
               {/* Partes Envolvidas */}
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                  <div className="text-xs text-amber-400 font-bold mb-1">CORRETOR CAPTADOR (50%)</div>
+                  <div className="text-xs text-amber-400 font-bold mb-1">CORRETOR CAPTADOR (EXEMPLO)</div>
                   <div className="text-sm font-semibold text-white">Carlos Eduardo Silva</div>
                   <div className="text-xs text-slate-400">CRECI 189420-F • São Paulo/SP</div>
                 </div>
 
                 <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                  <div className="text-xs text-amber-400 font-bold mb-1">CORRETOR PARCEIRO (50%)</div>
+                  <div className="text-xs text-amber-400 font-bold mb-1">CORRETOR PARCEIRO (EXEMPLO)</div>
                   <div className="text-sm font-semibold text-white">Mariana Costa Ramos</div>
                   <div className="text-xs text-slate-400">CRECI 204112-F • São Paulo/SP</div>
                 </div>
@@ -1720,7 +1694,7 @@ export default function NegociaLarApp({
                 DVP Digital (Documento de Visita Presencial)
               </h2>
               <p className="text-sm text-slate-400">
-                Padrão COFECI com Trava de Anterioridade de 180 dias. Prova definitiva de quem apresentou o cliente ao imóvel.
+                Registro interno de visita. Não coleta assinatura eletrônica nem substitui a formalização jurídica entre as partes.
               </p>
             </div>
 
@@ -1764,7 +1738,7 @@ export default function NegociaLarApp({
                     ...prev,
                   ]);
                   setDvpEmitted(true);
-                  setToastMessage(`📜 Certificado ${res.certificate.certificateHash} registrado no banco com trava de 180 dias!`);
+                  setToastMessage(`Registro ${res.certificate.certificateHash} salvo como rascunho. Ele ainda não tem aceite eletrônico.`);
                   setTimeout(() => setToastMessage(null), 6000);
                 }
               }}
@@ -1773,9 +1747,9 @@ export default function NegociaLarApp({
               <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30">
                 <div className="flex items-center gap-2 text-xs text-emerald-400 font-semibold">
                   <Fingerprint className="w-4 h-4" />
-                  Trava de Anterioridade Ativada (180 dias)
+                  Registro interno • rascunho sem aceite eletrônico
                 </div>
-                <span className="text-[11px] text-slate-400 font-mono">Art. 727 Código Civil</span>
+                <span className="text-[11px] text-slate-400">Sem aceite contratual</span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1807,7 +1781,7 @@ export default function NegociaLarApp({
                       name="clientName"
                       required
                       placeholder="Ex: Dr. Roberto Silveira"
-                      defaultValue="Dr. Roberto Silveira"
+                      defaultValue=""
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
                     />
                   </div>
@@ -1817,7 +1791,7 @@ export default function NegociaLarApp({
                       name="clientCpf"
                       required
                       placeholder="***.382.910-**"
-                      defaultValue="***.382.910-**"
+                      defaultValue=""
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
                     />
                   </div>
@@ -1826,7 +1800,7 @@ export default function NegociaLarApp({
                     <input
                       name="clientPhone"
                       placeholder="(11) 97777-6666"
-                      defaultValue="(11) 97777-6666"
+                      defaultValue=""
                       className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
                     />
                   </div>
@@ -1849,7 +1823,7 @@ export default function NegociaLarApp({
                   className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-slate-950 font-bold py-3.5 rounded-xl transition shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 text-xs sm:text-sm"
                 >
                   <Stamp className="w-5 h-5" />
-                  Emitir e Gravar DVP Digital no Banco de Dados (180 Dias de Trava)
+                  Registrar visita em rascunho
                 </button>
               </div>
             </form>
@@ -1863,7 +1837,7 @@ export default function NegociaLarApp({
                     Certificados DVP Registrados no Banco ({dvpList.length})
                   </h3>
                 </div>
-                <span className="text-xs text-slate-400">Proteção Ativa COFECI</span>
+                <span className="text-xs text-slate-400">Registros internos de visita</span>
               </div>
 
               {dvpList.length === 0 ? (
@@ -1880,13 +1854,13 @@ export default function NegociaLarApp({
                           {dvp.certificateHash}
                         </span>
                         <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-bold">
-                          Trava Ativa (180 dias)
+                          {dvp.status === "rascunho" ? "Rascunho • sem efeito contratual" : dvp.status}
                         </span>
                       </div>
                       <div className="text-xs text-slate-300 grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                         <div><strong>Cliente:</strong> {dvp.clientName} (CPF: {dvp.clientCpfPartial})</div>
                         <div><strong>Data da Visita:</strong> {new Date(dvp.visitDate).toLocaleDateString("pt-BR")}</div>
-                        <div><strong>Validade da Blindagem:</strong> até {new Date(dvp.lockExpirationDate).toLocaleDateString("pt-BR")}</div>
+                        <div><strong>Data calculada no registro, sem efeito contratual:</strong> {new Date(dvp.lockExpirationDate).toLocaleDateString("pt-BR")}</div>
                         <div><strong>Divisão de Comissão:</strong> {dvp.commissionSplit}% / {100 - parseFloat(dvp.commissionSplit)}%</div>
                       </div>
                     </div>
@@ -1958,7 +1932,6 @@ export default function NegociaLarApp({
 
                     try {
                       const res = await createProperty({
-                        brokerId: currentBroker.id,
                         title,
                         purpose: formPurpose,
                         salePrice,
@@ -2003,7 +1976,7 @@ export default function NegociaLarApp({
                         coverPhoto: formCoverPhoto,
                         photos: formGalleryPhotos.length > 0 ? formGalleryPhotos : [formCoverPhoto],
                         floorPlanPhotos: formFloorPlans,
-                        description: (fd.get("description") as string) || "Excelente oportunidade de negócio com divisão garantida.",
+                        description: (fd.get("description") as string) || "Oportunidade imobiliária disponível para consulta.",
                         ownerName,
                         ownerPhone,
                         acceptsPartnership: true,
@@ -2703,11 +2676,11 @@ export default function NegociaLarApp({
                       </div>
                       <div className="space-y-1">
                         <div className="text-xs font-bold text-white flex items-center gap-1.5">
-                          <span>[x] Ocultar Rua do Cliente Final (Blindagem MLS Ativa)</span>
+                          <span>Ocultar rua e número na vitrine pública</span>
                           <Lock className="w-3.5 h-3.5 text-amber-400" />
                         </div>
                         <p className="text-[11px] leading-relaxed text-slate-300">
-                          Recomendado! Os corretores parceiros e compradores veem apenas o Bairro e a Cidade na vitrine e na ficha white-label. O nome da rua e o número só são revelados após a assinatura do DVP Digital de 180 dias.
+                          Oculte rua e número na vitrine pública. O DVP ainda está em desenvolvimento e não controla a liberação desses dados por assinatura.
                         </p>
                       </div>
                     </div>

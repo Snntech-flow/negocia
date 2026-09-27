@@ -35,6 +35,7 @@ export default function LandingPage({
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
   const [selectedPlanForOnboarding, setSelectedPlanForOnboarding] = useState("40");
+  const [onboardingMode, setOnboardingMode] = useState<"register" | "login">("register");
 
   const plans = [
     {
@@ -125,13 +126,13 @@ export default function LandingPage({
           <div className="flex items-center gap-2 sm:gap-3">
             <button
               onClick={() => {
+                setOnboardingMode("login");
                 setSelectedPlanForOnboarding("40");
                 setIsOnboardingOpen(true);
               }}
-              className="bg-amber-600 hover:bg-amber-700 text-white font-bold text-xs sm:text-sm py-2 sm:py-2.5 px-4 sm:px-5 rounded-lg transition shadow-sm flex items-center gap-1.5"
+              className="bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs sm:text-sm py-2 sm:py-2.5 px-4 sm:px-5 rounded-lg transition border border-slate-300"
             >
-              <span>Cadastrar / Entrar</span>
-              <ArrowRight className="w-3.5 h-3.5" />
+              Entrar
             </button>
           </div>
         </div>
@@ -167,6 +168,7 @@ export default function LandingPage({
                 </a>
                 <button
                   onClick={() => {
+                    setOnboardingMode("register");
                     setSelectedPlanForOnboarding("40");
                     setIsOnboardingOpen(true);
                   }}
@@ -189,7 +191,7 @@ export default function LandingPage({
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Check className="w-4 h-4 text-emerald-600 font-bold" />
-                  Cancele quando quiser
+                  Piloto sem cobrança integrada
                 </div>
               </div>
             </div>
@@ -452,6 +454,7 @@ export default function LandingPage({
                   <div className="pt-6">
                     <button
                       onClick={() => {
+                        setOnboardingMode("register");
                         const planKey = p.name.includes("10")
                           ? "10"
                           : p.name.includes("20")
@@ -481,13 +484,14 @@ export default function LandingPage({
               <div className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
                 <TrendingUp className="w-4 h-4" /> A Conta Matemática do Corretor
               </div>
-              <h4 className="text-base sm:text-lg font-bold">1 única parceria cobre 13 anos de mensalidade.</h4>
+              <h4 className="text-base sm:text-lg font-bold">Organize oportunidades e parcerias imobiliárias.</h4>
               <p className="text-xs text-slate-300 max-w-xl leading-relaxed">
-                Em um imóvel de R$ 800.000, sua fatia de 50% de comissão é de <strong>R$ 24.000</strong>. O Plano Pro custa R$ 149/mês. Não é custo, é alavancagem de vendas.
+                Registre seus imóveis e acompanhe as oportunidades com seus clientes. Os valores dos planos são apenas uma referência enquanto o pagamento não está integrado.
               </p>
             </div>
             <button
               onClick={() => {
+                setOnboardingMode("register");
                 setSelectedPlanForOnboarding("40");
                 setIsOnboardingOpen(true);
               }}
@@ -510,20 +514,20 @@ export default function LandingPage({
           <div className="space-y-3">
             {[
               {
-                q: "Como o sistema garante que meu parceiro não vai direto ao proprietário?",
+                q: "Quem consegue ver os dados do proprietário?",
                 a: "Os dados do proprietário são restritos ao corretor que cadastrou o imóvel. A versão atual não oferece assinatura eletrônica ou garantia jurídica automática; o registro de visita fica como rascunho.",
               },
               {
                 q: "O cliente final descobre quem é o captador do imóvel?",
-                a: "Nunca. Ao compartilhar a ficha White-Label, todos os dados exibidos na tela e no PDF (nome, CRECI, telefone e botão de WhatsApp) são exclusivamente seus.",
+                a: "Os dados completos do proprietário são exibidos somente para o corretor que cadastrou o imóvel. A ficha pública e o PDF ainda estão em desenvolvimento.",
               },
               {
                 q: "Preciso ter CRECI ativo para participar?",
-                a: "Sim. O Negocia Lar é uma rede B2B exclusiva para corretores e imobiliárias devidamente inscritos no CRECI. Todas as contas passam por moderação.",
+                a: "O cadastro pede o CRECI, mas a consulta ao conselho é manual. Contas novas ficam pendentes até a validação.",
               },
               {
                 q: "Existe taxa de cancelamento ou contrato de fidelidade?",
-                a: "Não. No plano mensal você pode cancelar a qualquer momento direto pelo painel com 1 clique.",
+                a: "O pagamento ainda não está integrado e o painel não tem cancelamento automático. Os valores exibidos são referências para o piloto.",
               },
             ].map((faq, idx) => (
               <div key={idx} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
@@ -555,7 +559,7 @@ export default function LandingPage({
             </div>
           </div>
           <div>
-            © 2026 SNNtech. Todos os direitos reservados. Em conformidade com a Res. COFECI 326/92 e Código Civil.
+            © 2026 SNNtech. Todos os direitos reservados. Plataforma em desenvolvimento.
           </div>
         </div>
       </footer>
@@ -569,6 +573,7 @@ export default function LandingPage({
           onAccessPlatform(userData);
         }}
         initialPlan={selectedPlanForOnboarding}
+        initialMode={onboardingMode}
       />
     </div>
   );
