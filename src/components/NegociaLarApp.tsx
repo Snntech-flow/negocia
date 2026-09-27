@@ -49,6 +49,7 @@ import {
   Sun,
   Compass,
   Eye,
+  Info,
   Trash2,
   CheckSquare,
   Square,
@@ -89,6 +90,16 @@ interface DvpCertificateItem {
   status: string;
   createdAt: Date;
 }
+
+const SCREEN_GUIDANCE: Record<string, { title: string; description: string }> = {
+  vitrine: { title: "Vitrine MLS", description: "Encontre imóveis compartilhados por corretores, filtre as oportunidades e consulte as condições diretamente com o captador. Endereços completos e dados do proprietário ficam restritos ao captador." },
+  crm: { title: "CRM de Leads", description: "Organize clientes e parceiros, acompanhe cada oportunidade por etapa, registre contatos e programe retornos. Os leads ficam privados na sua carteira." },
+  radar: { title: "Radar de Compradores", description: "Compare as preferências de compradores cadastrados com os imóveis disponíveis. Confira os critérios do match antes de falar com o corretor responsável." },
+  termo: { title: "Termo de Parceria", description: "Consulte uma prévia demonstrativa para discutir a parceria. O sistema não coleta aceite eletrônico nem emite um contrato válido; formalize os termos fora da plataforma." },
+  dvp: { title: "Registro de Visita · DVP em desenvolvimento", description: "Registre internamente os dados de uma visita. O DVP é salvo como rascunho, sem assinatura eletrônica e sem efeito contratual; não representa garantia de comissão nem substitui orientação jurídica." },
+  cadastrar: { title: "Nova Captação", description: "Cadastre um imóvel e suas condições de parceria. Os dados completos de endereço e do proprietário ficam visíveis apenas para o corretor captador." },
+  admin: { title: "Gestão e Faturamento", description: "Área administrativa para revisar cadastros e acompanhar informações de assinatura. Pagamentos ainda não são processados pela plataforma." },
+};
 
 interface Property {
   id: string;
@@ -320,7 +331,6 @@ export default function NegociaLarApp({
   const [selectedPropertyForWhiteLabel, setSelectedPropertyForWhiteLabel] = useState<Property | null>(null);
   const [selectedPropertyForTerm, setSelectedPropertyForTerm] = useState<Property | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
-  const [termSigned, setTermSigned] = useState(false);
   const [dvpEmitted, setDvpEmitted] = useState(false);
   const [userSearch, setUserSearch] = useState("");
   const [isUserSwitcherOpen, setIsUserSwitcherOpen] = useState(false);
@@ -638,9 +648,9 @@ export default function NegociaLarApp({
 
       {/* Top Header */}
       <header className="border-b border-slate-800 bg-slate-900/90 backdrop-blur sticky top-0 z-40">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-4">
-            <div className="relative w-12 h-12 rounded-xl overflow-hidden shadow-lg shadow-amber-500/10 border border-amber-500/30">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <div className="relative w-10 h-10 rounded-lg overflow-hidden shadow-lg shadow-amber-500/10 border border-amber-500/30">
               <Image
                 src="/logo-negocialar.png"
                 alt="Negocia Lar"
@@ -650,10 +660,10 @@ export default function NegociaLarApp({
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-extrabold text-2xl tracking-tight text-white">Negocia<span className="text-amber-500">lar</span></span>
+                <span className="font-extrabold text-xl tracking-tight text-white">Negocia<span className="text-amber-500">lar</span></span>
                 <span className="text-[10px] bg-amber-500/20 text-amber-300 font-semibold px-2 py-0.5 rounded-full border border-amber-500/30">MLS B2B</span>
               </div>
-              <p className="text-xs text-slate-400">
+              <p className="hidden text-[11px] text-slate-400 sm:block">
                 Rede de Co-corretagem Segura • <span className="text-amber-400 font-semibold">Um produto SNNtech</span>
               </p>
             </div>
@@ -667,18 +677,6 @@ export default function NegociaLarApp({
             >
               <span>🌐 Ver Landing Page</span>
             </button>
-
-            {currentUser?.role === "admin" && <button
-              onClick={() => setActiveTab("admin")}
-              className={`flex items-center gap-2 text-xs px-3 py-1.5 rounded-lg border transition ${
-                activeTab === "admin"
-                  ? "bg-amber-500 text-slate-950 font-bold border-amber-400 shadow-md shadow-amber-500/20"
-                  : "bg-slate-800/80 text-amber-400 border-amber-500/30 hover:bg-slate-800"
-              }`}
-            >
-              <TrendingUp className="w-3.5 h-3.5" />
-              <span>Painel Admin & Faturamento</span>
-            </button>}
 
             {/* Sininho de Notificações com IA */}
             <div className="relative">
@@ -824,90 +822,28 @@ export default function NegociaLarApp({
         </div>
 
         {/* Navigation Tabs */}
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-1 sm:space-x-3 border-t border-slate-800/60 overflow-x-auto py-2">
-          <button
-            onClick={() => setActiveTab("vitrine")}
-            className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition whitespace-nowrap ${
-              activeTab === "vitrine"
-                ? "bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/20"
-                : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-            }`}
-          >
-            <Building2 className="w-4 h-4" />
-            Vitrine MLS ({initialProperties.length})
+        <div className="max-w-7xl mx-auto flex items-center gap-2 border-t border-slate-800/60 px-4 py-1.5 sm:px-6 lg:px-8">
+          <button onClick={() => setActiveTab("vitrine")} className={`shrink-0 rounded-md px-2.5 py-1.5 text-xs font-semibold transition ${activeTab === "vitrine" ? "bg-amber-500 text-slate-950" : "text-slate-400 hover:bg-slate-800 hover:text-white"}`}>
+            <Building2 className="mr-1.5 inline h-3.5 w-3.5" />Vitrine ({initialProperties.length})
           </button>
-
-          <button
-            onClick={() => setActiveTab("crm")}
-            className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition whitespace-nowrap ${
-              activeTab === "crm"
-                ? "bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/20"
-                : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-            }`}
-          >
-            <Users className="w-4 h-4" /> CRM de Leads ({initialLeads.length})
-          </button>
-
-          <button
-            onClick={() => setActiveTab("radar")}
-            className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition relative whitespace-nowrap ${
-              activeTab === "radar"
-                ? "bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/20"
-                : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-            }`}
-          >
-            <Radar className="w-4 h-4" />
-            Radar de Compradores
-            <span className="bg-red-500 text-white text-[10px] font-bold px-1.5 py-0.2 rounded-full">1 MATCH</span>
-          </button>
-
-          <button
-            onClick={() => setActiveTab("termo")}
-            className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition whitespace-nowrap ${
-              activeTab === "termo"
-                ? "bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/20"
-                : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-            }`}
-          >
-            <FileText className="w-4 h-4" />
-            Termo Anti-Bypass (50/50)
-          </button>
-
-          <button
-            onClick={() => setActiveTab("dvp")}
-            className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition whitespace-nowrap ${
-              activeTab === "dvp"
-                ? "bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/20"
-                : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-            }`}
-          >
-            <Stamp className="w-4 h-4 text-emerald-400" />
-            Registro de Visita (DVP em desenvolvimento)
-          </button>
-
-          <button
-            onClick={() => setActiveTab("cadastrar")}
-            className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition whitespace-nowrap ${
-              activeTab === "cadastrar"
-                ? "bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/20"
-                : "text-slate-400 hover:text-white hover:bg-slate-800/50"
-            }`}
-          >
-            <PlusCircle className="w-4 h-4" />
-            Nova Captação Blindada
-          </button>
-
-          {currentUser?.role === "admin" && <button
-            onClick={() => setActiveTab("admin")}
-            className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition whitespace-nowrap border ${
-              activeTab === "admin"
-                ? "bg-amber-500 text-slate-950 font-bold border-amber-400 shadow-md shadow-amber-500/20"
-                : "text-amber-400 border-amber-500/40 hover:bg-slate-800/50"
-            }`}
-          >
-            <DollarSign className="w-4 h-4" />
-            Gestão & Faturamento
-          </button>}
+          {[
+            { title: "Atendimento", active: ["crm", "radar"], items: [{ id: "crm", label: `CRM de Leads (${initialLeads.length})`, icon: Users }, { id: "radar", label: "Radar de Compradores", icon: Radar }] },
+            { title: "Documentos", active: ["termo", "dvp"], items: [{ id: "termo", label: "Prévia do Termo de Parceria", icon: FileText }, { id: "dvp", label: "Registro de Visita", icon: Stamp }] },
+            { title: "Imóveis", active: ["cadastrar"], items: [{ id: "cadastrar", label: "Nova Captação", icon: PlusCircle }] },
+            ...(currentUser?.role === "admin" ? [{ title: "Administração", active: ["admin"], items: [{ id: "admin", label: "Gestão e Faturamento", icon: DollarSign }] }] : []),
+          ].map((menu) => (
+            <details key={menu.title} className="group relative shrink-0">
+              <summary className={`flex cursor-pointer list-none items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition [&::-webkit-details-marker]:hidden ${menu.active.includes(activeTab) ? "bg-amber-500/15 text-amber-300" : "text-slate-400 hover:bg-slate-800 hover:text-white"}`}>
+                {menu.title}<ChevronDown className="h-3.5 w-3.5 transition group-open:rotate-180" />
+              </summary>
+              <div className="absolute left-0 top-full z-50 mt-1 min-w-56 rounded-xl border border-slate-700 bg-slate-900 p-1.5 shadow-xl">
+                {menu.items.map((item) => {
+                  const MenuIcon = item.icon;
+                  return <button key={item.id} type="button" onClick={(event) => { setActiveTab(item.id as typeof activeTab); event.currentTarget.closest("details")?.removeAttribute("open"); }} className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-xs transition ${activeTab === item.id ? "bg-amber-500 text-slate-950 font-bold" : "text-slate-300 hover:bg-slate-800 hover:text-white"}`}><MenuIcon className="h-4 w-4 shrink-0" />{item.label}</button>;
+                })}
+              </div>
+            </details>
+          ))}
         </div>
       </header>
 
@@ -916,6 +852,15 @@ export default function NegociaLarApp({
         {currentUser && currentUser.verificationStatus !== "aprovado" && (
           <div role="status" className="mb-6 rounded-xl border border-amber-500/40 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
             Seu cadastro está pendente de verificação do CRECI e confirmação do pagamento. As ações de cadastro e parceria ficam bloqueadas até a aprovação.
+          </div>
+        )}
+        {SCREEN_GUIDANCE[activeTab] && (
+          <div className={`mb-6 flex items-start gap-3 rounded-xl border px-4 py-3 ${activeTab === "dvp" ? "border-amber-500/40 bg-amber-950/25" : "border-sky-500/25 bg-sky-950/20"}`}>
+            <Info className={`mt-0.5 h-4 w-4 shrink-0 ${activeTab === "dvp" ? "text-amber-300" : "text-sky-300"}`} />
+            <div>
+              <h2 className={`text-xs font-bold ${activeTab === "dvp" ? "text-amber-200" : "text-sky-200"}`}>{SCREEN_GUIDANCE[activeTab].title}</h2>
+              <p className="mt-1 text-xs leading-relaxed text-slate-300">{SCREEN_GUIDANCE[activeTab].description}</p>
+            </div>
           </div>
         )}
         {activeTab === "crm" && (
@@ -1695,27 +1640,8 @@ export default function NegociaLarApp({
                 </div>
               </div>
 
-              {/* Assinatura Eletrônica em 1 Clique */}
-              <div className="pt-2">
-                {termSigned ? (
-                  <div className="bg-emerald-950/40 border border-emerald-500/50 p-4 rounded-xl flex items-center gap-3 text-emerald-300 text-sm">
-                    <CheckCircle2 className="w-6 h-6 text-emerald-400 shrink-0" />
-                    <div>
-                      <div className="font-bold">Termo Aceito Eletronicamente por Ambas as Partes!</div>
-                      <div className="text-xs text-emerald-400/80">
-                        Hash SHA-256 gerado e arquivado. Válido como prova pré-constituída para cobrança de comissão.
-                      </div>
-                    </div>
-                  </div>
-                ) : (
-                  <button
-                    onClick={() => setTermSigned(true)}
-                    className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold py-3 rounded-xl transition shadow-lg shadow-amber-500/20 flex items-center justify-center gap-2"
-                  >
-                    <CheckCircle2 className="w-5 h-5" />
-                    Dar Aceite Eletrônico no Termo de Parceria (1 Clique)
-                  </button>
-                )}
+              <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-4 text-center text-xs leading-relaxed text-amber-100/80">
+                O aceite eletrônico ainda não está disponível. Esta tela é apenas uma prévia para conversa; revise e formalize qualquer parceria fora da plataforma.
               </div>
             </div>
           </div>
