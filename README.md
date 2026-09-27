@@ -8,9 +8,10 @@ Protótipo de uma rede MLS para corretores. O repositório contém a interface i
 - Novos cadastros ficam pendentes até uma pessoa autorizada verificar o CRECI e confirmar o pagamento.
 - Não há integração Pix, gateway, consulta automática ao CRECI ou assinatura eletrônica.
 - O registro de visita é um rascunho interno; não promete efeito jurídico nem trava de anterioridade.
+- O CRM permite cadastrar e editar leads, acompanhar etapas e atividades, agendar retornos, ver sugestões de imóveis e iniciar DVPs em rascunho vinculados ao lead.
 - Dados de proprietário e endereço completo só são retornados ao corretor que cadastrou o imóvel. Dados de clientes são limitados à conta proprietária; perfis de busca são compartilhados anonimizados apenas com corretores aprovados.
 
-Os recursos de co-corretagem, radar, planos e PDFs ainda precisam de implementação e revisão antes de serem oferecidos como serviço em produção.
+Os fluxos completos de co-corretagem, planos e PDFs ainda precisam de implementação e revisão antes de serem oferecidos como serviço em produção.
 
 ## Desenvolvimento local
 

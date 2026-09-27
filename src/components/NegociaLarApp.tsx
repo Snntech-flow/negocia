@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useMemo, useState } from "react";
 import Image from "next/image";
 import {
   ShieldCheck,
@@ -54,6 +54,7 @@ import {
   Square,
 } from "lucide-react";
 import OnboardingModal from "@/components/OnboardingModal";
+import LeadCRM from "@/components/LeadCRM";
 import {
   createProperty,
   updateUserStatus,
@@ -295,6 +296,8 @@ export default function NegociaLarApp({
   initialCurrentUser,
   initialNotifications = [],
   initialDvpList = [],
+  initialLeads = [],
+  initialLeadActivities = [],
 }: {
   initialProperties: Property[];
   initialRadar: BuyerProfile[];
@@ -303,9 +306,11 @@ export default function NegociaLarApp({
   initialCurrentUser?: UserItem | null;
   initialNotifications?: NotificationItem[];
   initialDvpList?: DvpCertificateItem[];
+  initialLeads?: React.ComponentProps<typeof LeadCRM>["initialLeads"];
+  initialLeadActivities?: React.ComponentProps<typeof LeadCRM>["initialActivities"];
 }) {
   const [currentView, setCurrentView] = useState<"app" | "landing">("landing");
-  const [activeTab, setActiveTab] = useState<"vitrine" | "radar" | "cadastrar" | "termo" | "dvp" | "admin">("vitrine");
+  const [activeTab, setActiveTab] = useState<"vitrine" | "crm" | "radar" | "cadastrar" | "termo" | "dvp" | "admin">("vitrine");
   const [userList, setUserList] = useState<UserItem[]>(initialUsers);
   const [currentUser, setCurrentUser] = useState<UserItem | null>(
     initialCurrentUser || initialUsers[0] || null
@@ -833,6 +838,17 @@ export default function NegociaLarApp({
           </button>
 
           <button
+            onClick={() => setActiveTab("crm")}
+            className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition whitespace-nowrap ${
+              activeTab === "crm"
+                ? "bg-amber-500 text-slate-950 font-bold shadow-md shadow-amber-500/20"
+                : "text-slate-400 hover:text-white hover:bg-slate-800/50"
+            }`}
+          >
+            <Users className="w-4 h-4" /> CRM de Leads ({initialLeads.length})
+          </button>
+
+          <button
             onClick={() => setActiveTab("radar")}
             className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition relative whitespace-nowrap ${
               activeTab === "radar"
@@ -901,6 +917,25 @@ export default function NegociaLarApp({
           <div role="status" className="mb-6 rounded-xl border border-amber-500/40 bg-amber-950/30 px-4 py-3 text-sm text-amber-200">
             Seu cadastro está pendente de verificação do CRECI e confirmação do pagamento. As ações de cadastro e parceria ficam bloqueadas até a aprovação.
           </div>
+        )}
+        {activeTab === "crm" && (
+          <LeadCRM
+            initialLeads={initialLeads}
+            initialActivities={initialLeadActivities}
+            properties={propertyList.map((property) => ({ ...property, brokerId: property.broker.id }))}
+            currentUserId={currentUser?.id || null}
+            onOpenProperty={(propertyId) => {
+              const property = propertyList.find((item) => item.id === propertyId);
+              if (!property) return;
+              setPropertyFilterPurpose("todos");
+              setPropertyFilterType("todos");
+              setPropertyFilterSearch(property.title);
+              setActiveTab("vitrine");
+              window.setTimeout(() => {
+                document.querySelector(`[data-property-id="${propertyId}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+              }, 100);
+            }}
+          />
         )}
         {/* TAB ADMIN: PAINEL DE CONTROLE DE USUÁRIOS E FATURAMENTO */}
         {activeTab === "admin" && (
@@ -1281,6 +1316,7 @@ export default function NegociaLarApp({
                 {filteredProperties.map((prop) => (
                   <div
                     key={prop.id}
+                    data-property-id={prop.id}
                     className="bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 hover:border-amber-500/40 transition duration-300 shadow-lg flex flex-col justify-between"
                   >
                     <div>

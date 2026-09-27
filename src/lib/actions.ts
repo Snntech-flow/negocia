@@ -5,6 +5,8 @@ import {
   properties,
   users,
   buyerProfiles,
+  leads,
+  leadActivities,
   partnerships,
   transactions,
   notifications,
@@ -14,6 +16,20 @@ import { eq, desc, and, lte, gte, or, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import crypto from "crypto";
+
+const LEAD_STAGES = ["novo", "contato", "qualificado", "visita", "proposta", "negociacao", "fechado", "perdido"] as const;
+const LEAD_ACTIVITY_TYPES = ["ligacao", "mensagem", "visita", "proposta", "nota"] as const;
+
+function normalizePhone(phone: string) {
+  return phone.replace(/\D/g, "");
+}
+
+function parseLeadDate(value?: string) {
+  if (!value?.trim()) return null;
+  const date = new Date(value);
+  if (!Number.isFinite(date.getTime())) throw new Error("Informe uma data válida para o próximo retorno.");
+  return date;
+}
 
 const SESSION_COOKIE = "negocialar_session";
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
@@ -265,6 +281,7 @@ export async function getMarketplaceData() {
         propertyId: dvpCertificates.propertyId,
         captorBrokerId: dvpCertificates.captorBrokerId,
         partnerBrokerId: dvpCertificates.partnerBrokerId,
+        leadId: dvpCertificates.leadId,
         clientName: dvpCertificates.clientName,
         clientCpfPartial: dvpCertificates.clientCpfPartial,
         visitDate: dvpCertificates.visitDate,
@@ -278,6 +295,49 @@ export async function getMarketplaceData() {
       .orderBy(desc(dvpCertificates.createdAt))
       : [];
 
+    const leadList = currentUser ? await db
+      .select({
+        id: leads.id,
+        fullName: leads.fullName,
+        phone: leads.phone,
+        email: leads.email,
+        leadType: leads.leadType,
+        stage: leads.stage,
+        source: leads.source,
+        propertyType: leads.propertyType,
+        city: leads.city,
+        neighborhoods: leads.neighborhoods,
+        maxBudget: leads.maxBudget,
+        minBedrooms: leads.minBedrooms,
+        notes: leads.notes,
+        nextAction: leads.nextAction,
+        nextActionAt: leads.nextActionAt,
+        lastContactAt: leads.lastContactAt,
+        lostReason: leads.lostReason,
+        createdAt: leads.createdAt,
+        updatedAt: leads.updatedAt,
+      })
+      .from(leads)
+      .where(eq(leads.ownerUserId, currentUser.id))
+      .orderBy(desc(leads.updatedAt))
+      : [];
+
+    const leadActivityList = currentUser ? await db
+      .select({
+        id: leadActivities.id,
+        leadId: leadActivities.leadId,
+        userId: leadActivities.userId,
+        activityType: leadActivities.activityType,
+        description: leadActivities.description,
+        occurredAt: leadActivities.occurredAt,
+      })
+      .from(leadActivities)
+      .innerJoin(leads, eq(leadActivities.leadId, leads.id))
+      .where(eq(leads.ownerUserId, currentUser.id))
+      .orderBy(desc(leadActivities.occurredAt))
+      .limit(500)
+      : [];
+
     return {
       properties: propertyList,
       radarList,
@@ -286,6 +346,8 @@ export async function getMarketplaceData() {
       currentUser,
       notifications: userNotifications,
       dvpList,
+      leads: leadList,
+      leadActivities: leadActivityList,
     };
   } catch (error) {
     console.error("Erro ao carregar dados do banco:", error);
@@ -297,8 +359,186 @@ export async function getMarketplaceData() {
       currentUser: null,
       notifications: [],
       dvpList: [],
+      leads: [],
+      leadActivities: [],
     };
   }
+}
+
+export async function createLead(data: {
+  fullName: string;
+  phone: string;
+  email?: string;
+  leadType: string;
+  source: string;
+  propertyType?: string;
+  city?: string;
+  neighborhoods?: string[];
+  maxBudget?: string;
+  minBedrooms?: number;
+  notes?: string;
+  nextAction?: string;
+  nextActionAt?: string;
+}) {
+  const actor = await requireCurrentUser();
+  requireActiveBroker(actor);
+  const fullName = data.fullName.trim();
+  const phone = data.phone.trim();
+  const normalizedPhone = normalizePhone(phone);
+  if (fullName.length < 2 || fullName.length > 120) throw new Error("Informe o nome do lead.");
+  if (normalizedPhone.length < 8 || normalizedPhone.length > 15) throw new Error("Informe um telefone válido com DDD.");
+  if (!(["comprador", "proprietario", "locatario", "parceiro"] as string[]).includes(data.leadType)) throw new Error("Tipo de lead inválido.");
+  if (!(["indicacao", "whatsapp", "portal", "site", "ligacao", "rede_social", "outro"] as string[]).includes(data.source)) throw new Error("Origem do lead inválida.");
+  const email = data.email?.trim().toLowerCase() || null;
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Informe um e-mail válido.");
+  const maxBudget = data.maxBudget?.trim() || null;
+  if (maxBudget && (!Number.isFinite(Number(maxBudget)) || Number(maxBudget) <= 0)) throw new Error("O orçamento deve ser maior que zero.");
+  const nextActionAt = parseLeadDate(data.nextActionAt);
+  const notes = data.notes?.trim() || null;
+  if (notes && notes.length > 3000) throw new Error("As observações devem ter até 3.000 caracteres.");
+
+  try {
+    const result = await db.transaction(async (tx) => {
+      const [created] = await tx.insert(leads).values({
+        ownerUserId: actor.id,
+        fullName,
+        phone,
+        normalizedPhone,
+        email,
+        leadType: data.leadType,
+        source: data.source,
+        propertyType: data.propertyType?.trim() || null,
+        city: data.city?.trim() || null,
+        neighborhoods: (data.neighborhoods || []).map((value) => value.trim()).filter(Boolean).slice(0, 20),
+        maxBudget,
+        minBedrooms: Number.isInteger(data.minBedrooms) && Number(data.minBedrooms) > 0 ? Number(data.minBedrooms) : null,
+        notes,
+        nextAction: data.nextAction?.trim() || null,
+        nextActionAt,
+        stage: "novo",
+        updatedAt: new Date(),
+      }).returning();
+      const [activity] = await tx.insert(leadActivities).values({
+        leadId: created.id,
+        userId: actor.id,
+        activityType: "cadastro",
+        description: "Lead cadastrado no CRM.",
+      }).returning();
+      return { lead: created, activity };
+    });
+    revalidatePath("/");
+    return { success: true, ...result };
+  } catch (error) {
+    if ((error as { code?: string }).code === "23505") throw new Error("Já existe um lead com este telefone na sua carteira.");
+    throw error;
+  }
+}
+
+export async function updateLead(leadId: string, data: Parameters<typeof createLead>[0]) {
+  const actor = await requireCurrentUser();
+  requireActiveBroker(actor);
+  const fullName = data.fullName.trim();
+  const phone = data.phone.trim();
+  const normalizedPhone = normalizePhone(phone);
+  if (fullName.length < 2 || fullName.length > 120) throw new Error("Informe o nome do lead.");
+  if (normalizedPhone.length < 8 || normalizedPhone.length > 15) throw new Error("Informe um telefone válido com DDD.");
+  if (!( ["comprador", "proprietario", "locatario", "parceiro"] as string[]).includes(data.leadType)) throw new Error("Tipo de lead inválido.");
+  if (!( ["indicacao", "whatsapp", "portal", "site", "ligacao", "rede_social", "outro"] as string[]).includes(data.source)) throw new Error("Origem do lead inválida.");
+  const email = data.email?.trim().toLowerCase() || null;
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Informe um e-mail válido.");
+  const maxBudget = data.maxBudget?.trim() || null;
+  if (maxBudget && (!Number.isFinite(Number(maxBudget)) || Number(maxBudget) <= 0)) throw new Error("O orçamento deve ser maior que zero.");
+  const nextActionAt = parseLeadDate(data.nextActionAt);
+  const notes = data.notes?.trim() || null;
+  if (notes && notes.length > 3000) throw new Error("As observações devem ter até 3.000 caracteres.");
+  const [ownedLead] = await db.select({ id: leads.id }).from(leads).where(and(eq(leads.id, leadId), eq(leads.ownerUserId, actor.id))).limit(1);
+  if (!ownedLead) throw new Error("Lead não encontrado na sua carteira.");
+
+  try {
+    const result = await db.transaction(async (tx) => {
+      const [updated] = await tx.update(leads).set({
+        fullName,
+        phone,
+        normalizedPhone,
+        email,
+        leadType: data.leadType,
+        source: data.source,
+        propertyType: data.propertyType?.trim() || null,
+        city: data.city?.trim() || null,
+        neighborhoods: (data.neighborhoods || []).map((value) => value.trim()).filter(Boolean).slice(0, 20),
+        maxBudget,
+        minBedrooms: Number.isInteger(data.minBedrooms) && Number(data.minBedrooms) > 0 ? Number(data.minBedrooms) : null,
+        notes,
+        nextAction: data.nextAction?.trim() || null,
+        nextActionAt,
+        updatedAt: new Date(),
+      }).where(and(eq(leads.id, leadId), eq(leads.ownerUserId, actor.id))).returning();
+      const [activity] = await tx.insert(leadActivities).values({
+        leadId,
+        userId: actor.id,
+        activityType: "nota",
+        description: "Dados cadastrais e preferências do lead atualizados.",
+      }).returning();
+      return { lead: updated, activity };
+    });
+    revalidatePath("/");
+    return { success: true, ...result };
+  } catch (error) {
+    if ((error as { code?: string }).code === "23505") throw new Error("Já existe outro lead com este telefone na sua carteira.");
+    throw error;
+  }
+}
+
+export async function updateLeadStage(leadId: string, nextStage: string, lostReason?: string) {
+  const actor = await requireCurrentUser();
+  requireActiveBroker(actor);
+  if (!(LEAD_STAGES as readonly string[]).includes(nextStage)) throw new Error("Etapa inválida.");
+  const [lead] = await db.select({ id: leads.id, stage: leads.stage }).from(leads).where(and(eq(leads.id, leadId), eq(leads.ownerUserId, actor.id))).limit(1);
+  if (!lead) throw new Error("Lead não encontrado na sua carteira.");
+  const cleanLostReason = lostReason?.trim() || null;
+  if (nextStage === "perdido" && !cleanLostReason) throw new Error("Informe o motivo da perda.");
+  const result = await db.transaction(async (tx) => {
+    const [saved] = await tx.update(leads).set({ stage: nextStage, lostReason: nextStage === "perdido" ? cleanLostReason : null, updatedAt: new Date() }).where(and(eq(leads.id, leadId), eq(leads.ownerUserId, actor.id))).returning();
+    const [activity] = await tx.insert(leadActivities).values({
+      leadId,
+      userId: actor.id,
+      activityType: "etapa",
+      description: `Etapa alterada: ${lead.stage} → ${nextStage}${cleanLostReason ? `. Motivo: ${cleanLostReason}` : ""}.`,
+    }).returning();
+    return { lead: saved, activity };
+  });
+  revalidatePath("/");
+  return { success: true, ...result };
+}
+
+export async function addLeadActivity(data: {
+  leadId: string;
+  activityType: string;
+  description: string;
+  nextAction?: string;
+  nextActionAt?: string;
+}) {
+  const actor = await requireCurrentUser();
+  requireActiveBroker(actor);
+  if (!(LEAD_ACTIVITY_TYPES as readonly string[]).includes(data.activityType)) throw new Error("Tipo de atividade inválido.");
+  const description = data.description.trim();
+  if (description.length < 2 || description.length > 2000) throw new Error("Descreva o contato em até 2.000 caracteres.");
+  const [lead] = await db.select({ id: leads.id }).from(leads).where(and(eq(leads.id, data.leadId), eq(leads.ownerUserId, actor.id))).limit(1);
+  if (!lead) throw new Error("Lead não encontrado na sua carteira.");
+  const nextAction = data.nextAction?.trim() || null;
+  const nextActionAt = parseLeadDate(data.nextActionAt);
+  const [activity] = await db.transaction(async (tx) => {
+    const [created] = await tx.insert(leadActivities).values({ leadId: lead.id, userId: actor.id, activityType: data.activityType, description }).returning();
+    await tx.update(leads).set({
+      ...(data.activityType === "nota" ? {} : { lastContactAt: new Date() }),
+      nextAction,
+      nextActionAt,
+      updatedAt: new Date(),
+    }).where(and(eq(leads.id, lead.id), eq(leads.ownerUserId, actor.id)));
+    return [created];
+  });
+  revalidatePath("/");
+  return { success: true, activity };
 }
 
 export async function updateUserStatus(userId: string, newStatus: string) {
@@ -551,6 +791,7 @@ export async function createDvpCertificate(data: {
   propertyId: string;
   captorBrokerId: string;
   partnerBrokerId: string;
+  leadId?: string;
   clientName: string;
   clientPhone?: string;
   clientCpfPartial: string;
@@ -560,14 +801,21 @@ export async function createDvpCertificate(data: {
   const actor = await requireCurrentUser();
   requireActiveBroker(actor);
   if (data.partnerBrokerId !== actor.id) throw new Error("O corretor parceiro deve ser o usuário conectado.");
-  const [property] = await db.select({ brokerId: properties.brokerId, acceptsPartnership: properties.acceptsPartnership }).from(properties).where(eq(properties.id, data.propertyId)).limit(1);
+  const [property] = await db.select({ brokerId: properties.brokerId, acceptsPartnership: properties.acceptsPartnership, title: properties.title }).from(properties).where(eq(properties.id, data.propertyId)).limit(1);
   if (!property || property.brokerId !== data.captorBrokerId || !property.acceptsPartnership || property.brokerId === actor.id) {
     throw new Error("Imóvel ou parceria inválidos para este registro.");
   }
-  if (data.clientName.trim().length < 2 || !/^\*{3}\.\d{3}\.\d{3}-\*\*$/.test(data.clientCpfPartial.trim())) {
+  const [lead] = data.leadId
+    ? await db.select({ id: leads.id, fullName: leads.fullName, phone: leads.phone, leadType: leads.leadType, stage: leads.stage }).from(leads).where(and(eq(leads.id, data.leadId), eq(leads.ownerUserId, actor.id))).limit(1)
+    : [];
+  if (data.leadId && !lead) throw new Error("Lead não encontrado na sua carteira.");
+  if (lead && !["comprador", "locatario"].includes(lead.leadType)) throw new Error("Só é possível vincular uma visita a um lead comprador ou locatário.");
+  const clientName = lead?.fullName || data.clientName.trim();
+  const clientPhone = lead?.phone || data.clientPhone || null;
+  if (clientName.length < 2 || !/^\*{3}\.\d{3}\.\d{3}-\*\*$/.test(data.clientCpfPartial.trim())) {
     throw new Error("Informe o nome do cliente e apenas o CPF parcialmente mascarado.");
   }
-  const rawHashString = `${data.propertyId}-${data.captorBrokerId}-${data.partnerBrokerId}-${data.clientName}-${data.clientCpfPartial}-${Date.now()}`;
+  const rawHashString = `${data.propertyId}-${data.captorBrokerId}-${data.partnerBrokerId}-${data.leadId || ""}-${clientName}-${data.clientCpfPartial}-${Date.now()}`;
   const certificateHash = crypto
     .createHash("sha256")
     .update(rawHashString)
@@ -579,47 +827,66 @@ export async function createDvpCertificate(data: {
   if (!Number.isFinite(visitDate.getTime())) throw new Error("Informe uma data de visita válida.");
   const lockExpirationDate = new Date(visitDate.getTime() + 180 * 24 * 60 * 60 * 1000);
 
-  const [dvp] = await db
-    .insert(dvpCertificates)
-    .values({
+  const result = await db.transaction(async (tx) => {
+    const [certificate] = await tx.insert(dvpCertificates).values({
       certificateHash: `DVP-${certificateHash}`,
       propertyId: data.propertyId,
       captorBrokerId: data.captorBrokerId,
       partnerBrokerId: data.partnerBrokerId,
-      clientName: data.clientName,
-      clientPhone: data.clientPhone || null,
-      clientCpfPartial: data.clientCpfPartial,
+      leadId: lead?.id || null,
+      clientName,
+      clientPhone,
+      clientCpfPartial: data.clientCpfPartial.trim(),
       visitDate,
       lockExpirationDate,
       commissionSplit: data.commissionSplit,
       status: "rascunho",
       legalClausesAccepted: false,
-    })
-    .returning();
+    }).returning();
 
-  // Registra ou atualiza a parceria
-  await db.insert(partnerships).values({
-    propertyId: data.propertyId,
-    captorBrokerId: data.captorBrokerId,
-    partnerBrokerId: data.partnerBrokerId,
-    status: "visita_agendada",
-    commissionSplit: data.commissionSplit,
-    visitScheduledDate: visitDate,
-    notes: `Registro interno de visita ${dvp.certificateHash}. Requer validação e aceite das partes antes de qualquer efeito contratual.`,
-  });
+    await tx.insert(partnerships).values({
+      propertyId: data.propertyId,
+      captorBrokerId: data.captorBrokerId,
+      partnerBrokerId: data.partnerBrokerId,
+      status: "visita_agendada",
+      commissionSplit: data.commissionSplit,
+      visitScheduledDate: visitDate,
+      notes: `Registro interno de visita ${certificate.certificateHash}. Requer validação e aceite das partes antes de qualquer efeito contratual.`,
+    });
 
-  // Notifica o corretor captador no sininho
-  await db.insert(notifications).values({
-    userId: data.captorBrokerId,
-    title: "Novo registro de visita em rascunho",
-    message: `Foi criado o registro ${dvp.certificateHash}. Ele ainda depende da validação e do aceite das partes.`,
-    type: "dvp",
-    propertyId: data.propertyId,
-    read: false,
+    await tx.insert(notifications).values({
+      userId: data.captorBrokerId,
+      title: "Novo registro de visita em rascunho",
+      message: `Foi criado o registro ${certificate.certificateHash} para ${property.title}. Ele ainda depende da validação e do aceite das partes.`,
+      type: "dvp",
+      propertyId: data.propertyId,
+      read: false,
+    });
+
+    let activity = null;
+    if (lead) {
+      const [createdActivity] = await tx.insert(leadActivities).values({
+        leadId: lead.id,
+        userId: actor.id,
+        activityType: "visita",
+        description: `Registro de visita ${certificate.certificateHash} criado para ${property.title}. O DVP ainda aguarda validação e aceite das partes.`,
+      }).returning();
+      activity = createdActivity;
+      const [updatedLead] = await tx.update(leads).set({
+        ...(["novo", "contato", "qualificado"].includes(lead.stage) ? { stage: "visita" } : {}),
+        lastContactAt: new Date(),
+        nextAction: "Confirmar visita e aceite do DVP",
+        nextActionAt: visitDate,
+        updatedAt: new Date(),
+      }).where(and(eq(leads.id, lead.id), eq(leads.ownerUserId, actor.id))).returning({ stage: leads.stage, nextAction: leads.nextAction, nextActionAt: leads.nextActionAt, lastContactAt: leads.lastContactAt, updatedAt: leads.updatedAt });
+      return { certificate, activity, lead: updatedLead };
+    }
+
+    return { certificate, activity, lead: null };
   });
 
   revalidatePath("/");
-  return { success: true, certificate: dvp };
+  return { success: true, ...result };
 }
 
 export async function markNotificationAsRead(notificationId: string) {

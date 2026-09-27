@@ -12,6 +12,8 @@ export default async function HomePage() {
     currentUser,
     notifications,
     dvpList,
+    leads,
+    leadActivities,
   } = await getMarketplaceData();
 
   return (
@@ -23,6 +25,8 @@ export default async function HomePage() {
       initialCurrentUser={currentUser}
       initialNotifications={notifications}
       initialDvpList={dvpList}
+      initialLeads={leads}
+      initialLeadActivities={leadActivities}
     />
   );
 }

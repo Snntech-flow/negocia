@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, numeric, integer, boolean, timestamp, jsonb } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, numeric, integer, boolean, timestamp, jsonb, index, uniqueIndex } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -120,6 +120,46 @@ export const buyerProfiles = pgTable("buyer_profiles", {
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
 
+export const leads = pgTable("leads", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  ownerUserId: uuid("owner_user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  fullName: text("full_name").notNull(),
+  phone: text("phone").notNull(),
+  normalizedPhone: text("normalized_phone").notNull(),
+  email: text("email"),
+  leadType: text("lead_type").default("comprador").notNull(),
+  stage: text("stage").default("novo").notNull(),
+  source: text("source").default("outro").notNull(),
+  propertyType: text("property_type"),
+  city: text("city"),
+  neighborhoods: jsonb("neighborhoods").$type<string[]>().default([]).notNull(),
+  maxBudget: numeric("max_budget", { precision: 12, scale: 2 }),
+  minBedrooms: integer("min_bedrooms"),
+  notes: text("notes"),
+  nextAction: text("next_action"),
+  nextActionAt: timestamp("next_action_at"),
+  lastContactAt: timestamp("last_contact_at"),
+  lostReason: text("lost_reason"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({
+  ownerStageIdx: index("leads_owner_stage_idx").on(table.ownerUserId, table.stage),
+  ownerActionIdx: index("leads_owner_action_idx").on(table.ownerUserId, table.nextActionAt),
+  ownerPhoneUnique: uniqueIndex("leads_owner_phone_unique").on(table.ownerUserId, table.normalizedPhone),
+}));
+
+export const leadActivities = pgTable("lead_activities", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  leadId: uuid("lead_id").references(() => leads.id, { onDelete: "cascade" }).notNull(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  activityType: text("activity_type").notNull(),
+  description: text("description").notNull(),
+  occurredAt: timestamp("occurred_at").defaultNow().notNull(),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({
+  leadTimelineIdx: index("lead_activities_timeline_idx").on(table.leadId, table.occurredAt),
+}));
+
 export const partnerships = pgTable("partnerships", {
   id: uuid("id").defaultRandom().primaryKey(),
   propertyId: uuid("property_id").references(() => properties.id, { onDelete: "cascade" }).notNull(),
@@ -163,6 +203,7 @@ export const dvpCertificates = pgTable("dvp_certificates", {
   propertyId: uuid("property_id").references(() => properties.id, { onDelete: "cascade" }).notNull(),
   captorBrokerId: uuid("captor_broker_id").references(() => users.id).notNull(),
   partnerBrokerId: uuid("partner_broker_id").references(() => users.id).notNull(),
+  leadId: uuid("lead_id").references(() => leads.id, { onDelete: "set null" }),
   clientName: text("client_name").notNull(),
   clientPhone: text("client_phone"),
   clientCpfPartial: text("client_cpf_partial").notNull(), // ex: ***.456.789-**
