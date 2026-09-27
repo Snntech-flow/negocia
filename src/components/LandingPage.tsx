@@ -38,14 +38,14 @@ export default function LandingPage({
 
   const plans = [
     {
-      name: "10 Captações",
+      name: "10 Anúncios",
       tagline: "Para o corretor que está iniciando sua carteira de parcerias",
       monthlyPrice: 59.9,
       annualPrice: 49.9,
       highlight: false,
-      cta: "Assinar 10 Captações",
+      cta: "Assinar 10 Anúncios",
       features: [
-        "Até 10 captações ativas simultâneas",
+        "Até 10 anúncios ativos simultâneos",
         "Acesso à vitrine de imóveis de todos os parceiros",
         "Endereço e proprietário 100% blindados",
         "Fichas White-Label para enviar a clientes",
@@ -54,14 +54,14 @@ export default function LandingPage({
       ],
     },
     {
-      name: "20 Captações",
+      name: "20 Anúncios",
       tagline: "Para corretores atuantes que querem dobrar o giro de vendas",
       monthlyPrice: 89.9,
       annualPrice: 74.9,
       highlight: false,
-      cta: "Assinar 20 Captações",
+      cta: "Assinar 20 Anúncios",
       features: [
-        "Até 20 captações ativas simultâneas",
+        "Até 20 anúncios ativos simultâneos",
         "Radar de Compradores (Match Reverso ativo)",
         "Fichas White-Label ilimitadas (Web + WhatsApp)",
         "Endereço e proprietário 100% blindados",
@@ -70,37 +70,20 @@ export default function LandingPage({
       ],
     },
     {
-      name: "40 Captações",
+      name: "40 Anúncios",
       tagline: "O plano favorito dos corretores de alta performance",
       monthlyPrice: 150.0,
       annualPrice: 125.0,
       highlight: true,
       badge: "Mais Escolhido ⭐",
-      cta: "Assinar 40 Captações",
+      cta: "Assinar 40 Anúncios",
       features: [
-        "Até 40 captações ativas simultâneas",
+        "Até 40 anúncios ativos simultâneos",
         "Radar de Compradores prioritário com notificações",
         "Fichas White-Label em Web e PDF com seu WhatsApp e CRECI",
         "Selo de Corretor Verificado Negocia Lar",
         "Termos 50/50 com Cláusula Penal de 100% anti-bypass",
         "Suporte direto e prioritário via WhatsApp",
-      ],
-    },
-    {
-      name: "Imobiliária",
-      tagline: "Para imobiliárias e gestores com equipes de vendas",
-      monthlyPrice: 499.0,
-      annualPrice: 399.0,
-      highlight: false,
-      badge: "CRECI Jurídico",
-      cta: "Assinar Imobiliária",
-      features: [
-        "SEM LIMITES de captação (Ilimitadas)",
-        "Até 5 corretores da equipe sob o mesmo CRECI-J",
-        "Painel do gestor para acompanhar captações da equipe",
-        "Fichas White-Label com o logotipo da sua Imobiliária",
-        "Radar compartilhado de clientes da imobiliária",
-        "Suporte a corretores adicionais sob demanda",
       ],
     },
   ];
@@ -415,8 +398,8 @@ export default function LandingPage({
             </div>
           </div>
 
-          {/* Cards dos 4 Planos */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6 items-stretch">
+          {/* Cards dos 3 Planos Individuais */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch max-w-5xl mx-auto">
             {plans.map((p, idx) => {
               const price = billingCycle === "monthly" ? p.monthlyPrice : p.annualPrice;
               const formattedPrice = price % 1 === 0 ? price.toFixed(0) : price.toFixed(2).replace(".", ",");
@@ -425,7 +408,7 @@ export default function LandingPage({
                   key={idx}
                   className={`rounded-2xl p-6 flex flex-col justify-between transition border ${
                     p.highlight
-                      ? "border-amber-500 bg-amber-50/25 shadow-xl relative xl:-translate-y-2 ring-1 ring-amber-500"
+                      ? "border-amber-500 bg-amber-50/25 shadow-xl relative md:-translate-y-2 ring-1 ring-amber-500"
                       : "border-slate-200 bg-white hover:border-slate-300 shadow-sm"
                   }`}
                 >
@@ -474,9 +457,7 @@ export default function LandingPage({
                           ? "10"
                           : p.name.includes("20")
                           ? "20"
-                          : p.name.includes("40")
-                          ? "40"
-                          : "imobiliaria";
+                          : "40";
                         setSelectedPlanForOnboarding(planKey);
                         setIsOnboardingOpen(true);
                       }}

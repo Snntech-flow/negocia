@@ -144,7 +144,7 @@ async function runSeed() {
       type: "mensalidade_pro",
       paymentMethod: "pix",
       status: "pago",
-      description: "Assinatura Plano 40 Captações via Pix Itaú",
+      description: "Assinatura Plano 40 Anúncios via Pix Itaú",
     },
     {
       userId: corretor2.id,
@@ -152,7 +152,7 @@ async function runSeed() {
       type: "mensalidade_pro",
       paymentMethod: "pix",
       status: "pago",
-      description: "Assinatura Plano 40 Captações via Pix Itaú",
+      description: "Assinatura Plano 40 Anúncios via Pix Itaú",
     },
     {
       userId: corretor4.id,
@@ -160,7 +160,7 @@ async function runSeed() {
       type: "mensalidade_pro",
       paymentMethod: "pix",
       status: "pago",
-      description: "Assinatura Plano 20 Captações via Pix Itaú",
+      description: "Assinatura Plano 20 Anúncios via Pix Itaú",
     },
     {
       userId: corretor5.id,
@@ -168,7 +168,7 @@ async function runSeed() {
       type: "mensalidade_pro",
       paymentMethod: "pix",
       status: "pago",
-      description: "Assinatura Plano 10 Captações via Pix Itaú",
+      description: "Assinatura Plano 10 Anúncios via Pix Itaú",
     },
   ]);
 

@@ -55,7 +55,7 @@ export default function OnboardingModal({
     state: "SP",
     city: "São Paulo",
     accountType: "corretor", // 'corretor' ou 'imobiliaria'
-    plan: initialPlan, // '10', '20', '40', 'imobiliaria'
+    plan: initialPlan === "imobiliaria" ? "40" : (initialPlan || "40"), // '10', '20', '40'
     billingCycle: "monthly", // 'monthly' ou 'annual'
   });
 
@@ -63,32 +63,25 @@ export default function OnboardingModal({
 
   const plansConfig: Record<string, { name: string; monthly: number; annual: number; limit: string; desc: string }> = {
     "10": {
-      name: "10 Captações",
+      name: "10 Anúncios",
       monthly: 59.9,
       annual: 49.9,
-      limit: "Até 10 captações ativas",
+      limit: "Até 10 anúncios ativos",
       desc: "Ideal para começar a girar parcerias",
     },
     "20": {
-      name: "20 Captações",
+      name: "20 Anúncios",
       monthly: 89.9,
       annual: 74.9,
-      limit: "Até 20 captações ativas",
+      limit: "Até 20 anúncios ativos",
       desc: "Com Radar de Compradores incluso",
     },
     "40": {
-      name: "40 Captações",
+      name: "40 Anúncios",
       monthly: 150.0,
       annual: 125.0,
-      limit: "Até 40 captações ativas",
+      limit: "Até 40 anúncios ativos",
       desc: "Mais escolhido por corretores ativos",
-    },
-    "imobiliaria": {
-      name: "Imobiliária",
-      monthly: 499.0,
-      annual: 399.0,
-      limit: "Captações ILIMITADAS (Até 5 corretores)",
-      desc: "Gestão unificada com CRECI Jurídico",
     },
   };
 
@@ -212,7 +205,7 @@ export default function OnboardingModal({
               </p>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 pt-1">
+            <div className="grid grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() =>
@@ -228,25 +221,7 @@ export default function OnboardingModal({
                     : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
                 }`}
               >
-                Corretor (PF)
-              </button>
-              <button
-                type="button"
-                onClick={() =>
-                  setFormData({
-                    ...formData,
-                    accountType: "imobiliaria",
-                    plan: "imobiliaria",
-                    creci: formData.creci.includes("MASTER") ? "" : formData.creci,
-                  })
-                }
-                className={`py-2 px-2 text-xs font-bold rounded-xl border text-center transition ${
-                  formData.accountType === "imobiliaria"
-                    ? "bg-slate-900 text-white border-slate-900 shadow-sm"
-                    : "bg-slate-50 text-slate-600 border-slate-200 hover:bg-slate-100"
-                }`}
-              >
-                Imobiliária (PJ)
+                Corretor Individual (PF)
               </button>
               <button
                 type="button"
@@ -278,7 +253,7 @@ export default function OnboardingModal({
             )}
 
             <div>
-              <label className="block text-xs font-bold text-slate-700 mb-1">Nome Completo / Razão Social</label>
+              <label className="block text-xs font-bold text-slate-700 mb-1">Nome Completo</label>
               <input
                 required
                 type="text"
@@ -305,8 +280,6 @@ export default function OnboardingModal({
                 <label className="block text-xs font-bold text-slate-700 mb-1">
                   {formData.accountType === "master"
                     ? "Credencial Master (Automático)"
-                    : formData.accountType === "imobiliaria"
-                    ? "CRECI Jurídico (CRECI-J)"
                     : "CRECI Individual"}
                 </label>
                 <div className="flex gap-2">
@@ -319,8 +292,6 @@ export default function OnboardingModal({
                     placeholder={
                       formData.accountType === "master"
                         ? "MASTER-SNNTECH"
-                        : formData.accountType === "imobiliaria"
-                        ? "Ex: 34980-J"
                         : "Ex: 189420-F"
                     }
                     className={`w-full border rounded-xl px-3 py-2 text-sm text-slate-900 focus:outline-none ${
@@ -495,11 +466,6 @@ export default function OnboardingModal({
                           {key === "40" && (
                             <span className="text-[10px] bg-amber-100 text-amber-800 font-extrabold px-1.5 py-0.2 rounded">
                               ⭐ Mais Escolhido
-                            </span>
-                          )}
-                          {key === "imobiliaria" && (
-                            <span className="text-[10px] bg-slate-100 text-slate-700 font-bold px-1.5 py-0.2 rounded">
-                              Até 5 corretores
                             </span>
                           )}
                         </div>

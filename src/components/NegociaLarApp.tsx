@@ -1067,7 +1067,7 @@ export default function NegociaLarApp({
 
                         <td className="py-3.5 px-4">
                           <div className="font-semibold capitalize text-white">
-                            {u.plan === "enterprise" ? "Imobiliária (5 corretores)" : u.plan === "pro" ? "40 Captações" : "10 Captações"}
+                            {u.plan === "enterprise" || u.plan === "pro" || u.plan === "40" ? "40 Anúncios" : u.plan === "20" ? "20 Anúncios" : "10 Anúncios"}
                           </div>
                           <div className="text-[11px] text-emerald-400 font-mono">
                             {formatBRL(u.monthlyFee)}/mês
