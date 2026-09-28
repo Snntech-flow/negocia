@@ -9,6 +9,7 @@ import {
   leadActivities,
   partnerships,
   partnershipActivities,
+  pilotFeedback,
   transactions,
   notifications,
   dvpCertificates,
@@ -51,14 +52,17 @@ function sessionSecret() {
   return "negociar-lar-local-development-secret-change-before-deploy";
 }
 
-function signUserId(userId: string, expiresAt: number) {
-  return crypto.createHmac("sha256", sessionSecret()).update(`${userId}.${expiresAt}`).digest("hex");
+function signUserId(userId: string, expiresAt: number, sessionVersion?: number) {
+  const payload = sessionVersion === undefined ? `${userId}.${expiresAt}` : `${userId}.${sessionVersion}.${expiresAt}`;
+  return crypto.createHmac("sha256", sessionSecret()).update(payload).digest("hex");
 }
 
 async function setBrokerSession(userId: string) {
   const cookieStore = cookies();
+  const [user] = await db.select({ sessionVersion: users.sessionVersion }).from(users).where(eq(users.id, userId)).limit(1);
+  if (!user) throw new Error("Conta não encontrada.");
   const expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
-  cookieStore.set(SESSION_COOKIE, `${userId}.${expiresAt}.${signUserId(userId, expiresAt)}`, {
+  cookieStore.set(SESSION_COOKIE, `${userId}.${user.sessionVersion}.${expiresAt}.${signUserId(userId, expiresAt, user.sessionVersion)}`, {
     path: "/",
     httpOnly: true,
     sameSite: "lax",
@@ -102,14 +106,22 @@ export async function getCurrentUserId(): Promise<string | null> {
   const cookieStore = cookies();
   const value = cookieStore.get(SESSION_COOKIE)?.value;
   if (!value) return null;
-  const [userId, expiresAtText, signature, ...extra] = value.split(".");
-  if (!userId || !expiresAtText || !signature || extra.length) return null;
+  const parts = value.split(".");
+  const isCurrentCookie = parts.length === 4;
+  if (!isCurrentCookie && parts.length !== 3) return null;
+  const userId = parts[0];
+  const sessionVersion = isCurrentCookie ? Number(parts[1]) : 0;
+  const expiresAtText = isCurrentCookie ? parts[2] : parts[1];
+  const signature = isCurrentCookie ? parts[3] : parts[2];
+  if (!userId || !Number.isSafeInteger(sessionVersion) || sessionVersion < 0 || !expiresAtText || !signature) return null;
   const expiresAt = Number(expiresAtText);
   if (!Number.isSafeInteger(expiresAt) || expiresAt <= Math.floor(Date.now() / 1000)) return null;
-  const expected = signUserId(userId, expiresAt);
+  const expected = isCurrentCookie ? signUserId(userId, expiresAt, sessionVersion) : signUserId(userId, expiresAt);
   const actualBuffer = Buffer.from(signature, "hex");
   const expectedBuffer = Buffer.from(expected, "hex");
   if (actualBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(actualBuffer, expectedBuffer)) return null;
+  const [user] = await db.select({ sessionVersion: users.sessionVersion }).from(users).where(eq(users.id, userId)).limit(1);
+  if (!user || user.sessionVersion !== sessionVersion) return null;
   return userId;
 }
 
@@ -318,6 +330,8 @@ export async function getMarketplaceData() {
         partnerName: partnershipPartner.name,
         status: partnerships.status,
         commissionSplit: partnerships.commissionSplit,
+        commissionStatus: partnerships.commissionStatus,
+        commissionRevision: partnerships.commissionRevision,
         captorAcceptedAt: partnerships.captorAcceptedAt,
         partnerAcceptedAt: partnerships.partnerAcceptedAt,
         commissionModel: partnerships.commissionModel,
@@ -402,6 +416,23 @@ export async function getMarketplaceData() {
       .limit(500)
       : [];
 
+    const pilotFeedbackList = currentUser?.role === "admin" ? await db
+      .select({
+        id: pilotFeedback.id,
+        userId: pilotFeedback.userId,
+        userName: users.name,
+        userCreci: users.creci,
+        screen: pilotFeedback.screen,
+        category: pilotFeedback.category,
+        message: pilotFeedback.message,
+        status: pilotFeedback.status,
+        createdAt: pilotFeedback.createdAt,
+      })
+      .from(pilotFeedback)
+      .innerJoin(users, eq(pilotFeedback.userId, users.id))
+      .orderBy(desc(pilotFeedback.createdAt))
+      .limit(200) : [];
+
     return {
       properties: propertyList,
       radarList,
@@ -414,6 +445,7 @@ export async function getMarketplaceData() {
       partnershipActivities: partnershipActivityList,
       leads: leadList,
       leadActivities: leadActivityList,
+      pilotFeedback: pilotFeedbackList,
     };
   } catch (error) {
     console.error("Erro ao carregar dados do banco:", error);
@@ -429,6 +461,7 @@ export async function getMarketplaceData() {
       partnershipActivities: [],
       leads: [],
       leadActivities: [],
+      pilotFeedback: [],
     };
   }
 }
@@ -1034,6 +1067,8 @@ export async function createDvpCertificate(data: {
       captorBrokerId: data.captorBrokerId,
       partnerBrokerId: data.partnerBrokerId,
       status: "visita_agendada",
+      commissionStatus: "aguardando_aceites",
+      commissionRevision: 1,
       commissionModel,
       commissionSplit: captorCommissionPercent,
       captorCommissionPercent,
@@ -1112,12 +1147,19 @@ export async function updatePartnershipStatus(partnershipId: string, newStatus: 
       captorBrokerId: partnerships.captorBrokerId,
       partnerBrokerId: partnerships.partnerBrokerId,
       status: partnerships.status,
+      commissionStatus: partnerships.commissionStatus,
     }).from(partnerships).where(and(
       eq(partnerships.id, partnershipId),
       or(eq(partnerships.captorBrokerId, actor.id), eq(partnerships.partnerBrokerId, actor.id)),
     )).for("update").limit(1);
     if (!partnership) throw new Error("Parceria não encontrada na sua carteira.");
     if (!PARTNERSHIP_TRANSITIONS[partnership.status]?.includes(newStatus)) throw new Error("Esta mudança de etapa não é permitida.");
+    if (["em_negociacao", "fechado"].includes(newStatus) && partnership.commissionStatus === "aguardando_aceites") {
+      throw new Error("Os dois corretores precisam confirmar a divisão antes de avançar esta parceria.");
+    }
+    if (["em_negociacao", "fechado"].includes(newStatus) && partnership.commissionStatus === "recusada") {
+      throw new Error("A divisão foi recusada. Revise a proposta e obtenha as duas confirmações antes de avançar.");
+    }
 
     const [updated] = await tx.update(partnerships).set({ status: newStatus, updatedAt: new Date() })
       .where(and(eq(partnerships.id, partnership.id), eq(partnerships.status, partnership.status))).returning();
@@ -1153,6 +1195,7 @@ export async function respondToPartnershipSplit(partnershipId: string, accepted:
       partnerBrokerId: partnerships.partnerBrokerId,
       status: partnerships.status,
       commissionModel: partnerships.commissionModel,
+      commissionStatus: partnerships.commissionStatus,
       captorAcceptedAt: partnerships.captorAcceptedAt,
       partnerAcceptedAt: partnerships.partnerAcceptedAt,
     }).from(partnerships).where(and(
@@ -1160,38 +1203,129 @@ export async function respondToPartnershipSplit(partnershipId: string, accepted:
       or(eq(partnerships.captorBrokerId, actor.id), eq(partnerships.partnerBrokerId, actor.id)),
     )).for("update").limit(1);
     if (!partnership) throw new Error("Parceria não encontrada na sua carteira.");
-    if (partnership.commissionModel !== "three_party_referral_40_40_20") throw new Error("Esta parceria não usa a divisão de indicação 40/40/20.");
-    if (partnership.status === "recusado") throw new Error("Esta proposta já foi recusada.");
+    if (partnership.commissionStatus === "nao_registrada") throw new Error("Esta parceria antiga ainda não tem proposta de divisão para confirmar.");
+    if (["recusado", "fechado"].includes(partnership.status)) throw new Error("Esta parceria já foi encerrada.");
+    if (partnership.commissionStatus === "recusada") throw new Error("Esta proposta foi recusada. Revise os termos para criar uma nova versão.");
     const acceptedAt = actor.id === partnership.captorBrokerId ? partnership.captorAcceptedAt : partnership.partnerAcceptedAt;
     if (accepted && acceptedAt) return { partnership, activity: null, alreadyAccepted: true };
     if (!accepted && acceptedAt) throw new Error("Sua confirmação já foi registrada e não pode ser retirada nesta tela.");
 
     const now = new Date();
+    const otherAcceptedAt = actor.id === partnership.captorBrokerId ? partnership.partnerAcceptedAt : partnership.captorAcceptedAt;
+    const bothAccepted = accepted && Boolean(otherAcceptedAt);
     const [updated] = await tx.update(partnerships).set({
-      ...(accepted ? actor.id === partnership.captorBrokerId ? { captorAcceptedAt: now } : { partnerAcceptedAt: now } : { status: "recusado" }),
+      ...(accepted ? {
+        ...(actor.id === partnership.captorBrokerId ? { captorAcceptedAt: now } : { partnerAcceptedAt: now }),
+        commissionStatus: bothAccepted ? "confirmada" : "aguardando_aceites",
+      } : { commissionStatus: "recusada" }),
       updatedAt: now,
     }).where(eq(partnerships.id, partnership.id)).returning();
     const [activity] = await tx.insert(partnershipActivities).values({
       partnershipId: partnership.id,
       actorUserId: actor.id,
       previousStatus: partnership.status,
-      newStatus: accepted ? "divisao_confirmada" : "divisao_recusada",
+      newStatus: accepted ? bothAccepted ? "divisao_confirmada_ambos" : "divisao_confirmada_um" : "divisao_recusada",
       note: accepted
-        ? "Confirmou a proposta interna de divisão 40/40/20. Esta confirmação na plataforma não é assinatura eletrônica."
-        : "Não aceitou a proposta interna de divisão 40/40/20.",
+        ? `Confirmou a divisão ${partnership.commissionModel === "three_party_referral_40_40_20" ? "40/40/20" : "50/50"}${bothAccepted ? "; os dois corretores confirmaram" : ""}. Confirmação interna, não é assinatura eletrônica.`
+        : `Recusou a divisão ${partnership.commissionModel === "three_party_referral_40_40_20" ? "40/40/20" : "50/50"}.`,
     }).returning();
     const otherBrokerId = actor.id === partnership.captorBrokerId ? partnership.partnerBrokerId : partnership.captorBrokerId;
     await tx.insert(notifications).values({
       userId: otherBrokerId,
       title: accepted ? "Confirmação da divisão de parceria" : "Divisão de parceria recusada",
       message: accepted
-        ? "Um dos corretores confirmou a proposta de divisão 40/40/20. Esta confirmação interna não é assinatura eletrônica."
-        : "Um dos corretores não aceitou a proposta de divisão 40/40/20. A parceria foi marcada como recusada.",
+        ? `Um corretor confirmou a proposta ${partnership.commissionModel === "three_party_referral_40_40_20" ? "40/40/20" : "50/50"}${bothAccepted ? ". Os dois já confirmaram" : ". Falta a confirmação do outro corretor"}. Esta confirmação interna não é assinatura eletrônica.`
+        : `Um corretor recusou a divisão ${partnership.commissionModel === "three_party_referral_40_40_20" ? "40/40/20" : "50/50"}. A parceria pode receber uma nova versão da proposta.`,
       type: "parceria",
       propertyId: partnership.propertyId,
       read: false,
     });
     return { partnership: updated, activity, alreadyAccepted: false };
+  });
+  revalidatePath("/");
+  return { success: true, ...result };
+}
+
+export async function revisePartnershipCommission(partnershipId: string, input: {
+  commissionModel: string;
+  externalReferrerName?: string;
+  externalReferrerCreci?: string;
+  externalReferrerWhatsapp?: string;
+}) {
+  const actor = await requireCurrentUser();
+  requireActiveBroker(actor);
+  if (!["two_party_50_50", "three_party_referral_40_40_20"].includes(input.commissionModel)) throw new Error("Escolha uma divisão válida.");
+  const commissionModel = input.commissionModel;
+  const externalReferrerName = input.externalReferrerName?.trim() || null;
+  const externalReferrerCreci = input.externalReferrerCreci?.trim().toUpperCase() || null;
+  const externalReferrerWhatsapp = input.externalReferrerWhatsapp?.trim() || null;
+  if (commissionModel === "three_party_referral_40_40_20") {
+    if (!externalReferrerName || externalReferrerName.length < 2 || externalReferrerName.length > 120) throw new Error("Informe o nome do indicador externo.");
+    if (!externalReferrerCreci || externalReferrerCreci.length < 2 || externalReferrerCreci.length > 30) throw new Error("Informe o CRECI do indicador externo.");
+    if (externalReferrerWhatsapp && externalReferrerWhatsapp.length > 30) throw new Error("O WhatsApp do indicador está inválido.");
+  }
+  const isReferral = commissionModel === "three_party_referral_40_40_20";
+  const captorCommissionPercent = isReferral ? "40.00" : "50.00";
+  const partnerCommissionPercent = captorCommissionPercent;
+  const referrerCommissionPercent = isReferral ? "20.00" : "0.00";
+  const result = await db.transaction(async (tx) => {
+    const [partnership] = await tx.select({
+      id: partnerships.id,
+      propertyId: partnerships.propertyId,
+      captorBrokerId: partnerships.captorBrokerId,
+      partnerBrokerId: partnerships.partnerBrokerId,
+      status: partnerships.status,
+      commissionModel: partnerships.commissionModel,
+      commissionStatus: partnerships.commissionStatus,
+      commissionRevision: partnerships.commissionRevision,
+      captorCommissionPercent: partnerships.captorCommissionPercent,
+      partnerCommissionPercent: partnerships.partnerCommissionPercent,
+      referrerCommissionPercent: partnerships.referrerCommissionPercent,
+      externalReferrerName: partnerships.externalReferrerName,
+      externalReferrerCreci: partnerships.externalReferrerCreci,
+    }).from(partnerships).where(and(
+      eq(partnerships.id, partnershipId),
+      or(eq(partnerships.captorBrokerId, actor.id), eq(partnerships.partnerBrokerId, actor.id)),
+    )).for("update").limit(1);
+    if (!partnership) throw new Error("Parceria não encontrada na sua carteira.");
+    if (["fechado", "recusado"].includes(partnership.status)) throw new Error("Não é possível revisar uma parceria encerrada.");
+    const describe = (model: string, captor: string, partner: string, referrer: string, name: string | null, creci: string | null) =>
+      model === "three_party_referral_40_40_20" ? `40/40/20 (indicador: ${name || "sem nome"}, CRECI ${creci || "não informado"})` : `${captor}/${partner}`;
+    const previousTerms = describe(partnership.commissionModel, partnership.captorCommissionPercent, partnership.partnerCommissionPercent, partnership.referrerCommissionPercent, partnership.externalReferrerName, partnership.externalReferrerCreci);
+    const nextRevision = partnership.commissionRevision + 1;
+    const nextTerms = describe(commissionModel, captorCommissionPercent, partnerCommissionPercent, referrerCommissionPercent, externalReferrerName, externalReferrerCreci);
+    const [updated] = await tx.update(partnerships).set({
+      commissionModel,
+      commissionStatus: "aguardando_aceites",
+      commissionRevision: nextRevision,
+      commissionSplit: captorCommissionPercent,
+      captorCommissionPercent,
+      partnerCommissionPercent,
+      referrerCommissionPercent,
+      externalReferrerName,
+      externalReferrerCreci,
+      externalReferrerWhatsapp: isReferral ? externalReferrerWhatsapp : null,
+      captorAcceptedAt: null,
+      partnerAcceptedAt: null,
+      updatedAt: new Date(),
+    }).where(eq(partnerships.id, partnership.id)).returning();
+    const [activity] = await tx.insert(partnershipActivities).values({
+      partnershipId: partnership.id,
+      actorUserId: actor.id,
+      previousStatus: partnership.status,
+      newStatus: "divisao_revisada",
+      note: `Proposta revisada para a versão ${nextRevision}: ${previousTerms} → ${nextTerms}. As confirmações anteriores foram zeradas; os dois corretores precisam responder novamente.`,
+    }).returning();
+    const otherBrokerId = actor.id === partnership.captorBrokerId ? partnership.partnerBrokerId : partnership.captorBrokerId;
+    await tx.insert(notifications).values({
+      userId: otherBrokerId,
+      title: "Nova versão da divisão da parceria",
+      message: `A divisão foi revisada para a versão ${nextRevision} (${nextTerms}). Confira e confirme ou recuse a nova proposta.`,
+      type: "parceria",
+      propertyId: partnership.propertyId,
+      read: false,
+    });
+    return { partnership: updated, activity };
   });
   revalidatePath("/");
   return { success: true, ...result };
@@ -1206,6 +1340,33 @@ export async function markNotificationAsRead(notificationId: string) {
 
   revalidatePath("/");
   return { success: true };
+}
+
+export async function submitPilotFeedback(input: { screen: string; category: string; message: string }) {
+  const actor = await requireCurrentUser();
+  const screen = input.screen.trim();
+  const category = input.category.trim();
+  const message = input.message.trim();
+  if (!["vitrine", "crm", "radar", "cadastrar", "termo", "dvp", "admin"].includes(screen)) throw new Error("Selecione uma tela válida.");
+  if (!["duvida", "erro", "ideia"].includes(category)) throw new Error("Selecione um tipo de feedback válido.");
+  if (message.length < 10 || message.length > 2000) throw new Error("Escreva de 10 a 2.000 caracteres.");
+  const [feedback] = await db.insert(pilotFeedback).values({ userId: actor.id, screen, category, message }).returning({ id: pilotFeedback.id, createdAt: pilotFeedback.createdAt });
+  revalidatePath("/");
+  return { success: true, feedback };
+}
+
+export async function updatePilotFeedbackStatus(feedbackId: string, status: string) {
+  const actor = await requireCurrentUser();
+  if (actor.role !== "admin") throw new Error("Apenas administradores podem atualizar o feedback do piloto.");
+  if (!["novo", "em_analise", "concluido"].includes(status)) throw new Error("Status de feedback inválido.");
+  const [updated] = await db.update(pilotFeedback).set({
+    status,
+    reviewedAt: status === "novo" ? null : new Date(),
+    reviewedBy: status === "novo" ? null : actor.id,
+  }).where(eq(pilotFeedback.id, feedbackId)).returning({ id: pilotFeedback.id, status: pilotFeedback.status, reviewedAt: pilotFeedback.reviewedAt });
+  if (!updated) throw new Error("Feedback não encontrado.");
+  revalidatePath("/");
+  return { success: true, feedback: updated };
 }
 
 export async function validateCreciWithAI(creci: string, state: string, _name?: string) {

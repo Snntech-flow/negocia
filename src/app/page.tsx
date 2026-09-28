@@ -16,6 +16,7 @@ export default async function HomePage() {
     partnershipActivities,
     leads,
     leadActivities,
+    pilotFeedback,
   } = await getMarketplaceData();
 
   return (
@@ -31,6 +32,7 @@ export default async function HomePage() {
       initialPartnershipActivities={partnershipActivities}
       initialLeads={leads}
       initialLeadActivities={leadActivities}
+      initialFeedback={pilotFeedback}
     />
   );
 }

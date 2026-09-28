@@ -8,6 +8,7 @@ export const users = pgTable("users", {
   whatsapp: text("whatsapp").notNull(),
   // Nullable for legacy/demo seed accounts; new accounts must authenticate with a password.
   passwordHash: text("password_hash"),
+  sessionVersion: integer("session_version").default(0).notNull(),
   avatarUrl: text("avatar_url"),
   city: text("city").notNull(),
   state: text("state").default("SP").notNull(),
@@ -175,6 +176,8 @@ export const partnerships = pgTable("partnerships", {
   status: text("status").default("proposta").notNull(), // proposta, visita_agendada, em_negociacao, fechado, recusado
   captorAcceptedAt: timestamp("captor_accepted_at"),
   partnerAcceptedAt: timestamp("partner_accepted_at"),
+  commissionStatus: text("commission_status").default("nao_registrada").notNull(),
+  commissionRevision: integer("commission_revision").default(1).notNull(),
   commissionModel: text("commission_model").default("two_party_50_50").notNull(),
   commissionSplit: numeric("commission_split", { precision: 5, scale: 2 }).default("50.00").notNull(),
   captorCommissionPercent: numeric("captor_commission_percent", { precision: 5, scale: 2 }).default("50.00").notNull(),
@@ -198,6 +201,18 @@ export const partnershipActivities = pgTable("partnership_activities", {
   note: text("note"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({ partnershipTimelineIdx: index("partnership_activities_timeline_idx").on(table.partnershipId, table.createdAt) }));
+
+export const pilotFeedback = pgTable("pilot_feedback", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  screen: text("screen").notNull(),
+  category: text("category").notNull(),
+  message: text("message").notNull(),
+  status: text("status").default("novo").notNull(),
+  reviewedAt: timestamp("reviewed_at"),
+  reviewedBy: uuid("reviewed_by").references(() => users.id),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({ statusCreatedIdx: index("pilot_feedback_status_created_idx").on(table.status, table.createdAt) }));
 
 export const transactions = pgTable("transactions", {
   id: uuid("id").defaultRandom().primaryKey(),

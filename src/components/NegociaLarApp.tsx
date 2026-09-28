@@ -53,6 +53,7 @@ import {
   Trash2,
   CheckSquare,
   Square,
+  MessageSquarePlus,
 } from "lucide-react";
 import OnboardingModal from "@/components/OnboardingModal";
 import LeadCRM from "@/components/LeadCRM";
@@ -63,6 +64,9 @@ import {
   createDvpCertificate,
   updatePartnershipStatus,
   respondToPartnershipSplit,
+  revisePartnershipCommission,
+  submitPilotFeedback,
+  updatePilotFeedbackStatus,
   markNotificationAsRead,
   logoutUser,
 } from "@/lib/actions";
@@ -110,6 +114,8 @@ interface PartnershipItem {
   partnerName: string;
   status: string;
   commissionSplit: string;
+  commissionStatus: string;
+  commissionRevision: number;
   captorAcceptedAt: Date | null;
   partnerAcceptedAt: Date | null;
   commissionModel: string;
@@ -123,6 +129,18 @@ interface PartnershipItem {
   notes: string | null;
   createdAt: Date;
   updatedAt: Date;
+}
+
+interface PilotFeedbackItem {
+  id: string;
+  userId: string;
+  userName: string;
+  userCreci: string;
+  screen: string;
+  category: string;
+  message: string;
+  status: string;
+  createdAt: Date;
 }
 
 interface PartnershipActivityItem {
@@ -370,6 +388,7 @@ export default function NegociaLarApp({
   initialPartnershipActivities = [],
   initialLeads = [],
   initialLeadActivities = [],
+  initialFeedback = [],
 }: {
   initialProperties: Property[];
   initialRadar: BuyerProfile[];
@@ -382,6 +401,7 @@ export default function NegociaLarApp({
   initialPartnershipActivities?: PartnershipActivityItem[];
   initialLeads?: React.ComponentProps<typeof LeadCRM>["initialLeads"];
   initialLeadActivities?: React.ComponentProps<typeof LeadCRM>["initialActivities"];
+  initialFeedback?: PilotFeedbackItem[];
 }) {
   const [currentView, setCurrentView] = useState<"app" | "landing">("landing");
   const [activeTab, setActiveTab] = useState<"vitrine" | "crm" | "radar" | "cadastrar" | "termo" | "dvp" | "admin">("vitrine");
@@ -399,6 +419,8 @@ export default function NegociaLarApp({
   const [userSearch, setUserSearch] = useState("");
   const [isUserSwitcherOpen, setIsUserSwitcherOpen] = useState(false);
   const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false);
+  const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+  const [feedbackBusy, setFeedbackBusy] = useState(false);
 
   // Notificações e Sininho da IA (Reais do Banco)
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
@@ -410,6 +432,7 @@ export default function NegociaLarApp({
   const [dvpList, setDvpList] = useState<DvpCertificateItem[]>(initialDvpList);
   const [partnershipList, setPartnershipList] = useState<PartnershipItem[]>(initialPartnerships);
   const [partnershipActivityList, setPartnershipActivityList] = useState<PartnershipActivityItem[]>(initialPartnershipActivities);
+  const [pilotFeedbackList, setPilotFeedbackList] = useState<PilotFeedbackItem[]>(initialFeedback);
 
   // Filtros da Vitrine MLS
   const [propertyFilterPurpose, setPropertyFilterPurpose] = useState<string>("todos");
@@ -663,7 +686,8 @@ export default function NegociaLarApp({
   };
 
   const handlePartnershipSplitResponse = async (partnership: PartnershipItem, accepted: boolean) => {
-    if (!accepted && !window.confirm("Recusar a proposta 40/40/20? A parceria será marcada como recusada.")) return;
+    const splitName = partnership.commissionModel === "three_party_referral_40_40_20" ? "40/40/20" : "50/50";
+    if (!accepted && !window.confirm(`Recusar a proposta ${splitName}? Ela poderá receber uma nova versão.`)) return;
     try {
       const result = await respondToPartnershipSplit(partnership.id, accepted);
       setPartnershipList((items) => items.map((item) => item.id === partnership.id ? { ...item, ...result.partnership } : item));
@@ -673,11 +697,75 @@ export default function NegociaLarApp({
         actorUserId: currentUser?.id || "",
         actorName: currentUser?.name || "Você",
       }, ...items]);
-      setToastMessage(result.alreadyAccepted ? "Você já confirmou esta proposta." : accepted ? "Confirmação 40/40/20 registrada para este corretor." : "Proposta recusada e registrada no histórico.");
+      setToastMessage(result.alreadyAccepted ? "Você já confirmou esta proposta." : accepted ? `Confirmação ${splitName} registrada para este corretor.` : "Proposta recusada. Ela pode ser revisada e enviada novamente.");
     } catch (error) {
       setToastMessage(error instanceof Error ? error.message : "Não foi possível registrar a resposta.");
     }
     setTimeout(() => setToastMessage(null), 6000);
+  };
+
+  const handleRevisePartnershipCommission = async (partnership: PartnershipItem, event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const values = new FormData(form);
+    try {
+      const result = await revisePartnershipCommission(partnership.id, {
+        commissionModel: String(values.get("commissionModel") || ""),
+        externalReferrerName: String(values.get("externalReferrerName") || ""),
+        externalReferrerCreci: String(values.get("externalReferrerCreci") || ""),
+        externalReferrerWhatsapp: String(values.get("externalReferrerWhatsapp") || ""),
+      });
+      setPartnershipList((items) => items.map((item) => item.id === partnership.id ? { ...item, ...result.partnership } : item));
+      setPartnershipActivityList((items) => [{ ...result.activity, partnershipId: partnership.id, actorUserId: currentUser?.id || "", actorName: currentUser?.name || "Você" }, ...items]);
+      form.reset();
+      setToastMessage(`Versão ${result.partnership.commissionRevision} salva. Os dois corretores precisam confirmar novamente.`);
+    } catch (error) {
+      setToastMessage(error instanceof Error ? error.message : "Não foi possível revisar a divisão.");
+    }
+    setTimeout(() => setToastMessage(null), 6000);
+  };
+
+  const handlePilotFeedbackSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const form = event.currentTarget;
+    const values = new FormData(form);
+    setFeedbackBusy(true);
+    try {
+      const result = await submitPilotFeedback({
+        screen: activeTab,
+        category: String(values.get("category") || ""),
+        message: String(values.get("message") || ""),
+      });
+      if (currentUser?.role === "admin") setPilotFeedbackList((items) => [{
+        id: result.feedback.id,
+        userId: currentUser.id,
+        userName: currentUser.name,
+        userCreci: currentUser.creci,
+        screen: activeTab,
+        category: String(values.get("category") || ""),
+        message: String(values.get("message") || ""),
+        status: "novo",
+        createdAt: new Date(result.feedback.createdAt),
+      }, ...items]);
+      form.reset();
+      setIsFeedbackOpen(false);
+      setToastMessage("Obrigado. Seu feedback foi enviado para a equipe do piloto.");
+    } catch (error) {
+      setToastMessage(error instanceof Error ? error.message : "Não foi possível enviar seu feedback.");
+    } finally {
+      setFeedbackBusy(false);
+    }
+    setTimeout(() => setToastMessage(null), 6000);
+  };
+
+  const handlePilotFeedbackStatus = async (feedback: PilotFeedbackItem, status: string) => {
+    try {
+      const result = await updatePilotFeedbackStatus(feedback.id, status);
+      setPilotFeedbackList((items) => items.map((item) => item.id === feedback.id ? { ...item, status: result.feedback.status } : item));
+    } catch (error) {
+      setToastMessage(error instanceof Error ? error.message : "Não foi possível atualizar o feedback.");
+      setTimeout(() => setToastMessage(null), 6000);
+    }
   };
 
   const activeProperty = selectedPropertyForTerm;
@@ -781,6 +869,7 @@ export default function NegociaLarApp({
             >
               <span>🌐 Ver Landing Page</span>
             </button>
+            {currentUser && <button type="button" onClick={() => setIsFeedbackOpen(true)} aria-label="Enviar feedback" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/90 px-2.5 py-1.5 text-xs text-slate-300 transition hover:border-amber-500/40 hover:text-amber-300 sm:px-3"><MessageSquarePlus className="h-3.5 w-3.5" /><span className="hidden sm:inline">Enviar feedback</span></button>}
 
             {/* Sininho de Notificações com IA */}
             <div className="relative">
@@ -1251,6 +1340,11 @@ export default function NegociaLarApp({
                 </table>
               </div>
             </div>
+
+            <section className="bg-slate-900 rounded-2xl border border-slate-800 p-6 shadow-xl space-y-4">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-3"><div><h3 className="text-lg font-bold text-white">Feedback do piloto ({pilotFeedbackList.length})</h3><p className="text-xs text-slate-400">Dúvidas, erros e sugestões enviados pelos corretores.</p></div><MessageSquarePlus className="h-5 w-5 text-amber-400" /></div>
+              {pilotFeedbackList.length === 0 ? <p className="rounded-lg border border-dashed border-slate-700 px-4 py-6 text-center text-xs text-slate-400">Nenhum feedback recebido ainda.</p> : <div className="space-y-3">{pilotFeedbackList.map((feedback) => <article key={feedback.id} className="rounded-xl border border-slate-800 bg-slate-950 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold text-white">{feedback.userName} · CRECI {feedback.userCreci}</p><p className="mt-1 text-[10px] text-slate-500">{feedback.screen} · {feedback.category === "erro" ? "Erro" : feedback.category === "ideia" ? "Ideia" : "Dúvida"} · {new Date(feedback.createdAt).toLocaleString("pt-BR")}</p></div><select aria-label="Status do feedback" value={feedback.status} onChange={(event) => void handlePilotFeedbackStatus(feedback, event.target.value)} className="rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-[11px] text-white"><option value="novo">Novo</option><option value="em_analise">Em análise</option><option value="concluido">Concluído</option></select></div><p className="mt-3 whitespace-pre-wrap text-xs leading-relaxed text-slate-300">{feedback.message}</p></article>)}</div>}
+            </section>
           </div>
         )}
 
@@ -1982,32 +2076,43 @@ export default function NegociaLarApp({
                 <div><h3 className="text-sm font-bold uppercase tracking-wider text-white">Acompanhamento das parcerias ({partnershipList.length})</h3><p className="mt-1 text-xs text-slate-400">Veja em que etapa está cada visita compartilhada.</p></div>
                 <ArrowRight className="h-4 w-4 shrink-0 text-sky-300" />
               </div>
-              <div className="rounded-lg border border-amber-500/25 bg-amber-950/20 p-3 text-[11px] leading-relaxed text-amber-100/80">Você ou o outro corretor podem atualizar a etapa; o histórico mostra quem alterou e quando. Nas propostas 40/40/20, cada um dos dois corretores também pode confirmar ou recusar a divisão. Essa confirmação interna não é assinatura eletrônica nem garante comissão; formalizem o acordo fora da plataforma.</div>
+              <div className="rounded-lg border border-amber-500/25 bg-amber-950/20 p-3 text-[11px] leading-relaxed text-amber-100/80">Você ou o outro corretor podem atualizar a etapa; o histórico mostra quem alterou e quando. Nas propostas 50/50 e 40/40/20, cada um dos dois corretores pode confirmar ou recusar a divisão. Essa confirmação interna não é assinatura eletrônica nem garante comissão; formalizem o acordo fora da plataforma.</div>
               {partnershipList.length === 0 ? <div className="rounded-xl border border-dashed border-slate-700 px-5 py-6 text-center"><p className="text-sm font-semibold text-white">Ainda não há parcerias para acompanhar</p><p className="mx-auto mt-2 max-w-lg text-xs leading-relaxed text-slate-400">Os registros aparecem aqui depois que você salva uma visita a um imóvel de outro corretor. Na Vitrine, escolha um imóvel que aceite parceria, clique em “Agendar visita” e preencha os dados do cliente. Salvar como rascunho só guarda essas informações; nenhum corretor dá aceite por essa ação.</p><button type="button" onClick={() => { setActiveTab("vitrine"); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2.5 text-xs font-bold text-slate-950 hover:bg-amber-400"><Building2 className="h-4 w-4" />Escolher imóvel na Vitrine</button></div> : (
                 <div className="space-y-3">
                   {partnershipList.map((partnership) => {
                     const transitions: Record<string, string[]> = { proposta: ["visita_agendada", "recusado"], visita_agendada: ["em_negociacao", "recusado"], em_negociacao: ["fechado", "recusado"] };
-                    const labels: Record<string, string> = { proposta: "Proposta", visita_agendada: "Visita agendada", em_negociacao: "Em negociação", fechado: "Encerrada como fechada", recusado: "Recusada", divisao_confirmada: "Divisão 40/40/20 confirmada por um corretor", divisao_recusada: "Divisão 40/40/20 não aceita" };
+                    const labels: Record<string, string> = { proposta: "Proposta", visita_agendada: "Visita agendada", em_negociacao: "Em negociação", fechado: "Encerrada como fechada", recusado: "Recusada", divisao_confirmada: "Divisão confirmada por um corretor", divisao_recusada: "Divisão não aceita" };
                     const nextStatuses = transitions[partnership.status] || [];
                     const history = partnershipActivityList.filter((activity) => activity.partnershipId === partnership.id);
                     return <article key={partnership.id} className="rounded-xl border border-slate-800 bg-slate-950 p-4">
                       <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0"><h4 className="truncate text-sm font-bold text-white">{partnership.propertyTitle}</h4><p className="mt-1 text-xs text-slate-400">Captador: {partnership.captorName} · Parceiro: {partnership.partnerName}</p><p className="mt-1 text-[11px] text-slate-500">Visita: {partnership.visitScheduledDate ? new Date(partnership.visitScheduledDate).toLocaleString("pt-BR") : "não agendada"} · divisão {partnership.commissionModel === "three_party_referral_40_40_20" ? "40/40/20 proposta" : `${partnership.commissionSplit}% / ${100 - Number(partnership.commissionSplit)}% informada`}</p></div>
+                        <div className="min-w-0"><h4 className="truncate text-sm font-bold text-white">{partnership.propertyTitle}</h4><p className="mt-1 text-xs text-slate-400">Captador: {partnership.captorName} · Parceiro: {partnership.partnerName}</p><p className="mt-1 text-[11px] text-slate-500">Visita: {partnership.visitScheduledDate ? new Date(partnership.visitScheduledDate).toLocaleString("pt-BR") : "não agendada"} · divisão {partnership.commissionModel === "three_party_referral_40_40_20" ? "40/40/20" : "50/50"} · versão {partnership.commissionRevision}</p></div>
                         <span className="rounded-full border border-sky-500/25 bg-sky-500/10 px-2.5 py-1 text-[10px] font-bold text-sky-200">{labels[partnership.status] || partnership.status}</span>
                       </div>
-                      {partnership.commissionModel === "three_party_referral_40_40_20" && <div className="mt-3 rounded-lg border border-amber-500/20 bg-amber-950/15 p-3 space-y-3">
-                        <div className="text-xs text-slate-200"><strong>Proposta de divisão:</strong> {partnership.captorCommissionPercent}% captador · {partnership.partnerCommissionPercent}% corretor do comprador · {partnership.referrerCommissionPercent}% indicador externo ({partnership.externalReferrerName}, CRECI {partnership.externalReferrerCreci}){partnership.externalReferrerWhatsapp ? ` · WhatsApp ${partnership.externalReferrerWhatsapp}` : ""}.</div>
+                      <div className="mt-3 rounded-lg border border-amber-500/20 bg-amber-950/15 p-3 space-y-3">
+                        <div className="text-xs text-slate-200"><strong>Proposta de divisão (versão {partnership.commissionRevision}):</strong> {partnership.captorCommissionPercent}% captador · {partnership.partnerCommissionPercent}% corretor do comprador{partnership.commissionModel === "three_party_referral_40_40_20" ? ` · ${partnership.referrerCommissionPercent}% indicador externo (${partnership.externalReferrerName}, CRECI ${partnership.externalReferrerCreci}${partnership.externalReferrerWhatsapp ? `, WhatsApp ${partnership.externalReferrerWhatsapp}` : ""})` : ""}.</div>
                         <div className="grid gap-2 sm:grid-cols-2 text-[11px]">
                           <div className="rounded-md bg-slate-950/70 p-2 text-slate-300">Captador: {partnership.captorAcceptedAt ? `confirmou em ${new Date(partnership.captorAcceptedAt).toLocaleString("pt-BR")}` : "aguardando confirmação"}</div>
                           <div className="rounded-md bg-slate-950/70 p-2 text-slate-300">Corretor do comprador: {partnership.partnerAcceptedAt ? `confirmou em ${new Date(partnership.partnerAcceptedAt).toLocaleString("pt-BR")}` : "aguardando confirmação"}</div>
                         </div>
-                        <p className="text-[10px] leading-relaxed text-amber-100/70">O indicador externo fica identificado no registro, mas não precisa acessar a plataforma. A proposta só aparece como confirmada quando os dois corretores cadastrados confirmarem. Isso não é assinatura eletrônica.</p>
-                        {partnership.status !== "recusado" && <div className="flex flex-wrap gap-2">
+                        <p className="text-[10px] leading-relaxed text-amber-100/70">{partnership.commissionModel === "three_party_referral_40_40_20" ? "O indicador externo fica identificado no registro, mas não precisa acessar a plataforma. " : ""}A proposta só aparece como confirmada quando os dois corretores cadastrados confirmarem. Isso não é assinatura eletrônica nem substitui a formalização entre as partes.</p>
+                        {partnership.commissionStatus !== "nao_registrada" && <div className="grid gap-2 sm:grid-cols-2 text-[11px]">
+                          <div className="rounded-md bg-slate-950/70 p-2 text-slate-300">Captador: {partnership.captorAcceptedAt ? `confirmou em ${new Date(partnership.captorAcceptedAt).toLocaleString("pt-BR")}` : "aguardando confirmação"}</div>
+                          <div className="rounded-md bg-slate-950/70 p-2 text-slate-300">Corretor do comprador: {partnership.partnerAcceptedAt ? `confirmou em ${new Date(partnership.partnerAcceptedAt).toLocaleString("pt-BR")}` : "aguardando confirmação"}</div>
+                        </div>}
+                        {partnership.commissionStatus === "aguardando_aceites" && partnership.status !== "recusado" && <div className="flex flex-wrap gap-2">
                           {currentUser?.id === partnership.captorBrokerId && !partnership.captorAcceptedAt && <><button type="button" onClick={() => void handlePartnershipSplitResponse(partnership, true)} className="rounded-lg bg-emerald-500 px-3 py-2 text-[11px] font-bold text-slate-950">Confirmar divisão (captador)</button><button type="button" onClick={() => void handlePartnershipSplitResponse(partnership, false)} className="rounded-lg border border-rose-500/40 px-3 py-2 text-[11px] font-semibold text-rose-300">Não aceito</button></>}
-                          {currentUser?.id === partnership.partnerBrokerId && !partnership.partnerAcceptedAt && <><button type="button" onClick={() => void handlePartnershipSplitResponse(partnership, true)} className="rounded-lg bg-emerald-500 px-3 py-2 text-[11px] font-bold text-slate-950">Confirmar divisão (corretor do comprador)</button><button type="button" onClick={() => void handlePartnershipSplitResponse(partnership, false)} className="rounded-lg border border-rose-500/40 px-3 py-2 text-[11px] font-semibold text-rose-300">Não aceito</button></>}
+                          {currentUser?.id === partnership.partnerBrokerId && !partnership.partnerAcceptedAt && <><button type="button" onClick={() => void handlePartnershipSplitResponse(partnership, true)} className="rounded-lg bg-emerald-500 px-3 py-2 text-[11px] font-bold text-slate-950">Confirmar divisão (parceiro)</button><button type="button" onClick={() => void handlePartnershipSplitResponse(partnership, false)} className="rounded-lg border border-rose-500/40 px-3 py-2 text-[11px] font-semibold text-rose-300">Não aceito</button></>}
                         </div>}
                         {partnership.captorAcceptedAt && partnership.partnerAcceptedAt && <p className="text-[11px] font-semibold text-emerald-300">Os dois corretores confirmaram esta proposta.</p>}
-                      </div>}
+                        {(currentUser?.id === partnership.captorBrokerId || currentUser?.id === partnership.partnerBrokerId) && partnership.status !== "fechado" && partnership.status !== "recusado" && <details className="border-t border-amber-500/15 pt-3"><summary className="cursor-pointer text-[11px] font-semibold text-amber-200">Revisar proposta de divisão</summary><form onSubmit={(event) => void handleRevisePartnershipCommission(partnership, event)} className="mt-3 grid gap-2 sm:grid-cols-2">
+                          <label className="text-[10px] text-slate-300">Modelo<select name="commissionModel" defaultValue={partnership.commissionModel} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-2 text-xs text-white"><option value="two_party_50_50">50% / 50%</option><option value="three_party_referral_40_40_20">40% / 40% / 20%</option></select></label>
+                          <label className="text-[10px] text-slate-300">Nome do indicador externo (se houver)<input name="externalReferrerName" defaultValue={partnership.externalReferrerName || ""} maxLength={120} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-2 text-xs text-white" /></label>
+                          <label className="text-[10px] text-slate-300">CRECI do indicador<input name="externalReferrerCreci" defaultValue={partnership.externalReferrerCreci || ""} maxLength={40} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-2 text-xs text-white" /></label>
+                          <label className="text-[10px] text-slate-300">WhatsApp do indicador<input name="externalReferrerWhatsapp" defaultValue={partnership.externalReferrerWhatsapp || ""} maxLength={30} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-2 text-xs text-white" /></label>
+                          <button className="sm:col-span-2 rounded-lg border border-amber-500/40 px-3 py-2 text-[11px] font-bold text-amber-200 hover:bg-amber-500/10">Salvar nova versão e pedir confirmação dos dois</button>
+                        </form></details>}
+                      </div>
                       {nextStatuses.length > 0 && (currentUser?.id === partnership.captorBrokerId || currentUser?.id === partnership.partnerBrokerId) && <div className="mt-3 flex flex-wrap gap-2">{nextStatuses.map((nextStatus) => <button key={nextStatus} type="button" onClick={() => { if (["fechado", "recusado"].includes(nextStatus) && !window.confirm(`Confirmar etapa “${labels[nextStatus]}”?`)) return; void handlePartnershipStatus(partnership, nextStatus); }} className={`rounded-lg border px-3 py-2 text-[11px] font-bold ${nextStatus === "recusado" ? "border-rose-500/25 text-rose-300 hover:bg-rose-500/10" : "border-emerald-500/25 text-emerald-300 hover:bg-emerald-500/10"}`}>{nextStatus === "recusado" ? "Recusar" : `Marcar: ${labels[nextStatus]}`}</button>)}</div>}
                       <details className="mt-3 border-t border-slate-800 pt-3"><summary className="cursor-pointer text-[11px] font-semibold text-slate-300">Linha do tempo ({history.length})</summary><div className="mt-3 space-y-2">{history.length ? history.map((activity) => <div key={activity.id} className="border-l border-slate-700 pl-3 text-[11px]"><div className="flex flex-wrap items-center justify-between gap-2 text-slate-300"><span>{activity.actorName}: {labels[activity.newStatus] || activity.newStatus}</span><time className="text-slate-500">{new Date(activity.createdAt).toLocaleString("pt-BR")}</time></div>{activity.note && <p className="mt-1 whitespace-pre-wrap text-slate-500">{activity.note}</p>}</div>) : <p className="text-[11px] text-slate-500">Nenhum evento registrado.</p>}</div></details>
                     </article>;
@@ -3204,6 +3309,7 @@ export default function NegociaLarApp({
       )}
 
       {/* Modal de Onboarding Direto */}
+      {isFeedbackOpen && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 p-4" role="dialog" aria-modal="true" aria-labelledby="pilot-feedback-title"><form onSubmit={(event) => void handlePilotFeedbackSubmit(event)} className="w-full max-w-lg space-y-4 rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl"><div className="flex items-start justify-between gap-4"><div><h2 id="pilot-feedback-title" className="text-lg font-bold text-white">Conte como foi usar esta tela</h2><p className="mt-1 text-xs text-slate-400">O feedback será enviado à equipe do piloto junto com a tela atual.</p></div><button type="button" aria-label="Fechar" onClick={() => setIsFeedbackOpen(false)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white">✕</button></div><label className="block text-xs font-semibold text-slate-300">Tipo<select name="category" required className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white"><option value="duvida">Dúvida</option><option value="erro">Encontrei um erro</option><option value="ideia">Sugestão de melhoria</option></select></label><label className="block text-xs font-semibold text-slate-300">O que aconteceu ou o que você sugere?<textarea name="message" required minLength={10} maxLength={2000} rows={5} placeholder="Descreva o que tentou fazer e o que ficou confuso…" className="mt-1 w-full resize-y rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white placeholder:text-slate-500" /></label><div className="flex justify-end gap-2"><button type="button" onClick={() => setIsFeedbackOpen(false)} className="rounded-lg px-3 py-2 text-xs text-slate-300 hover:bg-slate-800">Cancelar</button><button disabled={feedbackBusy} className="rounded-lg bg-amber-500 px-4 py-2 text-xs font-bold text-slate-950 disabled:opacity-50">{feedbackBusy ? "Enviando…" : "Enviar feedback"}</button></div></form></div>}
       <OnboardingModal
         isOpen={isOnboardingModalOpen}
         onClose={() => setIsOnboardingModalOpen(false)}
