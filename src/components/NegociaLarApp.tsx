@@ -120,11 +120,11 @@ interface PartnershipActivityItem {
 }
 
 const SCREEN_GUIDANCE: Record<string, { title: string; description: string }> = {
-  vitrine: { title: "Vitrine MLS", description: "Encontre imóveis compartilhados por corretores, filtre as oportunidades e consulte as condições diretamente com o captador. Endereços completos e dados do proprietário ficam restritos ao captador." },
+  vitrine: { title: "Vitrine de imóveis compartilhados (MLS)", description: "MLS é uma rede em que corretores compartilham imóveis e oportunidades. Consulte as condições com o captador; o endereço completo e os dados do proprietário ficam restritos a ele." },
   crm: { title: "CRM de Leads", description: "Organize clientes e parceiros, acompanhe cada oportunidade por etapa, registre contatos e programe retornos. Os leads ficam privados na sua carteira." },
   radar: { title: "Radar de Compradores", description: "Compare as preferências de compradores cadastrados com os imóveis disponíveis. Confira os critérios do match antes de falar com o corretor responsável." },
-  termo: { title: "Termo de Parceria", description: "Consulte uma prévia demonstrativa para discutir a parceria. O sistema não coleta aceite eletrônico nem emite um contrato válido; formalize os termos fora da plataforma." },
-  dvp: { title: "Registro de Visita · DVP em desenvolvimento", description: "Registre internamente os dados de uma visita. O DVP é salvo como rascunho, sem assinatura eletrônica e sem efeito contratual; não representa garantia de comissão nem substitui orientação jurídica." },
+  termo: { title: "Termo de Parceria", description: "Veja um exemplo de como uma parceria pode ser combinada. Esta tela não coleta o aceite dos corretores nem gera contrato; formalizem o acordo fora da plataforma." },
+  dvp: { title: "Registro de visita · DVP em desenvolvimento", description: "Salve os dados da visita para consulta e acompanhamento. O rascunho não é assinado por ninguém, não confirma um acordo e não garante comissão." },
   cadastrar: { title: "Nova Captação", description: "Cadastre um imóvel e suas condições de parceria. Os dados completos de endereço e do proprietário ficam visíveis apenas para o corretor captador." },
   admin: { title: "Gestão e Faturamento", description: "Área administrativa para revisar cadastros e acompanhar informações de assinatura. Pagamentos ainda não são processados pela plataforma." },
 };
@@ -275,6 +275,16 @@ export const PRIVATE_AMENITIES_LIST = [
   "Ofurô / Hidromassagem",
   "Sauna privativa",
   "Ventilador de teto",
+  "Ar-condicionado central",
+  "Painel de energia solar",
+  "Adega",
+  "Torneiras com água quente",
+  "Sistema de automação residencial",
+  "Cofre",
+  "Poço artesiano",
+  "Fechadura eletrônica",
+  "Piso aquecido",
+  "Captação de água da chuva",
 ];
 
 export const CONDO_AMENITIES_GROUPS = [
@@ -300,6 +310,9 @@ export const CONDO_AMENITIES_GROUPS = [
       "Pet place / Pet care",
       "Haras / Hípica",
       "Heliponto",
+      "Parque aquático",
+      "Lavanderia compartilhada",
+      "Bar / Restaurante",
     ],
   },
   {
@@ -317,6 +330,7 @@ export const CONDO_AMENITIES_GROUPS = [
     items: [
       "Portaria 24 horas",
       "Portaria remota / virtual",
+      "Portaria blindada",
       "Reconhecimento facial / Biometria",
       "Câmeras CFTV 24h",
       "Gerador de energia",
@@ -715,7 +729,7 @@ export default function NegociaLarApp({
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-extrabold text-xl tracking-tight text-white">Negocia<span className="text-amber-500">lar</span></span>
-                <span className="text-[10px] bg-amber-500/20 text-amber-300 font-semibold px-2 py-0.5 rounded-full border border-amber-500/30">MLS B2B</span>
+                <span className="text-[10px] bg-amber-500/20 text-amber-300 font-semibold px-2 py-0.5 rounded-full border border-amber-500/30" title="Rede de imóveis compartilhados entre corretores">Rede de corretores</span>
               </div>
               <p className="hidden text-[11px] text-slate-400 sm:block">
                 Rede de Co-corretagem Segura • <span className="text-amber-400 font-semibold">Um produto SNNtech</span>
@@ -1851,7 +1865,7 @@ export default function NegociaLarApp({
                   className="w-full bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-slate-950 font-bold py-3.5 rounded-xl transition shadow-lg shadow-emerald-500/20 flex items-center justify-center gap-2 text-xs sm:text-sm"
                 >
                   <Stamp className="w-5 h-5" />
-                  Registrar visita em rascunho
+                  Salvar rascunho da visita
                 </button>
               </div>
             </form>
@@ -1882,14 +1896,14 @@ export default function NegociaLarApp({
                           {dvp.certificateHash}
                         </span>
                         <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-bold">
-                          {dvp.status === "rascunho" ? "Rascunho • sem efeito contratual" : dvp.status}
+                          {dvp.status === "rascunho" ? "Rascunho • nenhum aceite registrado" : dvp.status}
                         </span>
                       </div>
                       <div className="text-xs text-slate-300 grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
                         <div><strong>Cliente:</strong> {dvp.clientName} (CPF: {dvp.clientCpfPartial})</div>
                         <div><strong>Data da Visita:</strong> {new Date(dvp.visitDate).toLocaleDateString("pt-BR")}</div>
-                        <div><strong>Data calculada no registro, sem efeito contratual:</strong> {new Date(dvp.lockExpirationDate).toLocaleDateString("pt-BR")}</div>
-                        <div><strong>Divisão de Comissão:</strong> {dvp.commissionSplit}% / {100 - parseFloat(dvp.commissionSplit)}%</div>
+                        <div><strong>Prazo de acompanhamento interno:</strong> {new Date(dvp.lockExpirationDate).toLocaleDateString("pt-BR")} <span className="text-slate-500">(não cria uma trava contratual)</span></div>
+                        <div><strong>Divisão informada:</strong> {dvp.commissionSplit}% / {100 - parseFloat(dvp.commissionSplit)}% <span className="text-slate-500">(a combinar entre as partes)</span></div>
                       </div>
                     </div>
                   ))}
@@ -1902,8 +1916,8 @@ export default function NegociaLarApp({
                 <div><h3 className="text-sm font-bold uppercase tracking-wider text-white">Acompanhamento das parcerias ({partnershipList.length})</h3><p className="mt-1 text-xs text-slate-400">Veja em que etapa está cada visita compartilhada.</p></div>
                 <ArrowRight className="h-4 w-4 shrink-0 text-sky-300" />
               </div>
-              <div className="rounded-lg border border-amber-500/25 bg-amber-950/20 p-3 text-[11px] leading-relaxed text-amber-100/80">As etapas e o histórico são controles internos. Alterá-los não significa aceite de parceria, assinatura eletrônica, garantia de comissão ou obrigação contratual.</div>
-              {partnershipList.length === 0 ? <div className="rounded-xl border border-dashed border-slate-700 px-5 py-6 text-center"><p className="text-sm font-semibold text-white">Ainda não há parcerias para acompanhar</p><p className="mx-auto mt-2 max-w-lg text-xs leading-relaxed text-slate-400">Esta lista só é preenchida depois que você registra uma visita em um imóvel de outro corretor. Escolha um imóvel que aceite parceria, registre o cliente e salve a visita como rascunho.</p><button type="button" onClick={() => { setActiveTab("vitrine"); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2.5 text-xs font-bold text-slate-950 hover:bg-amber-400"><Building2 className="h-4 w-4" />Ir à Vitrine para escolher um imóvel</button></div> : (
+              <div className="rounded-lg border border-amber-500/25 bg-amber-950/20 p-3 text-[11px] leading-relaxed text-amber-100/80">Você ou o outro corretor da parceria podem atualizar a etapa. O histórico mostra quem fez cada alteração e quando. Isso serve para organizar o andamento; não registra aceite, não assina contrato e não garante comissão. A divisão exibida é apenas a condição informada no cadastro.</div>
+              {partnershipList.length === 0 ? <div className="rounded-xl border border-dashed border-slate-700 px-5 py-6 text-center"><p className="text-sm font-semibold text-white">Ainda não há parcerias para acompanhar</p><p className="mx-auto mt-2 max-w-lg text-xs leading-relaxed text-slate-400">Os registros aparecem aqui depois que você salva uma visita a um imóvel de outro corretor. Na Vitrine, escolha um imóvel que aceite parceria, clique em “Agendar visita” e preencha os dados do cliente. Salvar como rascunho só guarda essas informações; nenhum corretor dá aceite por essa ação.</p><button type="button" onClick={() => { setActiveTab("vitrine"); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2.5 text-xs font-bold text-slate-950 hover:bg-amber-400"><Building2 className="h-4 w-4" />Escolher imóvel na Vitrine</button></div> : (
                 <div className="space-y-3">
                   {partnershipList.map((partnership) => {
                     const transitions: Record<string, string[]> = { proposta: ["visita_agendada", "recusado"], visita_agendada: ["em_negociacao", "recusado"], em_negociacao: ["fechado", "recusado"] };
@@ -1912,7 +1926,7 @@ export default function NegociaLarApp({
                     const history = partnershipActivityList.filter((activity) => activity.partnershipId === partnership.id);
                     return <article key={partnership.id} className="rounded-xl border border-slate-800 bg-slate-950 p-4">
                       <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0"><h4 className="truncate text-sm font-bold text-white">{partnership.propertyTitle}</h4><p className="mt-1 text-xs text-slate-400">Captador: {partnership.captorName} · Parceiro: {partnership.partnerName}</p><p className="mt-1 text-[11px] text-slate-500">Visita: {partnership.visitScheduledDate ? new Date(partnership.visitScheduledDate).toLocaleString("pt-BR") : "não agendada"} · divisão cadastrada {partnership.commissionSplit}% / {100 - Number(partnership.commissionSplit)}%</p></div>
+                        <div className="min-w-0"><h4 className="truncate text-sm font-bold text-white">{partnership.propertyTitle}</h4><p className="mt-1 text-xs text-slate-400">Captador: {partnership.captorName} · Parceiro: {partnership.partnerName}</p><p className="mt-1 text-[11px] text-slate-500">Visita: {partnership.visitScheduledDate ? new Date(partnership.visitScheduledDate).toLocaleString("pt-BR") : "não agendada"} · divisão informada {partnership.commissionSplit}% / {100 - Number(partnership.commissionSplit)}% (a combinar entre as partes)</p></div>
                         <span className="rounded-full border border-sky-500/25 bg-sky-500/10 px-2.5 py-1 text-[10px] font-bold text-sky-200">{labels[partnership.status] || partnership.status}</span>
                       </div>
                       {nextStatuses.length > 0 && (currentUser?.id === partnership.captorBrokerId || currentUser?.id === partnership.partnerBrokerId) && <div className="mt-3 flex flex-wrap gap-2">{nextStatuses.map((nextStatus) => <button key={nextStatus} type="button" onClick={() => { if (["fechado", "recusado"].includes(nextStatus) && !window.confirm(`Confirmar etapa “${labels[nextStatus]}”?`)) return; void handlePartnershipStatus(partnership, nextStatus); }} className={`rounded-lg border px-3 py-2 text-[11px] font-bold ${nextStatus === "recusado" ? "border-rose-500/25 text-rose-300 hover:bg-rose-500/10" : "border-emerald-500/25 text-emerald-300 hover:bg-emerald-500/10"}`}>{nextStatus === "recusado" ? "Recusar" : `Marcar: ${labels[nextStatus]}`}</button>)}</div>}
@@ -1956,7 +1970,7 @@ export default function NegociaLarApp({
                       Cadastrar Imóvel com Blindagem de Captação
                     </h2>
                     <p className="text-sm text-slate-400">
-                      Formulário completo com 14 tipos, 20 comodidades privativas, 32 itens de condomínio e blindagem MLS.
+                      Formulário com 14 tipos de imóvel, {PRIVATE_AMENITIES_LIST.length} comodidades privativas e {CONDO_AMENITIES_GROUPS.reduce((total, group) => total + group.items.length, 0)} itens de condomínio, além de proteção dos dados do proprietário.
                     </p>
                   </div>
                   <div className="flex items-center gap-2 text-xs text-amber-400 bg-amber-950/30 border border-amber-500/30 px-3 py-1.5 rounded-xl">
@@ -2615,7 +2629,7 @@ export default function NegociaLarApp({
                   <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-5 shadow-lg">
                     <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-slate-800 pb-3">
                       <MapPin className="w-4 h-4 text-amber-500" />
-                      5. Localização & Blindagem de Endereço MLS
+                      5. Localização e proteção do endereço
                     </h3>
 
                     {/* Busca Inteligente por CEP */}
@@ -2678,7 +2692,7 @@ export default function NegociaLarApp({
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                       <div>
                         <label className="block text-xs font-medium text-slate-300 mb-1">
-                          Bairro (Visível no MLS) *
+                          Bairro (visível na Vitrine) *
                         </label>
                         <input
                           value={formNeighborhood}

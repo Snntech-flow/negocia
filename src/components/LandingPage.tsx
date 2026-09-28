@@ -107,7 +107,7 @@ export default function LandingPage({
                   Negocia<span className="text-amber-600">lar</span>
                 </span>
                 <span className="hidden sm:inline-block text-[10px] bg-slate-100 text-slate-600 font-bold px-2 py-0.5 rounded border border-slate-200">
-                  REDE MLS
+                  REDE DE IMÓVEIS
                 </span>
               </div>
               <div className="text-[11px] text-slate-500 font-medium">
@@ -279,7 +279,7 @@ export default function LandingPage({
               <div className="w-8 h-8 rounded-lg bg-red-100 text-red-600 flex items-center justify-center font-bold text-sm">
                 ✕
               </div>
-              <h3 className="font-bold text-slate-900 text-sm">O "Parceiro Laranja Podre"</h3>
+              <h3 className="font-bold text-slate-900 text-sm">O corretor atravessador</h3>
               <p className="text-xs text-slate-600 leading-relaxed">
                 Você leva o corretor parceiro para visitar o imóvel com o cliente dele. Dias depois, descobre que ele foi direto no proprietário para tirar você da jogada.
               </p>
