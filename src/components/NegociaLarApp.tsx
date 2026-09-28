@@ -630,7 +630,7 @@ export default function NegociaLarApp({
     }
   };
 
-  const activeProperty = selectedPropertyForTerm || initialProperties[0];
+  const activeProperty = selectedPropertyForTerm;
 
   // Métricas do Admin
   const totalRevenue = initialTransactions
@@ -1452,16 +1452,10 @@ export default function NegociaLarApp({
                         <Share2 className="w-4 h-4" />
                         Ficha White-Label
                       </button>
-                      <button
-                        onClick={() => {
-                          setSelectedPropertyForTerm(prop);
-                          setActiveTab("dvp");
-                        }}
+                      {prop.broker.id !== currentBroker.id && prop.acceptsPartnership ? <button
+                        onClick={() => { setSelectedPropertyForTerm(prop); setActiveTab("dvp"); window.scrollTo({ top: 0, behavior: "smooth" }); }}
                         className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs py-2.5 px-3 rounded-xl transition border border-slate-700"
-                      >
-                        <Stamp className="w-4 h-4 text-emerald-400" />
-                        Agendar Visita (DVP)
-                      </button>
+                      ><Stamp className="w-4 h-4 text-emerald-400" />Agendar visita</button> : <button type="button" disabled className="flex cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-xs font-semibold text-slate-500" title={prop.broker.id === currentBroker.id ? "Esta é uma captação sua; escolha um imóvel de outro corretor para iniciar uma parceria." : "Este imóvel não está aceitando parcerias."}><Stamp className="h-4 w-4" />{prop.broker.id === currentBroker.id ? "Imóvel da sua carteira" : "Parceria indisponível"}</button>}
                     </div>
                   </div>
                 ))}
@@ -1705,18 +1699,24 @@ export default function NegociaLarApp({
         {activeTab === "dvp" && (
           <div className="max-w-3xl mx-auto space-y-6">
             <div>
-              <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <Stamp className="w-5 h-5 text-emerald-400" />
-                DVP Digital (Documento de Visita Presencial)
-              </h2>
-              <p className="text-sm text-slate-400">
-                Registro interno de visita. Não coleta assinatura eletrônica nem substitui a formalização jurídica entre as partes.
-              </p>
+              <h2 className="text-xl font-bold text-white flex items-center gap-2"><Stamp className="w-5 h-5 text-emerald-400" />Registrar uma visita</h2>
+              <p className="text-sm text-slate-400">Este registro interno ainda não é um contrato e não tem assinatura eletrônica.</p>
+              <ol className="mt-4 grid gap-2 rounded-xl border border-sky-500/20 bg-sky-950/20 p-4 text-xs text-slate-300 sm:grid-cols-3">
+                <li><strong className="text-sky-200">1. Escolha o imóvel</strong><br />Na Vitrine, abra um imóvel de outro corretor que aceite parceria e clique em “Agendar visita”.</li>
+                <li><strong className="text-sky-200">2. Preencha os dados</strong><br />Informe o cliente, CPF parcialmente oculto e data da visita. Depois clique em “Registrar visita em rascunho”.</li>
+                <li><strong className="text-sky-200">3. Acompanhe aqui</strong><br />O registro de visita e a parceria aparecem nesta tela para consulta e acompanhamento.</li>
+              </ol>
             </div>
 
             <form
+              id="dvp-visit-form"
               onSubmit={async (e) => {
                 e.preventDefault();
+                if (!activeProperty || activeProperty.broker.id === currentBroker.id || !activeProperty.acceptsPartnership) {
+                  setToastMessage("Escolha na Vitrine um imóvel de outro corretor que aceite parceria.");
+                  setTimeout(() => setToastMessage(null), 6000);
+                  return;
+                }
                 const form = e.currentTarget;
                 const fd = new FormData(form);
                 const clientName = fd.get("clientName") as string;
@@ -1784,16 +1784,14 @@ export default function NegociaLarApp({
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
-                  <div className="text-xs text-slate-400">Imóvel Selecionado:</div>
-                  <div className="text-sm font-bold text-white">{activeProperty?.title}</div>
-                  <div className="text-xs text-amber-400">{activeProperty?.neighborhood}, {activeProperty?.city}</div>
-                  <div className="text-[11px] text-slate-500 pt-1">Captador: {activeProperty?.broker.name} (CRECI {activeProperty?.broker.creci})</div>
+                  <div className="text-xs text-slate-400">Imóvel escolhido para a visita</div>
+                  {activeProperty ? <><div className="text-sm font-bold text-white">{activeProperty.title}</div><div className="text-xs text-amber-400">{activeProperty.neighborhood}, {activeProperty.city}</div><div className="text-[11px] text-slate-500 pt-1">Captador: {activeProperty.broker.name} (CRECI {activeProperty.broker.creci})</div></> : <><div className="text-sm font-semibold text-amber-200">Nenhum imóvel selecionado</div><p className="text-[11px] text-slate-400">Abra a Vitrine e escolha um imóvel de outro corretor.</p><button type="button" onClick={() => { setActiveTab("vitrine"); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="mt-2 rounded-lg bg-amber-500 px-3 py-2 text-[11px] font-bold text-slate-950">Escolher imóvel na Vitrine</button></>}
                 </div>
 
                 <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
                   <div className="text-xs text-slate-400">Corretor Solicitante:</div>
                   <div className="text-sm font-bold text-white">{currentBroker.name}</div>
-                  <div className="text-xs text-emerald-400">CRECI {currentBroker.creci} • Parceria 50/50</div>
+                  <div className="text-xs text-emerald-400">CRECI {currentBroker.creci} • divisão cadastrada no imóvel</div>
                 </div>
               </div>
 
@@ -1863,8 +1861,8 @@ export default function NegociaLarApp({
               <div className="flex items-center justify-between pb-3 border-b border-slate-800">
                 <div className="flex items-center gap-2">
                   <Fingerprint className="w-4 h-4 text-emerald-400" />
-                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">
-                    Certificados DVP Registrados no Banco ({dvpList.length})
+                    <h3 className="text-sm font-bold text-white uppercase tracking-wider">
+                    Registros de visita ({dvpList.length})
                   </h3>
                 </div>
                 <span className="text-xs text-slate-400">Registros internos de visita</span>
@@ -1872,7 +1870,7 @@ export default function NegociaLarApp({
 
               {dvpList.length === 0 ? (
                 <div className="p-6 text-center text-xs text-slate-500">
-                  Nenhum DVP emitido ainda. Preencha o formulário acima para registrar sua primeira visita blindada!
+                  Nenhuma visita registrada. Escolha um imóvel de outro corretor na Vitrine e clique em “Agendar visita”.
                 </div>
               ) : (
                 <div className="space-y-3">
@@ -1901,11 +1899,11 @@ export default function NegociaLarApp({
 
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
               <div className="flex items-center justify-between gap-3 border-b border-slate-800 pb-3">
-                <div><h3 className="text-sm font-bold uppercase tracking-wider text-white">Acompanhamento operacional de parcerias ({partnershipList.length})</h3><p className="mt-1 text-xs text-slate-400">Atualize o andamento e consulte quem fez cada alteração.</p></div>
+                <div><h3 className="text-sm font-bold uppercase tracking-wider text-white">Acompanhamento das parcerias ({partnershipList.length})</h3><p className="mt-1 text-xs text-slate-400">Veja em que etapa está cada visita compartilhada.</p></div>
                 <ArrowRight className="h-4 w-4 shrink-0 text-sky-300" />
               </div>
               <div className="rounded-lg border border-amber-500/25 bg-amber-950/20 p-3 text-[11px] leading-relaxed text-amber-100/80">As etapas e o histórico são controles internos. Alterá-los não significa aceite de parceria, assinatura eletrônica, garantia de comissão ou obrigação contratual.</div>
-              {partnershipList.length === 0 ? <p className="py-5 text-center text-xs text-slate-500">As parcerias relacionadas aos seus registros de visita aparecerão aqui.</p> : (
+              {partnershipList.length === 0 ? <div className="rounded-xl border border-dashed border-slate-700 px-5 py-6 text-center"><p className="text-sm font-semibold text-white">Ainda não há parcerias para acompanhar</p><p className="mx-auto mt-2 max-w-lg text-xs leading-relaxed text-slate-400">Esta lista só é preenchida depois que você registra uma visita em um imóvel de outro corretor. Escolha um imóvel que aceite parceria, registre o cliente e salve a visita como rascunho.</p><button type="button" onClick={() => { setActiveTab("vitrine"); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2.5 text-xs font-bold text-slate-950 hover:bg-amber-400"><Building2 className="h-4 w-4" />Ir à Vitrine para escolher um imóvel</button></div> : (
                 <div className="space-y-3">
                   {partnershipList.map((partnership) => {
                     const transitions: Record<string, string[]> = { proposta: ["visita_agendada", "recusado"], visita_agendada: ["em_negociacao", "recusado"], em_negociacao: ["fechado", "recusado"] };
