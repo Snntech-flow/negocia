@@ -1404,10 +1404,10 @@ export async function registerUserWithPix(userData: {
 }) {
   const cleanEmail = userData.email.trim().toLowerCase();
   const cleanCreci = userData.creci.trim().toUpperCase();
-  const prices: Record<string, { monthly: string; annual: string }> = {
-    "10": { monthly: "59.90", annual: "49.90" },
-    "20": { monthly: "89.90", annual: "74.90" },
-    "40": { monthly: "150.00", annual: "125.00" },
+  const prices: Record<string, { monthly: string; annual: string; annualTotal: string }> = {
+    "10": { monthly: "59.90", annual: "54.91", annualTotal: "658.90" },
+    "20": { monthly: "89.90", annual: "82.41", annualTotal: "988.90" },
+    "40": { monthly: "150.00", annual: "137.50", annualTotal: "1650.00" },
   };
   const selectedPlan = prices[userData.plan];
   if (!selectedPlan) throw new Error("Plano inválido.");
@@ -1415,9 +1415,7 @@ export async function registerUserWithPix(userData: {
   if (userData.name.trim().length < 2 || userData.city.trim().length < 2 || !/^[A-Z]{2}$/.test(userData.state.toUpperCase())) throw new Error("Confira nome, cidade e estado.");
   if (!/^[0-9]{3,7}-?[FJ]?$/.test(cleanCreci)) throw new Error("Informe um CRECI no formato numérico aceito.");
   const monthlyFee = selectedPlan[userData.billingCycle];
-  const amountDue = userData.billingCycle === "annual"
-    ? (Number(monthlyFee) * 12).toFixed(2)
-    : monthlyFee;
+  const amountDue = userData.billingCycle === "annual" ? selectedPlan.annualTotal : selectedPlan.monthly;
   const passwordHash = hashPassword(userData.password);
 
   const [newUser] = await db
@@ -1448,7 +1446,7 @@ export async function registerUserWithPix(userData: {
     type: userData.plan === "imobiliaria" ? "mensalidade_imobiliaria" : "mensalidade_pro",
     paymentMethod: "pix",
     status: "pendente",
-    description: `Plano ${userData.plan} (${userData.billingCycle}) — pagamento aguardando configuração do gateway`,
+    description: `Plano ${userData.plan} (${userData.billingCycle}) — pagamento Pix aguardando confirmação manual`,
   });
 
   // Notificação de boas-vindas do sistema

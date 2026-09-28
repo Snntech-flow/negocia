@@ -12,6 +12,7 @@ import {
   Sparkles,
   X,
   AlertCircle,
+  Copy,
 } from "lucide-react";
 
 import { validateCreciWithAI, registerUserWithPix, loginUser } from "@/lib/actions";
@@ -42,6 +43,7 @@ export default function OnboardingModal({
     message: string;
   } | null>(null);
   const [registeredUser, setRegisteredUser] = useState<any>(null);
+  const [pixKeyCopied, setPixKeyCopied] = useState(false);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -105,6 +107,9 @@ export default function OnboardingModal({
     formData.billingCycle === "monthly" ? currentPlanConfig.monthly : currentPlanConfig.annual;
   const formattedPrice =
     currentPrice % 1 === 0 ? currentPrice.toFixed(0) : currentPrice.toFixed(2).replace(".", ",");
+  const paymentAmount = formData.billingCycle === "annual" ? currentPlanConfig.annualTotal : currentPlanConfig.monthly;
+  const formattedPaymentAmount = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(paymentAmount);
+  const pixKey = "b993844f-33d9-4515-a0b4-b3b26b886cf3";
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -463,13 +468,12 @@ export default function OnboardingModal({
               })}
             </div>
 
-            {/* O gateway ainda não está configurado; não prometer nem coletar pagamento aqui. */}
             <div className="bg-emerald-50 border border-emerald-200 p-3.5 rounded-2xl flex items-start gap-2.5">
               <ShieldCheck className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />
               <div className="text-xs text-emerald-900 leading-relaxed">
-                <span className="font-bold">Pagamento ainda não integrado</span>
+                <span className="font-bold">Pagamento via Pix</span>
                 <p className="text-[11px] text-emerald-800 mt-0.5">
-                  Seu cadastro e plano ficarão pendentes até a validação do CRECI e a confirmação de pagamento.
+                  A equipe confirma o pagamento manualmente após o cadastro.
                 </p>
               </div>
             </div>
@@ -501,15 +505,27 @@ export default function OnboardingModal({
               <span className="text-xs bg-amber-100 text-amber-800 font-bold px-3 py-1 rounded-full uppercase tracking-wider">
                 Passo 3: Cadastro
               </span>
-              <h3 className="text-xl font-extrabold text-slate-900 mt-2">
-                Pagamento não integrado
-              </h3>
+              <h3 className="text-xl font-extrabold text-slate-900 mt-2">Pague com Pix</h3>
               <p className="text-xs text-slate-500">
-                Plano {currentPlanConfig.name} • {formData.billingCycle === "annual" ? `R$ ${currentPlanConfig.annualTotal.toFixed(2).replace(".", ",")} cobrado anualmente (Use 12 meses, pague 11)` : `R$ ${formattedPrice}/mês`}
+                Plano {currentPlanConfig.name} • {formData.billingCycle === "annual" ? `${formattedPaymentAmount} no ano (Use 12 meses, pague 11)` : `${formattedPaymentAmount}/mês`}
               </p>
             </div>
-            <div className="bg-amber-50 border border-amber-200 p-4 rounded-2xl text-left text-xs text-amber-900">
-              Não há QR Code nem confirmação automática de pagamento configurados. Você pode criar o cadastro, mas o acesso à rede ficará bloqueado até a equipe validar o CRECI e confirmar o pagamento.
+            <div className="bg-white border border-slate-200 p-4 rounded-2xl text-left">
+              <div className="flex flex-col sm:flex-row items-center gap-4">
+                <Image src="/pix-negocialar.png" alt="QR Code Pix do Negocia Lar" width={180} height={180} className="w-40 h-40 rounded-lg border border-slate-100" />
+                <div className="min-w-0 flex-1 space-y-2">
+                  <p className="text-sm font-bold text-slate-900">Valor a pagar: {formattedPaymentAmount}</p>
+                  <p className="text-[11px] text-slate-600">Escaneie o QR Code e informe esse valor no aplicativo do seu banco. O QR é estático e não preenche o valor automaticamente.</p>
+                  <div>
+                    <span className="block text-[10px] font-bold uppercase tracking-wide text-slate-500">Chave Pix</span>
+                    <code className="block break-all text-[11px] text-slate-700">{pixKey}</code>
+                  </div>
+                  <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(pixKey); setPixKeyCopied(true); window.setTimeout(() => setPixKeyCopied(false), 2500); } catch { setActionError("Não foi possível copiar a chave Pix."); } }} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-[11px] font-semibold text-slate-700 hover:bg-slate-50">
+                    <Copy className="w-3.5 h-3.5" />{pixKeyCopied ? "Chave Pix copiada" : "Copiar chave Pix"}
+                  </button>
+                </div>
+              </div>
+              <p className="mt-3 rounded-lg bg-amber-50 p-3 text-[11px] leading-relaxed text-amber-900">Depois do pagamento, conclua seu cadastro. A equipe confirmará o Pix manualmente e validará o CRECI antes de liberar o acesso.</p>
             </div>
             {actionError && <p role="alert" className="text-xs text-red-700">{actionError}</p>}
 
@@ -528,7 +544,7 @@ export default function OnboardingModal({
                 className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-4 rounded-xl transition flex items-center justify-center gap-2 shadow-md text-xs sm:text-sm"
               >
                 <CheckCircle2 className="w-4 h-4" />
-                <span>Criar cadastro pendente</span>
+                <span>Já paguei • criar cadastro</span>
               </button>
             </div>
           </div>

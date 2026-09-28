@@ -88,7 +88,7 @@ export default function LandingPage({
     <div className="min-h-screen bg-[#FDFDFD] text-slate-900 font-sans antialiased">
       {/* Barra Superior Institucional */}
       <div className="bg-slate-900 text-slate-300 text-xs py-2 px-4 border-b border-slate-800 text-center font-medium">
-        <span className="text-amber-400 font-bold">Versão inicial:</span> pagamento e assinatura eletrônica ainda não estão integrados.
+        <span className="text-amber-400 font-bold">Pagamento via Pix:</span> a confirmação é feita manualmente pela equipe.
       </div>
 
       {/* Header Limpo & Autoritário */}
@@ -152,7 +152,7 @@ export default function LandingPage({
               </h1>
 
               <p className="text-base sm:text-lg text-slate-600 leading-relaxed max-w-xl">
-                O <strong>Negocia Lar</strong> está em desenvolvimento para ajudar corretores a organizar imóveis e oportunidades de parceria. Dados de contato do proprietário aparecem apenas para o corretor que cadastrou o imóvel; aceite eletrônico e pagamentos ainda não estão disponíveis.
+                O <strong>Negocia Lar</strong> está em desenvolvimento para ajudar corretores a organizar imóveis e oportunidades de parceria. Dados de contato do proprietário aparecem apenas para o corretor que cadastrou o imóvel; o pagamento é feito via Pix, com confirmação manual.
               </p>
 
               <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
@@ -188,7 +188,7 @@ export default function LandingPage({
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Check className="w-4 h-4 text-emerald-600 font-bold" />
-                  Piloto sem cobrança integrada
+                  Pagamento via Pix
                 </div>
               </div>
             </div>
@@ -483,7 +483,7 @@ export default function LandingPage({
               </div>
               <h4 className="text-base sm:text-lg font-bold">Organize oportunidades e parcerias imobiliárias.</h4>
               <p className="text-xs text-slate-300 max-w-xl leading-relaxed">
-                Registre seus imóveis e acompanhe as oportunidades com seus clientes. Os valores dos planos são apenas uma referência enquanto o pagamento não está integrado.
+                Registre seus imóveis e acompanhe as oportunidades com seus clientes. O pagamento é feito via Pix e confirmado manualmente pela equipe.
               </p>
             </div>
             <button
