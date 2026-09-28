@@ -51,7 +51,6 @@ export default function LandingPage({
         "Dados de contato do proprietário restritos ao captador",
         "Perfis de busca de compradores",
         "Registro interno de visita em rascunho",
-        "CRECI e pagamento ainda aguardam validação manual",
       ],
     },
     {
@@ -66,7 +65,6 @@ export default function LandingPage({
         "Dados de contato do proprietário restritos ao captador",
         "Perfis de busca de compradores",
         "Registro interno de visita em rascunho",
-        "CRECI e pagamento ainda aguardam validação manual",
       ],
     },
     {
@@ -82,7 +80,6 @@ export default function LandingPage({
         "Dados de contato do proprietário restritos ao captador",
         "Perfis de busca de compradores",
         "Registro interno de visita em rascunho",
-        "CRECI e pagamento ainda aguardam validação manual",
       ],
     },
   ];
@@ -91,7 +88,7 @@ export default function LandingPage({
     <div className="min-h-screen bg-[#FDFDFD] text-slate-900 font-sans antialiased">
       {/* Barra Superior Institucional */}
       <div className="bg-slate-900 text-slate-300 text-xs py-2 px-4 border-b border-slate-800 text-center font-medium">
-        <span className="text-amber-400 font-bold">Versão inicial:</span> cadastro sujeito a validação manual; pagamento e assinatura eletrônica ainda não estão integrados.
+        <span className="text-amber-400 font-bold">Versão inicial:</span> pagamento e assinatura eletrônica ainda não estão integrados.
       </div>
 
       {/* Header Limpo & Autoritário */}
@@ -520,14 +517,6 @@ export default function LandingPage({
               {
                 q: "O cliente final descobre quem é o captador do imóvel?",
                 a: "Os dados completos do proprietário são exibidos somente para o corretor que cadastrou o imóvel. A ficha pública e o PDF ainda estão em desenvolvimento.",
-              },
-              {
-                q: "Preciso ter CRECI ativo para participar?",
-                a: "O cadastro pede o CRECI, mas a consulta ao conselho é manual. Contas novas ficam pendentes até a validação.",
-              },
-              {
-                q: "Existe taxa de cancelamento ou contrato de fidelidade?",
-                a: "O pagamento ainda não está integrado e o painel não tem cancelamento automático. Os valores exibidos são referências para o piloto.",
               },
             ].map((faq, idx) => (
               <div key={idx} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
