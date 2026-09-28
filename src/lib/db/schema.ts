@@ -175,7 +175,14 @@ export const partnerships = pgTable("partnerships", {
   status: text("status").default("proposta").notNull(), // proposta, visita_agendada, em_negociacao, fechado, recusado
   captorAcceptedAt: timestamp("captor_accepted_at"),
   partnerAcceptedAt: timestamp("partner_accepted_at"),
+  commissionModel: text("commission_model").default("two_party_50_50").notNull(),
   commissionSplit: numeric("commission_split", { precision: 5, scale: 2 }).default("50.00").notNull(),
+  captorCommissionPercent: numeric("captor_commission_percent", { precision: 5, scale: 2 }).default("50.00").notNull(),
+  partnerCommissionPercent: numeric("partner_commission_percent", { precision: 5, scale: 2 }).default("50.00").notNull(),
+  referrerCommissionPercent: numeric("referrer_commission_percent", { precision: 5, scale: 2 }).default("0.00").notNull(),
+  externalReferrerName: text("external_referrer_name"),
+  externalReferrerCreci: text("external_referrer_creci"),
+  externalReferrerWhatsapp: text("external_referrer_whatsapp"),
   visitScheduledDate: timestamp("visit_scheduled_date"),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
@@ -226,7 +233,14 @@ export const dvpCertificates = pgTable("dvp_certificates", {
   clientCpfPartial: text("client_cpf_partial").notNull(), // ex: ***.456.789-**
   visitDate: timestamp("visit_date").notNull(),
   lockExpirationDate: timestamp("lock_expiration_date").notNull(), // data calculada; só tem efeito após formalização válida
+  commissionModel: text("commission_model").default("two_party_50_50").notNull(),
   commissionSplit: numeric("commission_split", { precision: 5, scale: 2 }).default("50.00").notNull(),
+  captorCommissionPercent: numeric("captor_commission_percent", { precision: 5, scale: 2 }).default("50.00").notNull(),
+  partnerCommissionPercent: numeric("partner_commission_percent", { precision: 5, scale: 2 }).default("50.00").notNull(),
+  referrerCommissionPercent: numeric("referrer_commission_percent", { precision: 5, scale: 2 }).default("0.00").notNull(),
+  externalReferrerName: text("external_referrer_name"),
+  externalReferrerCreci: text("external_referrer_creci"),
+  externalReferrerWhatsapp: text("external_referrer_whatsapp"),
   status: text("status").default("rascunho").notNull(), // 'rascunho', 'ativo', 'fechado', 'expirado', 'contestado'
   legalClausesAccepted: boolean("legal_clauses_accepted").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),

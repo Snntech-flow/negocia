@@ -292,6 +292,13 @@ export async function getMarketplaceData() {
         visitDate: dvpCertificates.visitDate,
         lockExpirationDate: dvpCertificates.lockExpirationDate,
         commissionSplit: dvpCertificates.commissionSplit,
+        commissionModel: dvpCertificates.commissionModel,
+        captorCommissionPercent: dvpCertificates.captorCommissionPercent,
+        partnerCommissionPercent: dvpCertificates.partnerCommissionPercent,
+        referrerCommissionPercent: dvpCertificates.referrerCommissionPercent,
+        externalReferrerName: dvpCertificates.externalReferrerName,
+        externalReferrerCreci: dvpCertificates.externalReferrerCreci,
+        externalReferrerWhatsapp: dvpCertificates.externalReferrerWhatsapp,
         status: sql<string>`'rascunho'`,
         createdAt: dvpCertificates.createdAt,
       })
@@ -311,6 +318,15 @@ export async function getMarketplaceData() {
         partnerName: partnershipPartner.name,
         status: partnerships.status,
         commissionSplit: partnerships.commissionSplit,
+        captorAcceptedAt: partnerships.captorAcceptedAt,
+        partnerAcceptedAt: partnerships.partnerAcceptedAt,
+        commissionModel: partnerships.commissionModel,
+        captorCommissionPercent: partnerships.captorCommissionPercent,
+        partnerCommissionPercent: partnerships.partnerCommissionPercent,
+        referrerCommissionPercent: partnerships.referrerCommissionPercent,
+        externalReferrerName: partnerships.externalReferrerName,
+        externalReferrerCreci: partnerships.externalReferrerCreci,
+        externalReferrerWhatsapp: partnerships.externalReferrerWhatsapp,
         visitScheduledDate: partnerships.visitScheduledDate,
         notes: partnerships.notes,
         createdAt: partnerships.createdAt,
@@ -934,6 +950,10 @@ export async function createDvpCertificate(data: {
   clientCpfPartial: string;
   visitDate: string;
   commissionSplit: string;
+  commissionModel?: string;
+  externalReferrerName?: string;
+  externalReferrerCreci?: string;
+  externalReferrerWhatsapp?: string;
 }) {
   const actor = await requireCurrentUser();
   requireActiveBroker(actor);
@@ -952,6 +972,27 @@ export async function createDvpCertificate(data: {
   if (clientName.length < 2 || !/^\*{3}\.\d{3}\.\d{3}-\*\*$/.test(data.clientCpfPartial.trim())) {
     throw new Error("Informe o nome do cliente e apenas o CPF parcialmente mascarado.");
   }
+  if (data.commissionModel && !["two_party_50_50", "three_party_referral_40_40_20"].includes(data.commissionModel)) {
+    throw new Error("Escolha uma divisão de comissão válida.");
+  }
+  const commissionModel = data.commissionModel === "three_party_referral_40_40_20" ? data.commissionModel : "two_party_50_50";
+  const externalReferrerName = data.externalReferrerName?.trim() || null;
+  const externalReferrerCreci = data.externalReferrerCreci?.trim().toUpperCase() || null;
+  const externalReferrerWhatsapp = data.externalReferrerWhatsapp?.trim() || null;
+  if (commissionModel === "three_party_referral_40_40_20") {
+    if (!externalReferrerName || externalReferrerName.length < 2 || externalReferrerName.length > 120) {
+      throw new Error("Informe o nome do corretor indicador externo.");
+    }
+    if (!externalReferrerCreci || externalReferrerCreci.length < 2 || externalReferrerCreci.length > 30) {
+      throw new Error("Informe o CRECI do corretor indicador externo.");
+    }
+    if (externalReferrerWhatsapp && externalReferrerWhatsapp.length > 30) {
+      throw new Error("O WhatsApp do corretor indicador está inválido.");
+    }
+  }
+  const captorCommissionPercent = commissionModel === "three_party_referral_40_40_20" ? "40.00" : "50.00";
+  const partnerCommissionPercent = captorCommissionPercent;
+  const referrerCommissionPercent = commissionModel === "three_party_referral_40_40_20" ? "20.00" : "0.00";
   const rawHashString = `${data.propertyId}-${data.captorBrokerId}-${data.partnerBrokerId}-${data.leadId || ""}-${clientName}-${data.clientCpfPartial}-${Date.now()}`;
   const certificateHash = crypto
     .createHash("sha256")
@@ -976,7 +1017,14 @@ export async function createDvpCertificate(data: {
       clientCpfPartial: data.clientCpfPartial.trim(),
       visitDate,
       lockExpirationDate,
-      commissionSplit: data.commissionSplit,
+      commissionModel,
+      commissionSplit: captorCommissionPercent,
+      captorCommissionPercent,
+      partnerCommissionPercent,
+      referrerCommissionPercent,
+      externalReferrerName,
+      externalReferrerCreci,
+      externalReferrerWhatsapp,
       status: "rascunho",
       legalClausesAccepted: false,
     }).returning();
@@ -986,7 +1034,14 @@ export async function createDvpCertificate(data: {
       captorBrokerId: data.captorBrokerId,
       partnerBrokerId: data.partnerBrokerId,
       status: "visita_agendada",
-      commissionSplit: data.commissionSplit,
+      commissionModel,
+      commissionSplit: captorCommissionPercent,
+      captorCommissionPercent,
+      partnerCommissionPercent,
+      referrerCommissionPercent,
+      externalReferrerName,
+      externalReferrerCreci,
+      externalReferrerWhatsapp,
       visitScheduledDate: visitDate,
       notes: `Registro interno de visita ${certificate.certificateHash}. Requer validação e aceite das partes antes de qualquer efeito contratual.`,
     }).returning();
@@ -1001,7 +1056,9 @@ export async function createDvpCertificate(data: {
     await tx.insert(notifications).values({
       userId: data.captorBrokerId,
       title: "Novo registro de visita em rascunho",
-      message: `Foi criado o registro ${certificate.certificateHash} para ${property.title}. Ele ainda depende da validação e do aceite das partes.`,
+      message: commissionModel === "three_party_referral_40_40_20"
+        ? `Foi criado o registro ${certificate.certificateHash} para ${property.title}. Confira a divisão 40/40/20 e responda na tela de acompanhamento.`
+        : `Foi criado o registro ${certificate.certificateHash} para ${property.title}. O rascunho ainda não tem assinatura eletrônica.`,
       type: "dvp",
       propertyId: data.propertyId,
       read: false,
@@ -1080,6 +1137,61 @@ export async function updatePartnershipStatus(partnershipId: string, newStatus: 
       read: false,
     });
     return { partnership: updated, activity };
+  });
+  revalidatePath("/");
+  return { success: true, ...result };
+}
+
+export async function respondToPartnershipSplit(partnershipId: string, accepted: boolean) {
+  const actor = await requireCurrentUser();
+  requireActiveBroker(actor);
+  const result = await db.transaction(async (tx) => {
+    const [partnership] = await tx.select({
+      id: partnerships.id,
+      propertyId: partnerships.propertyId,
+      captorBrokerId: partnerships.captorBrokerId,
+      partnerBrokerId: partnerships.partnerBrokerId,
+      status: partnerships.status,
+      commissionModel: partnerships.commissionModel,
+      captorAcceptedAt: partnerships.captorAcceptedAt,
+      partnerAcceptedAt: partnerships.partnerAcceptedAt,
+    }).from(partnerships).where(and(
+      eq(partnerships.id, partnershipId),
+      or(eq(partnerships.captorBrokerId, actor.id), eq(partnerships.partnerBrokerId, actor.id)),
+    )).for("update").limit(1);
+    if (!partnership) throw new Error("Parceria não encontrada na sua carteira.");
+    if (partnership.commissionModel !== "three_party_referral_40_40_20") throw new Error("Esta parceria não usa a divisão de indicação 40/40/20.");
+    if (partnership.status === "recusado") throw new Error("Esta proposta já foi recusada.");
+    const acceptedAt = actor.id === partnership.captorBrokerId ? partnership.captorAcceptedAt : partnership.partnerAcceptedAt;
+    if (accepted && acceptedAt) return { partnership, activity: null, alreadyAccepted: true };
+    if (!accepted && acceptedAt) throw new Error("Sua confirmação já foi registrada e não pode ser retirada nesta tela.");
+
+    const now = new Date();
+    const [updated] = await tx.update(partnerships).set({
+      ...(accepted ? actor.id === partnership.captorBrokerId ? { captorAcceptedAt: now } : { partnerAcceptedAt: now } : { status: "recusado" }),
+      updatedAt: now,
+    }).where(eq(partnerships.id, partnership.id)).returning();
+    const [activity] = await tx.insert(partnershipActivities).values({
+      partnershipId: partnership.id,
+      actorUserId: actor.id,
+      previousStatus: partnership.status,
+      newStatus: accepted ? "divisao_confirmada" : "divisao_recusada",
+      note: accepted
+        ? "Confirmou a proposta interna de divisão 40/40/20. Esta confirmação na plataforma não é assinatura eletrônica."
+        : "Não aceitou a proposta interna de divisão 40/40/20.",
+    }).returning();
+    const otherBrokerId = actor.id === partnership.captorBrokerId ? partnership.partnerBrokerId : partnership.captorBrokerId;
+    await tx.insert(notifications).values({
+      userId: otherBrokerId,
+      title: accepted ? "Confirmação da divisão de parceria" : "Divisão de parceria recusada",
+      message: accepted
+        ? "Um dos corretores confirmou a proposta de divisão 40/40/20. Esta confirmação interna não é assinatura eletrônica."
+        : "Um dos corretores não aceitou a proposta de divisão 40/40/20. A parceria foi marcada como recusada.",
+      type: "parceria",
+      propertyId: partnership.propertyId,
+      read: false,
+    });
+    return { partnership: updated, activity, alreadyAccepted: false };
   });
   revalidatePath("/");
   return { success: true, ...result };

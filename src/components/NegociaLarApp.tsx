@@ -62,6 +62,7 @@ import {
   createBuyerProfile,
   createDvpCertificate,
   updatePartnershipStatus,
+  respondToPartnershipSplit,
   markNotificationAsRead,
   logoutUser,
 } from "@/lib/actions";
@@ -88,6 +89,13 @@ interface DvpCertificateItem {
   visitDate: Date;
   lockExpirationDate: Date;
   commissionSplit: string;
+  commissionModel: string;
+  captorCommissionPercent: string;
+  partnerCommissionPercent: string;
+  referrerCommissionPercent: string;
+  externalReferrerName: string | null;
+  externalReferrerCreci: string | null;
+  externalReferrerWhatsapp: string | null;
   status: string;
   createdAt: Date;
 }
@@ -102,6 +110,15 @@ interface PartnershipItem {
   partnerName: string;
   status: string;
   commissionSplit: string;
+  captorAcceptedAt: Date | null;
+  partnerAcceptedAt: Date | null;
+  commissionModel: string;
+  captorCommissionPercent: string;
+  partnerCommissionPercent: string;
+  referrerCommissionPercent: string;
+  externalReferrerName: string | null;
+  externalReferrerCreci: string | null;
+  externalReferrerWhatsapp: string | null;
   visitScheduledDate: Date | null;
   notes: string | null;
   createdAt: Date;
@@ -378,6 +395,7 @@ export default function NegociaLarApp({
   const [selectedPropertyForTerm, setSelectedPropertyForTerm] = useState<Property | null>(null);
   const [copiedLink, setCopiedLink] = useState(false);
   const [dvpEmitted, setDvpEmitted] = useState(false);
+  const [commissionModel, setCommissionModel] = useState<"two_party_50_50" | "three_party_referral_40_40_20">("two_party_50_50");
   const [userSearch, setUserSearch] = useState("");
   const [isUserSwitcherOpen, setIsUserSwitcherOpen] = useState(false);
   const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false);
@@ -642,6 +660,24 @@ export default function NegociaLarApp({
       setToastMessage(error instanceof Error ? error.message : "Não foi possível atualizar a parceria.");
       setTimeout(() => setToastMessage(null), 6000);
     }
+  };
+
+  const handlePartnershipSplitResponse = async (partnership: PartnershipItem, accepted: boolean) => {
+    if (!accepted && !window.confirm("Recusar a proposta 40/40/20? A parceria será marcada como recusada.")) return;
+    try {
+      const result = await respondToPartnershipSplit(partnership.id, accepted);
+      setPartnershipList((items) => items.map((item) => item.id === partnership.id ? { ...item, ...result.partnership } : item));
+      if (result.activity) setPartnershipActivityList((items) => [{
+        ...result.activity,
+        partnershipId: partnership.id,
+        actorUserId: currentUser?.id || "",
+        actorName: currentUser?.name || "Você",
+      }, ...items]);
+      setToastMessage(result.alreadyAccepted ? "Você já confirmou esta proposta." : accepted ? "Confirmação 40/40/20 registrada para este corretor." : "Proposta recusada e registrada no histórico.");
+    } catch (error) {
+      setToastMessage(error instanceof Error ? error.message : "Não foi possível registrar a resposta.");
+    }
+    setTimeout(() => setToastMessage(null), 6000);
   };
 
   const activeProperty = selectedPropertyForTerm;
@@ -1747,6 +1783,10 @@ export default function NegociaLarApp({
                   clientCpfPartial: clientCpf,
                   visitDate,
                   commissionSplit: activeProperty.splitPercentage || "50.00",
+                  commissionModel,
+                  externalReferrerName: String(fd.get("externalReferrerName") || ""),
+                  externalReferrerCreci: String(fd.get("externalReferrerCreci") || ""),
+                  externalReferrerWhatsapp: String(fd.get("externalReferrerWhatsapp") || ""),
                 });
 
                 if (res.success && res.certificate) {
@@ -1762,6 +1802,13 @@ export default function NegociaLarApp({
                       visitDate: new Date(res.certificate.visitDate),
                       lockExpirationDate: new Date(res.certificate.lockExpirationDate),
                       commissionSplit: res.certificate.commissionSplit,
+                      commissionModel: res.certificate.commissionModel,
+                      captorCommissionPercent: res.certificate.captorCommissionPercent,
+                      partnerCommissionPercent: res.certificate.partnerCommissionPercent,
+                      referrerCommissionPercent: res.certificate.referrerCommissionPercent,
+                      externalReferrerName: res.certificate.externalReferrerName,
+                      externalReferrerCreci: res.certificate.externalReferrerCreci,
+                      externalReferrerWhatsapp: res.certificate.externalReferrerWhatsapp,
                       status: res.certificate.status,
                       createdAt: new Date(res.certificate.createdAt),
                     },
@@ -1782,7 +1829,9 @@ export default function NegociaLarApp({
                     }, ...prev]);
                   }
                   setDvpEmitted(true);
-                  setToastMessage(`Registro ${res.certificate.certificateHash} salvo como rascunho. Ele ainda não tem aceite eletrônico.`);
+                  setToastMessage(commissionModel === "three_party_referral_40_40_20"
+                    ? `Registro salvo. A divisão 40/40/20 aguarda a confirmação dos dois corretores na plataforma.`
+                    : `Registro ${res.certificate.certificateHash} salvo como rascunho; ainda não há aceite eletrônico.`);
                   setTimeout(() => setToastMessage(null), 6000);
                 }
               }}
@@ -1791,9 +1840,9 @@ export default function NegociaLarApp({
               <div className="flex items-center justify-between p-3 rounded-xl bg-emerald-950/30 border border-emerald-500/30">
                 <div className="flex items-center gap-2 text-xs text-emerald-400 font-semibold">
                   <Fingerprint className="w-4 h-4" />
-                  Registro interno • rascunho sem aceite eletrônico
+                  Registro da visita em rascunho
                 </div>
-                <span className="text-[11px] text-slate-400">Sem aceite contratual</span>
+                <span className="text-[11px] text-slate-400">Sem assinatura eletrônica</span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
@@ -1814,6 +1863,23 @@ export default function NegociaLarApp({
                 <div className="text-xs font-bold text-white uppercase tracking-wider flex items-center gap-2">
                   <UserCheck className="w-4 h-4 text-emerald-400" />
                   Dados do Cliente Apresentado para Registro
+                </div>
+
+                <div className="rounded-xl border border-slate-700 bg-slate-950 p-4 space-y-3">
+                  <div>
+                    <label htmlFor="commission-model" className="block text-xs font-semibold text-slate-200">Como a comissão será dividida?</label>
+                    <select id="commission-model" value={commissionModel} onChange={(event) => setCommissionModel(event.target.value as typeof commissionModel)} className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2.5 text-xs text-white">
+                      <option value="two_party_50_50">50% captador · 50% corretor do comprador</option>
+                      <option value="three_party_referral_40_40_20">40% captador · 40% corretor do comprador · 20% indicador externo</option>
+                    </select>
+                    {commissionModel === "three_party_referral_40_40_20" && <p className="mt-2 text-[11px] leading-relaxed text-slate-400">Os 20% são destinados ao corretor que conectou a oportunidade, calculados sobre a comissão total. Como ele não tem acesso à plataforma, informe os dados abaixo. Os dois corretores cadastrados precisam confirmar esta proposta.</p>}
+                  </div>
+                  {commissionModel === "three_party_referral_40_40_20" && <div className="grid gap-3 sm:grid-cols-3">
+                    <div><label className="block text-[11px] text-slate-300 mb-1" htmlFor="external-referrer-name">Nome do corretor indicador</label><input id="external-referrer-name" name="externalReferrerName" required minLength={2} maxLength={120} placeholder="Nome completo" className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white" /></div>
+                    <div><label className="block text-[11px] text-slate-300 mb-1" htmlFor="external-referrer-creci">CRECI do indicador</label><input id="external-referrer-creci" name="externalReferrerCreci" required minLength={2} maxLength={30} placeholder="Ex.: 12345-F" className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white" /></div>
+                    <div><label className="block text-[11px] text-slate-300 mb-1" htmlFor="external-referrer-whatsapp">WhatsApp (opcional)</label><input id="external-referrer-whatsapp" name="externalReferrerWhatsapp" maxLength={30} placeholder="(11) 99999-9999" className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white" /></div>
+                  </div>}
+                  <p className="text-[10px] text-slate-500">Esta tela registra a proposta e as confirmações internas. Não é assinatura eletrônica nem substitui a formalização do acordo.</p>
                 </div>
 
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
@@ -1903,7 +1969,7 @@ export default function NegociaLarApp({
                         <div><strong>Cliente:</strong> {dvp.clientName} (CPF: {dvp.clientCpfPartial})</div>
                         <div><strong>Data da Visita:</strong> {new Date(dvp.visitDate).toLocaleDateString("pt-BR")}</div>
                         <div><strong>Prazo de acompanhamento interno:</strong> {new Date(dvp.lockExpirationDate).toLocaleDateString("pt-BR")} <span className="text-slate-500">(não cria uma trava contratual)</span></div>
-                        <div><strong>Divisão informada:</strong> {dvp.commissionSplit}% / {100 - parseFloat(dvp.commissionSplit)}% <span className="text-slate-500">(a combinar entre as partes)</span></div>
+                        <div className="sm:col-span-2"><strong>Divisão informada:</strong> {dvp.commissionModel === "three_party_referral_40_40_20" ? `Captador ${dvp.captorCommissionPercent}% · corretor do comprador ${dvp.partnerCommissionPercent}% · indicador externo ${dvp.referrerCommissionPercent}% (${dvp.externalReferrerName}, CRECI ${dvp.externalReferrerCreci}${dvp.externalReferrerWhatsapp ? `, WhatsApp ${dvp.externalReferrerWhatsapp}` : ""})` : `${dvp.captorCommissionPercent}% captador · ${dvp.partnerCommissionPercent}% corretor do comprador`} <span className="text-slate-500">{dvp.commissionModel === "three_party_referral_40_40_20" ? "(aguardando confirmação dos dois corretores)" : "(condição cadastrada, a combinar entre as partes)"}</span></div>
                       </div>
                     </div>
                   ))}
@@ -1916,19 +1982,32 @@ export default function NegociaLarApp({
                 <div><h3 className="text-sm font-bold uppercase tracking-wider text-white">Acompanhamento das parcerias ({partnershipList.length})</h3><p className="mt-1 text-xs text-slate-400">Veja em que etapa está cada visita compartilhada.</p></div>
                 <ArrowRight className="h-4 w-4 shrink-0 text-sky-300" />
               </div>
-              <div className="rounded-lg border border-amber-500/25 bg-amber-950/20 p-3 text-[11px] leading-relaxed text-amber-100/80">Você ou o outro corretor da parceria podem atualizar a etapa. O histórico mostra quem fez cada alteração e quando. Isso serve para organizar o andamento; não registra aceite, não assina contrato e não garante comissão. A divisão exibida é apenas a condição informada no cadastro.</div>
+              <div className="rounded-lg border border-amber-500/25 bg-amber-950/20 p-3 text-[11px] leading-relaxed text-amber-100/80">Você ou o outro corretor podem atualizar a etapa; o histórico mostra quem alterou e quando. Nas propostas 40/40/20, cada um dos dois corretores também pode confirmar ou recusar a divisão. Essa confirmação interna não é assinatura eletrônica nem garante comissão; formalizem o acordo fora da plataforma.</div>
               {partnershipList.length === 0 ? <div className="rounded-xl border border-dashed border-slate-700 px-5 py-6 text-center"><p className="text-sm font-semibold text-white">Ainda não há parcerias para acompanhar</p><p className="mx-auto mt-2 max-w-lg text-xs leading-relaxed text-slate-400">Os registros aparecem aqui depois que você salva uma visita a um imóvel de outro corretor. Na Vitrine, escolha um imóvel que aceite parceria, clique em “Agendar visita” e preencha os dados do cliente. Salvar como rascunho só guarda essas informações; nenhum corretor dá aceite por essa ação.</p><button type="button" onClick={() => { setActiveTab("vitrine"); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2.5 text-xs font-bold text-slate-950 hover:bg-amber-400"><Building2 className="h-4 w-4" />Escolher imóvel na Vitrine</button></div> : (
                 <div className="space-y-3">
                   {partnershipList.map((partnership) => {
                     const transitions: Record<string, string[]> = { proposta: ["visita_agendada", "recusado"], visita_agendada: ["em_negociacao", "recusado"], em_negociacao: ["fechado", "recusado"] };
-                    const labels: Record<string, string> = { proposta: "Proposta", visita_agendada: "Visita agendada", em_negociacao: "Em negociação", fechado: "Encerrada como fechada", recusado: "Recusada" };
+                    const labels: Record<string, string> = { proposta: "Proposta", visita_agendada: "Visita agendada", em_negociacao: "Em negociação", fechado: "Encerrada como fechada", recusado: "Recusada", divisao_confirmada: "Divisão 40/40/20 confirmada por um corretor", divisao_recusada: "Divisão 40/40/20 não aceita" };
                     const nextStatuses = transitions[partnership.status] || [];
                     const history = partnershipActivityList.filter((activity) => activity.partnershipId === partnership.id);
                     return <article key={partnership.id} className="rounded-xl border border-slate-800 bg-slate-950 p-4">
                       <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="min-w-0"><h4 className="truncate text-sm font-bold text-white">{partnership.propertyTitle}</h4><p className="mt-1 text-xs text-slate-400">Captador: {partnership.captorName} · Parceiro: {partnership.partnerName}</p><p className="mt-1 text-[11px] text-slate-500">Visita: {partnership.visitScheduledDate ? new Date(partnership.visitScheduledDate).toLocaleString("pt-BR") : "não agendada"} · divisão informada {partnership.commissionSplit}% / {100 - Number(partnership.commissionSplit)}% (a combinar entre as partes)</p></div>
+                        <div className="min-w-0"><h4 className="truncate text-sm font-bold text-white">{partnership.propertyTitle}</h4><p className="mt-1 text-xs text-slate-400">Captador: {partnership.captorName} · Parceiro: {partnership.partnerName}</p><p className="mt-1 text-[11px] text-slate-500">Visita: {partnership.visitScheduledDate ? new Date(partnership.visitScheduledDate).toLocaleString("pt-BR") : "não agendada"} · divisão {partnership.commissionModel === "three_party_referral_40_40_20" ? "40/40/20 proposta" : `${partnership.commissionSplit}% / ${100 - Number(partnership.commissionSplit)}% informada`}</p></div>
                         <span className="rounded-full border border-sky-500/25 bg-sky-500/10 px-2.5 py-1 text-[10px] font-bold text-sky-200">{labels[partnership.status] || partnership.status}</span>
                       </div>
+                      {partnership.commissionModel === "three_party_referral_40_40_20" && <div className="mt-3 rounded-lg border border-amber-500/20 bg-amber-950/15 p-3 space-y-3">
+                        <div className="text-xs text-slate-200"><strong>Proposta de divisão:</strong> {partnership.captorCommissionPercent}% captador · {partnership.partnerCommissionPercent}% corretor do comprador · {partnership.referrerCommissionPercent}% indicador externo ({partnership.externalReferrerName}, CRECI {partnership.externalReferrerCreci}){partnership.externalReferrerWhatsapp ? ` · WhatsApp ${partnership.externalReferrerWhatsapp}` : ""}.</div>
+                        <div className="grid gap-2 sm:grid-cols-2 text-[11px]">
+                          <div className="rounded-md bg-slate-950/70 p-2 text-slate-300">Captador: {partnership.captorAcceptedAt ? `confirmou em ${new Date(partnership.captorAcceptedAt).toLocaleString("pt-BR")}` : "aguardando confirmação"}</div>
+                          <div className="rounded-md bg-slate-950/70 p-2 text-slate-300">Corretor do comprador: {partnership.partnerAcceptedAt ? `confirmou em ${new Date(partnership.partnerAcceptedAt).toLocaleString("pt-BR")}` : "aguardando confirmação"}</div>
+                        </div>
+                        <p className="text-[10px] leading-relaxed text-amber-100/70">O indicador externo fica identificado no registro, mas não precisa acessar a plataforma. A proposta só aparece como confirmada quando os dois corretores cadastrados confirmarem. Isso não é assinatura eletrônica.</p>
+                        {partnership.status !== "recusado" && <div className="flex flex-wrap gap-2">
+                          {currentUser?.id === partnership.captorBrokerId && !partnership.captorAcceptedAt && <><button type="button" onClick={() => void handlePartnershipSplitResponse(partnership, true)} className="rounded-lg bg-emerald-500 px-3 py-2 text-[11px] font-bold text-slate-950">Confirmar divisão (captador)</button><button type="button" onClick={() => void handlePartnershipSplitResponse(partnership, false)} className="rounded-lg border border-rose-500/40 px-3 py-2 text-[11px] font-semibold text-rose-300">Não aceito</button></>}
+                          {currentUser?.id === partnership.partnerBrokerId && !partnership.partnerAcceptedAt && <><button type="button" onClick={() => void handlePartnershipSplitResponse(partnership, true)} className="rounded-lg bg-emerald-500 px-3 py-2 text-[11px] font-bold text-slate-950">Confirmar divisão (corretor do comprador)</button><button type="button" onClick={() => void handlePartnershipSplitResponse(partnership, false)} className="rounded-lg border border-rose-500/40 px-3 py-2 text-[11px] font-semibold text-rose-300">Não aceito</button></>}
+                        </div>}
+                        {partnership.captorAcceptedAt && partnership.partnerAcceptedAt && <p className="text-[11px] font-semibold text-emerald-300">Os dois corretores confirmaram esta proposta.</p>}
+                      </div>}
                       {nextStatuses.length > 0 && (currentUser?.id === partnership.captorBrokerId || currentUser?.id === partnership.partnerBrokerId) && <div className="mt-3 flex flex-wrap gap-2">{nextStatuses.map((nextStatus) => <button key={nextStatus} type="button" onClick={() => { if (["fechado", "recusado"].includes(nextStatus) && !window.confirm(`Confirmar etapa “${labels[nextStatus]}”?`)) return; void handlePartnershipStatus(partnership, nextStatus); }} className={`rounded-lg border px-3 py-2 text-[11px] font-bold ${nextStatus === "recusado" ? "border-rose-500/25 text-rose-300 hover:bg-rose-500/10" : "border-emerald-500/25 text-emerald-300 hover:bg-emerald-500/10"}`}>{nextStatus === "recusado" ? "Recusar" : `Marcar: ${labels[nextStatus]}`}</button>)}</div>}
                       <details className="mt-3 border-t border-slate-800 pt-3"><summary className="cursor-pointer text-[11px] font-semibold text-slate-300">Linha do tempo ({history.length})</summary><div className="mt-3 space-y-2">{history.length ? history.map((activity) => <div key={activity.id} className="border-l border-slate-700 pl-3 text-[11px]"><div className="flex flex-wrap items-center justify-between gap-2 text-slate-300"><span>{activity.actorName}: {labels[activity.newStatus] || activity.newStatus}</span><time className="text-slate-500">{new Date(activity.createdAt).toLocaleString("pt-BR")}</time></div>{activity.note && <p className="mt-1 whitespace-pre-wrap text-slate-500">{activity.note}</p>}</div>) : <p className="text-[11px] text-slate-500">Nenhum evento registrado.</p>}</div></details>
                     </article>;
