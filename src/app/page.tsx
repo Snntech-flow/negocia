@@ -6,6 +6,7 @@ export const dynamic = "force-dynamic";
 export default async function HomePage() {
   const {
     properties,
+    propertyTotal,
     radarList,
     users,
     transactions,
@@ -17,11 +18,12 @@ export default async function HomePage() {
     leads,
     leadActivities,
     pilotFeedback,
-  } = await getMarketplaceData();
+  } = await getMarketplaceData({ section: "vitrine" });
 
   return (
     <NegociaLarApp
       initialProperties={properties}
+      initialPropertyTotal={propertyTotal}
       initialRadar={radarList}
       initialUsers={users}
       initialTransactions={transactions}

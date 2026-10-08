@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, numeric, integer, boolean, timestamp, jsonb, index, uniqueIndex } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, numeric, integer, boolean, timestamp, jsonb, index, uniqueIndex, type AnyPgColumn } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -8,6 +8,7 @@ export const users = pgTable("users", {
   whatsapp: text("whatsapp").notNull(),
   // Nullable for legacy/demo seed accounts; new accounts must authenticate with a password.
   passwordHash: text("password_hash"),
+  documentationTemplate: jsonb("documentation_template").$type<import("../negotiation-documents").NegotiationDocuments>(),
   sessionVersion: integer("session_version").default(0).notNull(),
   avatarUrl: text("avatar_url"),
   city: text("city").notNull(),
@@ -21,6 +22,9 @@ export const users = pgTable("users", {
   subscriptionStatus: text("subscription_status").default("pendente").notNull(), // 'pendente', 'ativo', 'inadimplente', 'cancelado'
   monthlyFee: numeric("monthly_fee", { precision: 10, scale: 2 }).default("149.00").notNull(),
   nextBillingDate: timestamp("next_billing_date"),
+  billingCycle: text("billing_cycle").default("monthly").notNull(),
+  referredBy: uuid("referred_by").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
+  referralRewardedAt: timestamp("referral_rewarded_at"),
   
   // Reputação Ética (Anti-Laranja Podre)
   trustScore: integer("trust_score").default(100).notNull(), // 0 a 100
@@ -37,6 +41,15 @@ export const authLoginAttempts = pgTable("auth_login_attempts", {
   blockedUntil: timestamp("blocked_until"),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
+
+export const passwordResetTokens = pgTable("password_reset_tokens", {
+  tokenHash: text("token_hash").primaryKey(),
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  sessionVersion: integer("session_version").default(0).notNull(),
+  expiresAt: timestamp("expires_at").notNull(),
+  consumedAt: timestamp("used_at"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+}, (table) => ({ userIdx: index("password_reset_tokens_user_idx").on(table.userId) }));
 
 export const properties = pgTable("properties", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -108,7 +121,7 @@ export const properties = pgTable("properties", {
   ownerName: text("owner_name").notNull(),
   ownerPhone: text("owner_phone").notNull(),
 
-  status: text("status").default("disponivel").notNull(), // disponivel, em_negociacao, vendido
+  status: text("status").default("disponivel").notNull(), // disponivel, em_negociacao, vendido, arquivado
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
 });
@@ -134,6 +147,7 @@ export const leads = pgTable("leads", {
   fullName: text("full_name").notNull(),
   phone: text("phone").notNull(),
   normalizedPhone: text("normalized_phone").notNull(),
+  documentation: jsonb("documentation").$type<import("../negotiation-documents").NegotiationDocuments>(),
   email: text("email"),
   leadType: text("lead_type").default("comprador").notNull(),
   stage: text("stage").default("novo").notNull(),

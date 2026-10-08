@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useState } from "react";
+import React, { useState } from "react";
 import Image from "next/image";
 import {
   ShieldCheck,
@@ -12,15 +12,18 @@ import {
   Sparkles,
   X,
   AlertCircle,
-  Copy,
 } from "lucide-react";
 
 import { validateCreciWithAI, registerUserWithPix, loginUser } from "@/lib/actions";
 
+import { RequestPasswordRecovery } from "./PasswordRecovery";
+
+type AuthUser = Awaited<ReturnType<typeof loginUser>>["user"];
+
 interface OnboardingModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onComplete: (userData: any) => void;
+  onComplete: (userData: AuthUser) => void;
   initialPlan?: string;
   initialMode?: "register" | "login";
 }
@@ -33,7 +36,7 @@ export default function OnboardingModal({
   initialMode = "register",
 }: OnboardingModalProps) {
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
-  const [mode, setMode] = useState<"register" | "login">("register");
+  const [mode, setMode] = useState<"register" | "login" | "recovery">(initialMode);
   const [aiValidating, setAiValidating] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
   const [aiCreciResult, setAiCreciResult] = useState<{
@@ -42,8 +45,8 @@ export default function OnboardingModal({
     council?: string;
     message: string;
   } | null>(null);
-  const [registeredUser, setRegisteredUser] = useState<any>(null);
-  const [pixKeyCopied, setPixKeyCopied] = useState(false);
+  const [registeredUser, setRegisteredUser] = useState<AuthUser | null>(null);
+  const [registering, setRegistering] = useState(false);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -58,21 +61,7 @@ export default function OnboardingModal({
     billingCycle: "monthly", // 'monthly' ou 'annual'
   });
 
-  useEffect(() => {
-    if (!isOpen) return;
-    setStep(1);
-    setMode(initialMode);
-    setActionError(null);
-    setAiCreciResult(null);
-    setRegisteredUser(null);
-    setFormData((current) => ({
-      ...current,
-      name: "", email: "", password: "", whatsapp: "", creci: "",
-      state: "SP", city: "São Paulo", plan: initialPlan === "imobiliaria" ? "40" : initialPlan,
-      billingCycle: "monthly",
-    }));
-  }, [isOpen, initialPlan, initialMode]);
-
+  const [referralCode, setReferralCode] = useState(() => typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("ref") || "");
   if (!isOpen) return null;
 
   const plansConfig: Record<string, { name: string; monthly: number; annual: number; annualTotal: number; limit: string; desc: string }> = {
@@ -81,7 +70,7 @@ export default function OnboardingModal({
       monthly: 59.9,
       annual: 54.91,
       annualTotal: 658.9,
-      limit: "Até 10 anúncios ativos",
+      limit: "Até 40 fotos por imóvel",
       desc: "Ideal para começar a girar parcerias",
     },
     "20": {
@@ -89,7 +78,7 @@ export default function OnboardingModal({
       monthly: 89.9,
       annual: 82.41,
       annualTotal: 988.9,
-      limit: "Até 20 anúncios ativos",
+      limit: "Até 40 fotos por imóvel",
       desc: "Com Radar de Compradores incluso",
     },
     "40": {
@@ -97,7 +86,7 @@ export default function OnboardingModal({
       monthly: 150.0,
       annual: 137.5,
       annualTotal: 1650.0,
-      limit: "Até 40 anúncios ativos",
+      limit: "Até 40 fotos por imóvel",
       desc: "Mais escolhido por corretores ativos",
     },
   };
@@ -109,7 +98,7 @@ export default function OnboardingModal({
     currentPrice % 1 === 0 ? currentPrice.toFixed(0) : currentPrice.toFixed(2).replace(".", ",");
   const paymentAmount = formData.billingCycle === "annual" ? currentPlanConfig.annualTotal : currentPlanConfig.monthly;
   const formattedPaymentAmount = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(paymentAmount);
-  const pixKey = "b993844f-33d9-4515-a0b4-b3b26b886cf3";
+
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -145,9 +134,12 @@ export default function OnboardingModal({
   };
 
   const handleFinishPayment = async () => {
+    if (registering) return;
+    setRegistering(true);
     setActionError(null);
     try {
       const res = await registerUserWithPix({
+        referralCode,
         name: formData.name,
         email: formData.email,
         password: formData.password,
@@ -158,11 +150,11 @@ export default function OnboardingModal({
         plan: formData.plan,
         billingCycle: formData.billingCycle as "monthly" | "annual",
       });
-      if (res.user) setRegisteredUser(res.user);
+      setRegisteredUser(res.user);
       setStep(4);
     } catch (error) {
       setActionError(error instanceof Error ? error.message : "Não foi possível criar seu cadastro.");
-    }
+    } finally { setRegistering(false); }
   };
 
   return (
@@ -173,11 +165,11 @@ export default function OnboardingModal({
         <div className="bg-slate-900 text-white p-5 flex items-center justify-between border-b border-slate-800">
           <div className="flex items-center gap-3">
             <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-amber-500/40">
-              <Image src="/logo-negocialar.png" alt="Negocia Lar" fill className="object-cover" />
+              <Image src="/logo-negocialar.png" alt="Negocia Lar" fill className="object-contain" />
             </div>
             <div>
               <div className="text-sm font-extrabold flex items-center gap-1.5">
-                <span>Negocia<span className="text-amber-500">lar</span></span>
+                <span className="rounded-md bg-white px-2 py-0.5 text-slate-900">Negocia<span className="text-amber-600">lar</span></span>
                 <span className="text-[10px] bg-slate-800 text-slate-300 font-mono px-1.5 py-0.2 rounded">SNNtech</span>
               </div>
               <div className="text-[11px] text-slate-400">Onboarding & Ativação de Corretor</div>
@@ -223,6 +215,8 @@ export default function OnboardingModal({
         )}
 
         {/* PASSO 1: DADOS DO CORRETOR / CRECI */}
+        {step === 1 && mode === "recovery" && <div className="p-6"><RequestPasswordRecovery onBack={() => { setMode("login"); setActionError(null); }} /></div>}
+
         {step === 1 && mode === "login" && (
           <form onSubmit={handleLogin} className="p-6 space-y-4">
             <div>
@@ -237,6 +231,7 @@ export default function OnboardingModal({
             </label>
             {actionError && <p role="alert" className="text-xs text-red-700">{actionError}</p>}
             <button className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl">Entrar</button>
+            <button type="button" onClick={() => { setMode("recovery"); setActionError(null); }} className="w-full text-xs text-amber-700 font-semibold">Esqueci minha senha</button>
             <button type="button" onClick={() => { setMode("register"); setActionError(null); }} className="w-full text-xs text-amber-700 font-semibold">Criar uma conta</button>
           </form>
         )}
@@ -473,7 +468,7 @@ export default function OnboardingModal({
               <div className="text-xs text-emerald-900 leading-relaxed">
                 <span className="font-bold">Pagamento via Pix</span>
                 <p className="text-[11px] text-emerald-800 mt-0.5">
-                  A equipe confirma o pagamento manualmente após o cadastro.
+                  Você começa com 30 dias grátis. Depois, solicite a renovação na área Minha assinatura; pagamento via Pix.
                 </p>
               </div>
             </div>
@@ -505,28 +500,19 @@ export default function OnboardingModal({
               <span className="text-xs bg-amber-100 text-amber-800 font-bold px-3 py-1 rounded-full uppercase tracking-wider">
                 Passo 3: Cadastro
               </span>
-              <h3 className="text-xl font-extrabold text-slate-900 mt-2">Pague com Pix</h3>
+              <h3 className="text-xl font-extrabold text-slate-900 mt-2">Comece seus 30 dias grátis</h3>
               <p className="text-xs text-slate-500">
                 Plano {currentPlanConfig.name} • {formData.billingCycle === "annual" ? `${formattedPaymentAmount} no ano (Use 12 meses, pague 11)` : `${formattedPaymentAmount}/mês`}
               </p>
             </div>
-            <div className="bg-white border border-slate-200 p-4 rounded-2xl text-left">
-              <div className="flex flex-col sm:flex-row items-center gap-4">
-                <Image src="/pix-negocialar.png" alt="QR Code Pix do Negocia Lar" width={180} height={180} className="w-40 h-40 rounded-lg border border-slate-100" />
-                <div className="min-w-0 flex-1 space-y-2">
-                  <p className="text-sm font-bold text-slate-900">Valor a pagar: {formattedPaymentAmount}</p>
-                  <p className="text-[11px] text-slate-600">Escaneie o QR Code e informe esse valor no aplicativo do seu banco. O QR é estático e não preenche o valor automaticamente.</p>
-                  <div>
-                    <span className="block text-[10px] font-bold uppercase tracking-wide text-slate-500">Chave Pix</span>
-                    <code className="block break-all text-[11px] text-slate-700">{pixKey}</code>
-                  </div>
-                  <button type="button" onClick={async () => { try { await navigator.clipboard.writeText(pixKey); setPixKeyCopied(true); window.setTimeout(() => setPixKeyCopied(false), 2500); } catch { setActionError("Não foi possível copiar a chave Pix."); } }} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-[11px] font-semibold text-slate-700 hover:bg-slate-50">
-                    <Copy className="w-3.5 h-3.5" />{pixKeyCopied ? "Chave Pix copiada" : "Copiar chave Pix"}
-                  </button>
-                </div>
-              </div>
-              <p className="mt-3 rounded-lg bg-amber-50 p-3 text-[11px] leading-relaxed text-amber-900">Depois do pagamento, conclua seu cadastro. A equipe confirmará o Pix manualmente e validará o CRECI antes de liberar o acesso.</p>
+            <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-left text-sm text-emerald-900">
+              <p className="font-bold">30 dias grátis, sem pagamento no cadastro</p>
+              <p className="mt-2 text-xs leading-relaxed">O período começa ao concluir seu cadastro. O acesso à rede depende da aprovação do CRECI. Ao terminar os 30 dias, você pode renovar via Pix em Minha assinatura. Não há débito automático.</p>
             </div>
+            <label className="block text-left text-xs font-semibold text-slate-600">Código de quem indicou (opcional)
+              <input value={referralCode} onChange={(event) => setReferralCode(event.target.value)} maxLength={36} className="mt-1 w-full rounded-lg border border-slate-200 p-3 text-sm" placeholder="Cole o código recebido do corretor" />
+              <span className="mt-1 block text-[11px] font-normal">Quem indicou ganha 30 dias após a confirmação do seu primeiro pagamento.</span>
+            </label>
             {actionError && <p role="alert" className="text-xs text-red-700">{actionError}</p>}
 
             {/* Botão de Finalização */}
@@ -541,10 +527,11 @@ export default function OnboardingModal({
               <button
                 type="button"
                 onClick={handleFinishPayment}
+                disabled={registering}
                 className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3.5 px-4 rounded-xl transition flex items-center justify-center gap-2 shadow-md text-xs sm:text-sm"
               >
                 <CheckCircle2 className="w-4 h-4" />
-                <span>Já paguei • criar cadastro</span>
+                <span>{registering ? "Criando cadastro…" : "Criar cadastro e começar grátis"}</span>
               </button>
             </div>
           </div>
@@ -562,19 +549,20 @@ export default function OnboardingModal({
                 Bem-vindo ao Negocia Lar!
               </h3>
               <p className="text-xs text-slate-500 max-w-sm mx-auto">
-                Seu cadastro do plano <strong>{currentPlanConfig.name}</strong> foi criado. A conta aguarda validação do CRECI e confirmação do pagamento.
+                Seu cadastro do plano <strong>{currentPlanConfig.name}</strong> foi criado. Seus 30 dias grátis já começaram. A conta aguarda validação do CRECI para acessar a rede.
               </p>
             </div>
 
             <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl text-xs text-slate-600 text-left flex items-center gap-2.5">
               <Clock className="w-4 h-4 text-emerald-600 shrink-0" />
-              <span>Status pendente. O acesso à rede será liberado após as validações.</span>
+              <span>CRECI em análise. Consulte os dias restantes em Minha assinatura.</span>
             </div>
 
             <div className="space-y-2 pt-2">
               <button
                 onClick={() => {
-                  onComplete(registeredUser || formData);
+                  if (!registeredUser) return;
+                  onComplete(registeredUser);
                   onClose();
                 }}
                 className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 px-4 rounded-xl transition flex items-center justify-center gap-2 shadow-lg text-sm"

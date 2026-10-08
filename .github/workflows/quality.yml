@@ -1,0 +1,38 @@
+name: Quality
+on:
+  push:
+  pull_request:
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16-alpine
+        env:
+          POSTGRES_USER: negocialar_test
+          POSTGRES_PASSWORD: local_test_only
+          POSTGRES_DB: negocialar_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U negocialar_test -d negocialar_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      NEGOCIAR_LAR_TEST_DATABASE_URL: postgresql://negocialar_test:local_test_only@localhost:5432/negocialar_test
+      NEGOCIAR_LAR_REQUIRE_INTEGRATION: "1"
+      DATABASE_URL: postgresql://negocialar_test:local_test_only@localhost:5432/negocialar_test
+      NEGOCIAR_LAR_SESSION_SECRET: test-only-session-secret-at-least-32-bytes
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+      - run: npm ci
+      - run: npm run db:test:push
+      - run: npm test
+      - run: npm run lint
+      - run: npm run typecheck
+      - run: npm run build

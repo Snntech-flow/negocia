@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Image from "next/image";
 import {
+  LayoutDashboard,
   ShieldCheck,
   Share2,
   FileText,
@@ -46,11 +47,11 @@ export default function LandingPage({
       highlight: false,
       cta: "Criar cadastro",
       features: [
-        "Até 10 anúncios ativos simultâneos",
-        "Vitrine de imóveis em versão inicial",
+        "Até 40 fotos por imóvel",
+        "Vitrine de imóveis para parcerias",
         "Dados de contato do proprietário restritos ao captador",
         "Perfis de busca de compradores",
-        "Registro interno de visita em rascunho",
+        "Registro interno de visitas (DVP)",
       ],
     },
     {
@@ -61,10 +62,11 @@ export default function LandingPage({
       highlight: false,
       cta: "Criar cadastro",
       features: [
-        "Vitrine de imóveis em versão inicial",
+        "Até 40 fotos por imóvel",
+        "Vitrine de imóveis para parcerias",
         "Dados de contato do proprietário restritos ao captador",
         "Perfis de busca de compradores",
-        "Registro interno de visita em rascunho",
+        "Registro interno de visitas (DVP)",
       ],
     },
     {
@@ -76,10 +78,11 @@ export default function LandingPage({
       badge: "Mais Escolhido ⭐",
       cta: "Criar cadastro",
       features: [
-        "Vitrine de imóveis em versão inicial",
+        "Até 40 fotos por imóvel",
+        "Vitrine de imóveis para parcerias",
         "Dados de contato do proprietário restritos ao captador",
         "Perfis de busca de compradores",
-        "Registro interno de visita em rascunho",
+        "Registro interno de visitas (DVP)",
       ],
     },
   ];
@@ -88,7 +91,7 @@ export default function LandingPage({
     <div className="min-h-screen bg-[#FDFDFD] text-slate-900 font-sans antialiased">
       {/* Barra Superior Institucional */}
       <div className="bg-slate-900 text-slate-300 text-xs py-2 px-4 border-b border-slate-800 text-center font-medium">
-        <span className="text-amber-400 font-bold">Pagamento via Pix:</span> a confirmação é feita manualmente pela equipe.
+        <span className="text-amber-400 font-bold">Experimente por 30 dias grátis.</span> Sem pagamento no cadastro. Depois, renove seu plano via Pix.
       </div>
 
       {/* Header Limpo & Autoritário */}
@@ -96,25 +99,23 @@ export default function LandingPage({
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="relative w-10 h-10 rounded-lg overflow-hidden border border-slate-200 shadow-sm">
-              <Image src="/logo-negocialar.png" alt="Negocia Lar" fill className="object-cover" />
+              <Image src="/logo-negocialar.png" alt="Negocia Lar" fill className="object-contain" />
             </div>
             <div>
               <div className="flex items-center gap-2">
                 <span className="font-extrabold text-2xl tracking-tight text-slate-900">
                   Negocia<span className="text-amber-600">lar</span>
                 </span>
-                <span className="hidden sm:inline-block text-[10px] bg-slate-100 text-slate-600 font-bold px-2 py-0.5 rounded border border-slate-200">
-                  REDE DE IMÓVEIS
-                </span>
               </div>
-              <div className="text-[11px] text-slate-500 font-medium">
-                Um produto <span className="font-extrabold text-slate-800 tracking-tight">SNNtech</span>
+              <div className="mt-1 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[9px] sm:text-[11px] font-bold text-amber-800">
+                <ShieldCheck className="h-3 w-3 shrink-0 text-amber-600" aria-hidden="true" />
+                Rede de parcerias para corretores
               </div>
             </div>
           </div>
 
           <nav className="hidden md:flex items-center gap-7 text-sm font-semibold text-slate-600">
-            <a href="#dor" className="hover:text-amber-600 transition">O Problema</a>
+            <a href="#sistema" className="hover:text-amber-600 transition">CRM & Match</a>
             <a href="#como-funciona" className="hover:text-amber-600 transition">Como Funciona</a>
             <a href="#seguranca" className="hover:text-amber-600 transition">Segurança Jurídica</a>
             <a href="#planos" className="text-amber-600 font-bold">Planos & Preços</a>
@@ -142,18 +143,22 @@ export default function LandingPage({
             
             {/* Texto Principal */}
             <div className="lg:col-span-7 space-y-6 text-left">
-              <div className="inline-flex items-center gap-2 bg-amber-50 border border-amber-200 text-amber-800 text-xs font-bold px-3 py-1 rounded-full">
-                <ShieldCheck className="w-4 h-4 text-amber-600" />
-                Rede de parcerias em versão inicial
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-5 text-center">
+                <Radar className="mx-auto h-8 w-8 text-orange-500" aria-hidden="true" />
+                <p className="mt-3 text-xs font-bold uppercase tracking-wide text-amber-700">Match automático no Radar</p>
+                <h2 className="mt-2 text-xl sm:text-2xl font-extrabold text-slate-950">O “<span className="text-orange-500">TINDER</span>” dos corretores</h2>
               </div>
 
               <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-950 tracking-tight leading-[1.15]">
-                Chega de perder comissão ou captação em grupos de WhatsApp.
+                Chega de perder comissão e captação.
               </h1>
 
-              <p className="text-base sm:text-lg text-slate-600 leading-relaxed max-w-xl">
-                O <strong>Negocia Lar</strong> está em desenvolvimento para ajudar corretores a organizar imóveis e oportunidades de parceria. Dados de contato do proprietário aparecem apenas para o corretor que cadastrou o imóvel; o pagamento é feito via Pix, com confirmação manual.
-              </p>
+              <div className="space-y-3 text-base sm:text-lg text-slate-600 leading-relaxed max-w-xl">
+                <p>Cansado de perder tanto tempo procurando o imóvel do seu cliente. Chegou o <span className="text-orange-500 font-bold">TINDER</span> dos corretores.</p>
+                <p>Esse app vai te proporcionar mais organização, agilidade, segurança e total suporte na sua negociação do início ao fim.</p>
+                <p>Vendas com muito mais velocidade. 🚀</p>
+                <p>Tenha um maior volume de vendas. Parcerias geram rotatividade.</p>
+              </div>
 
               <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
                 <a
@@ -184,7 +189,7 @@ export default function LandingPage({
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Check className="w-4 h-4 text-emerald-600 font-bold" />
-                  Plataforma em desenvolvimento
+                  30 dias grátis para conhecer a plataforma
                 </div>
                 <div className="flex items-center gap-1.5">
                   <Check className="w-4 h-4 text-emerald-600 font-bold" />
@@ -261,6 +266,39 @@ export default function LandingPage({
         </div>
       </section>
 
+      <section id="sistema" className="border-b border-slate-200 bg-white py-12 sm:py-16">
+        <div className="mx-auto max-w-5xl px-4 sm:px-6">
+          <div className="mx-auto max-w-3xl text-center">
+            <p className="text-xs font-bold uppercase tracking-widest text-amber-600">Muito além de uma vitrine de imóveis</p>
+            <h2 className="mt-3 text-2xl font-extrabold leading-tight text-slate-950 sm:text-3xl">O match certo para seus imóveis.<br className="hidden sm:block" /> Um CRM para organizar seus negócios.</h2>
+            <p className="mt-4 text-sm leading-relaxed text-slate-600">Encontre oportunidades de parceria, organize seus clientes e prepare a documentação da negociação em um só lugar.</p>
+          </div>
+          <div className="mt-8 grid gap-4 md:grid-cols-3">
+            <article className="rounded-2xl border border-amber-200 bg-amber-50/60 p-6">
+
+              <Radar className="h-8 w-8 text-orange-500" aria-hidden="true" />
+              <p className="mt-4 text-[11px] font-bold uppercase tracking-wide text-amber-700">Match automático no Radar</p>
+              <h3 className="mt-2 text-lg font-extrabold text-slate-950">O “<span className="text-orange-500">TINDER</span>” dos corretores</h3>
+              <p className="mt-3 text-sm leading-relaxed text-slate-600">Um corretor tem o imóvel. Outro tem o cliente. Cadastre a busca no Radar e o sistema cruza os critérios com os imóveis para parceria, avisando o corretor que procura quando encontra compatibilidade.</p>
+            </article>
+            <article className="rounded-2xl border border-sky-300 bg-sky-200 p-6">
+              <LayoutDashboard className="h-8 w-8 text-sky-700" aria-hidden="true" />
+              <p className="mt-4 text-[11px] font-bold uppercase tracking-wide text-sky-700">Sua carteira organizada</p>
+              <h3 className="mt-2 text-lg font-extrabold text-slate-950">Seu CRM integrado</h3>
+              <p className="mt-3 text-sm leading-relaxed text-slate-600">Organize clientes, acompanhe cada etapa da negociação e agende os próximos contatos. Sua agenda, suas anotações e seu histórico ficam privados na sua conta.</p>
+            </article>
+            <article className="rounded-2xl border border-slate-200 bg-slate-50 p-6">
+              <FileText className="h-8 w-8 text-slate-900" aria-hidden="true" />
+              <p className="mt-4 text-[11px] font-bold uppercase tracking-wide text-slate-600">Agilidade no atendimento</p>
+              <h3 className="mt-2 text-lg font-extrabold text-slate-950">Da oportunidade à documentação</h3>
+              <p className="mt-3 text-sm leading-relaxed text-slate-600">Personalize a lista de documentos e os custos da operação, acompanhe pendências e compartilhe a lista com o cliente pelo WhatsApp ou PDF. Salve seu modelo para reutilizar.</p>
+            </article>
+          </div>
+          <p className="mt-5 text-center text-xs leading-relaxed text-slate-500">O cruzamento acontece ao cadastrar uma busca no Radar ou um novo imóvel de venda para parceria. O match indica compatibilidade; os corretores confirmam os detalhes e combinam a parceria.</p>
+          <div className="mt-6 text-center"><button onClick={() => { setSelectedPlanForOnboarding("40"); setOnboardingMode("register"); setIsOnboardingOpen(true); }} className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-6 py-3 text-sm font-bold text-slate-950 transition hover:bg-amber-400">Conhecer o sistema por 30 dias grátis <ArrowRight className="h-4 w-4" aria-hidden="true" /></button></div>
+        </div>
+      </section>
+
       {/* Seção O PROBLEMA REAL (A Dor do Corretor) */}
       <section id="dor" className="py-16 bg-white border-b border-slate-100">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 space-y-10">
@@ -288,7 +326,7 @@ export default function LandingPage({
               </div>
               <h3 className="font-bold text-slate-900 text-sm">Grupos de WhatsApp Caóticos</h3>
               <p className="text-xs text-slate-600 leading-relaxed">
-                Centenas de mensagens por dia, fotos com marca d'água de concorrentes, fichas sem endereço e zero histórico ou garantia formal de comissão.
+                Centenas de mensagens por dia, fotos com marca d&apos;água de concorrentes, fichas sem endereço e zero histórico ou garantia formal de comissão.
               </p>
             </div>
 
@@ -305,13 +343,22 @@ export default function LandingPage({
         </div>
       </section>
 
+      <section className="border-b border-slate-200 bg-white py-12">
+        <div className="mx-auto max-w-5xl space-y-3 px-4 sm:px-6">
+          <Radar className="h-8 w-8 text-amber-600" aria-hidden="true" />
+          <h2 className="text-2xl font-extrabold text-slate-950">Radar de compradores: encontre oportunidades para seus imóveis</h2>
+          <p className="max-w-3xl text-sm leading-relaxed text-slate-600">Cadastre o que seu cliente procura e compare com os imóveis disponíveis. O match indica a compatibilidade entre as preferências do comprador e as características do imóvel, ajudando você a encontrar possíveis parcerias. Confira os critérios e converse com o corretor responsável para confirmar os detalhes.</p>
+        </div>
+      </section>
+
       {/* Seção Como Funciona (A Solução Prática) */}
       <section id="como-funciona" className="py-16 bg-slate-50 border-b border-slate-200">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 space-y-12">
           <div className="text-center space-y-2 max-w-2xl mx-auto">
             <h2 className="text-xs font-bold text-amber-700 uppercase tracking-widest">O Jeito Profissional</h2>
             <p className="text-2xl sm:text-3xl font-extrabold text-slate-950">
-              Como o Negocia Lar protege você do início ao fim
+              Como o Negocialar<br />
+              protege você do início ao fim.
             </p>
           </div>
 
@@ -340,9 +387,9 @@ export default function LandingPage({
               <div className="w-10 h-10 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center font-bold text-sm border border-amber-200">
                 3
               </div>
-              <h4 className="font-bold text-slate-900 text-sm">DVP Digital na Visita</h4>
+              <h4 className="font-bold text-slate-900 text-sm">DVP — Documento de Visita Presencial</h4>
               <p className="text-xs text-slate-600 leading-relaxed">
-                O sistema registra os dados da visita em rascunho. O registro não coleta assinatura nem produz sozinho uma garantia jurídica.
+                DVP significa Documento de Visita Presencial: um registro de quem visitou o imóvel, quando e com qual corretor. Nesta versão, o sistema salva esses dados em rascunho. O registro não coleta assinatura nem produz sozinho uma garantia jurídica.
               </p>
             </div>
 
@@ -350,9 +397,9 @@ export default function LandingPage({
               <div className="w-10 h-10 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center font-bold text-sm border border-amber-200">
                 4
               </div>
-              <h4 className="font-bold text-slate-900 text-sm">Formalização em desenvolvimento</h4>
+              <h4 className="font-bold text-slate-900 text-sm">Condições da parceria</h4>
               <p className="text-xs text-slate-600 leading-relaxed">
-                A divisão e os termos da parceria precisam ser acordados e formalizados pelas partes. O sistema ainda não produz esse contrato.
+                A divisão e os termos da parceria precisam ser acordados e formalizados pelas partes. Registrem as condições e formalizem o contrato entre as partes.
               </p>
             </div>
           </div>
@@ -483,7 +530,7 @@ export default function LandingPage({
               </div>
               <h4 className="text-base sm:text-lg font-bold">Organize oportunidades e parcerias imobiliárias.</h4>
               <p className="text-xs text-slate-300 max-w-xl leading-relaxed">
-                Registre seus imóveis e acompanhe as oportunidades com seus clientes. O pagamento é feito via Pix e confirmado manualmente pela equipe.
+                Registre seus imóveis e acompanhe as oportunidades com seus clientes. Pagamento via Pix.
               </p>
             </div>
             <button
@@ -510,18 +557,26 @@ export default function LandingPage({
 
           <div className="space-y-3">
             {[
-              {
-                q: "Quem consegue ver os dados do proprietário?",
-                a: "Os dados do proprietário são restritos ao corretor que cadastrou o imóvel. A versão atual não oferece assinatura eletrônica ou garantia jurídica automática; o registro de visita fica como rascunho.",
-              },
-              {
-                q: "O cliente final descobre quem é o captador do imóvel?",
-                a: "Os dados completos do proprietário são exibidos somente para o corretor que cadastrou o imóvel. A ficha pública e o PDF ainda estão em desenvolvimento.",
-              },
+              {"q": "Como funcionam os 30 dias grátis?", "a": "Cada corretor tem 30 dias gratuitos a partir do cadastro, sem pagamento inicial. Use esse período para conhecer a plataforma. A verificação do CRECI é feita pela equipe e é necessária para acessar as funções restritas."},
+              {"q": "Preciso pagar ou informar cartão para começar?", "a": "Não. O cadastro inicia o período gratuito sem cobrança e sem cartão. Após os 30 dias, você pode renovar o plano via Pix."},
+              {"q": "O que acontece depois do período gratuito?", "a": "Para continuar usando as funções do plano, faça a renovação. Em Minha assinatura você consulta o prazo de acesso, o plano e o histórico de pagamentos. A cobrança não é automática."},
+              {"q": "Qual plano devo escolher?", "a": "Os planos permitem cadastrar até 10, 20 ou 40 imóveis. Todos permitem até 40 fotos por imóvel. Consulte os valores mensais e anuais na seção de planos."},
+              {"q": "Como ganho um mês grátis por indicação?", "a": "Compartilhe seu link ou código de indicação, disponível em Minha assinatura. Quando a pessoa indicada tiver seu primeiro pagamento confirmado, você recebe mais 30 dias de acesso. O cadastro gratuito sozinho não gera a recompensa."},
+              {"q": "Quem consegue ver os dados do proprietário?", "a": "O endereço completo e os dados de contato do proprietário ficam restritos ao corretor que cadastrou o imóvel. Confira as informações da ficha antes de compartilhar com um cliente."},
+              {"q": "O que significa ficha White-Label?", "a": "É uma apresentação do imóvel para compartilhar com o cliente usando a identidade do corretor. Abra a ficha, confira os dados exibidos e as informações de contato antes de enviar."},
+              {"q": "Meus clientes ficam visíveis para outros corretores?", "a": "Sua carteira do CRM, contatos e histórico são privados. No Radar, preferências de busca podem ajudar a encontrar parcerias, sem expor o nome interno e as observações particulares do cliente."},
+              {"q": "O que posso fazer no CRM?", "a": "Cadastrar clientes, organizar oportunidades no funil, registrar contatos, agendar retornos, filtrar a carteira e importar ou exportar contatos em CSV. Acesse Atendimento → CRM · Minha carteira."},
+              {"q": "O que é importar CSV?", "a": "É trazer contatos de uma planilha para o CRM. CSV é um formato de arquivo que você pode salvar no Excel ou Google Planilhas. Na opção Importar contatos de uma planilha, confira as instruções e o modelo antes de enviar."},
+              {"q": "Como funciona o Radar de compradores?", "a": "Ao cadastrar uma busca no Radar ou um novo imóvel de venda para parceria, o sistema cruza cidade, tipo, bairros, orçamento, quartos e vagas. Quando encontra compatibilidade, gera um aviso dentro do sistema para o corretor que procura. O match não fecha a venda nem envia documentos automaticamente; os corretores confirmam os detalhes e combinam a parceria."},
+              {"q": "O Bartolomeu pode ajudar com financiamento?", "a": "Sim. Ele ajuda com atendimento, organização do CRM e dúvidas sobre MCMV, SBPE, FGTS e financiamento. Pode pesquisar e apresentar fontes consultadas. Confirme regras e valores com o banco; a IA não aprova crédito nem garante subsídio. Não envie documentos ou dados pessoais de clientes."},
+              {"q": "A simulação de amortização é uma proposta do banco?", "a": "Não. É uma estimativa matemática em SAC ou Price para comparar aportes que reduzem o prazo ou a parcela. Não inclui seguros, tarifas, TR/IPCA ou regras específicas da instituição. Confirme as condições no contrato e no banco."},
+              {"q": "O que é DVP? Ele vale como contrato assinado?", "a": "DVP significa Documento de Visita Presencial. Na plataforma, ele registra os dados da visita como rascunho para acompanhamento. Esse registro não é assinatura eletrônica nem garante comissão; formalize os acordos entre as partes."},
+              {"q": "Como pedir ajuda ou sugerir melhorias?", "a": "Depois de entrar, use Ajuda / Fale conosco. Sua mensagem é enviada à equipe do NegociaLar para suporte e avaliação de sugestões."},
             ].map((faq, idx) => (
               <div key={idx} className="bg-white rounded-xl border border-slate-200 overflow-hidden">
                 <button
                   onClick={() => setOpenFaq(openFaq === idx ? null : idx)}
+                  aria-expanded={openFaq === idx}
                   className="w-full p-4 text-left flex items-center justify-between text-xs sm:text-sm font-bold text-slate-900"
                 >
                   <span>{faq.q}</span>
@@ -548,13 +603,13 @@ export default function LandingPage({
             </div>
           </div>
           <div>
-            © 2026 SNNtech. Todos os direitos reservados. Plataforma em desenvolvimento.
+            © 2026 SNNtech. Todos os direitos reservados.
           </div>
         </div>
       </footer>
 
       {/* Modal de Onboarding */}
-      <OnboardingModal
+      {isOnboardingOpen && <OnboardingModal
         isOpen={isOnboardingOpen}
         onClose={() => setIsOnboardingOpen(false)}
         onComplete={(userData) => {
@@ -563,7 +618,7 @@ export default function LandingPage({
         }}
         initialPlan={selectedPlanForOnboarding}
         initialMode={onboardingMode}
-      />
+      />}
     </div>
   );
 }

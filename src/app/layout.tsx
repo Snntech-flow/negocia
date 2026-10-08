@@ -5,7 +5,7 @@ export const metadata: Metadata = {
   metadataBase: new URL("https://negocialar.com.br"),
   title: "Negocia Lar — Plataforma MLS B2B para Corretores",
   description:
-    "Plataforma em desenvolvimento para cadastro e parceria de imóveis, registro de visitas e organização de clientes. Um produto SNNtech.",
+    "Plataforma para cadastro e parceria de imóveis, registro de visitas e organização de clientes. Experimente por 30 dias grátis. Um produto SNNtech.",
   keywords: [
     "co-corretagem",
     "parceria imobiliaria",
@@ -23,7 +23,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: "Negocia Lar — Rede de Parcerias Imobiliárias (MLS B2B)",
     description:
-      "Organize imóveis, clientes e potenciais parcerias em uma plataforma em desenvolvimento para corretores. Um produto SNNtech.",
+      "Organize imóveis, clientes e potenciais parcerias em uma plataforma para corretores. Um produto SNNtech.",
     url: "https://negocialar.com.br",
     siteName: "Negocia Lar - SNNtech",
     images: [

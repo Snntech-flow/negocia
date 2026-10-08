@@ -9,6 +9,9 @@ const config: Config = {
   theme: {
     extend: {
       colors: {
+        // Navy tones match the blue in the NegociaLar logo.
+        slate: { 800: "#205779", 900: "#124766", 950: "#0c3753" },
+        black: "#0c3753",
         brand: {
           50: "#effbf7",
           100: "#d6f5eb",

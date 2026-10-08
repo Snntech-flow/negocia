@@ -1,6 +1,13 @@
 "use client";
 
-import React, { useMemo, useState } from "react";
+import dynamic from "next/dynamic";
+import { PROPERTY_PAGE_SIZE } from "@/lib/marketplace-query";
+import RadarMatches from "./RadarMatches";
+import WhiteLabelSheet from "./WhiteLabelSheet";
+import PropertyMarketplace from "./PropertyMarketplace";
+import type { Property } from "@/lib/property-types";
+const SubscriptionPanel = dynamic(() => import("./SubscriptionPanel"));
+import React, { useEffect, useMemo, useState } from "react";
 import Image from "next/image";
 import {
   ShieldCheck,
@@ -56,10 +63,12 @@ import {
   MessageSquarePlus,
 } from "lucide-react";
 import OnboardingModal from "@/components/OnboardingModal";
-import LeadCRM from "@/components/LeadCRM";
+const LeadCRM = dynamic(() => import("./LeadCRM"));
 import {
+  getMarketplaceData,
   createProperty,
   updateUserStatus,
+  confirmPixSubscriptionPayment,
   createBuyerProfile,
   createDvpCertificate,
   updatePartnershipStatus,
@@ -71,12 +80,14 @@ import {
   logoutUser,
 } from "@/lib/actions";
 
+const PropertyInventory = dynamic(() => import("./PropertyInventory"), { loading: () => <p className="p-4 text-sm">Carregando carteira…</p> });
+
 interface NotificationItem {
   id: string;
   userId: string;
   title: string;
   message: string;
-  type: "ai_match" | "dvp" | "parceria" | "sistema";
+  type: string;
   read: boolean;
   propertyId: string | null;
   createdAt: Date;
@@ -155,69 +166,15 @@ interface PartnershipActivityItem {
 }
 
 const SCREEN_GUIDANCE: Record<string, { title: string; description: string }> = {
+  atendimento: { title: "Atendimento aos clientes", description: "Acompanhe o funil de atendimento e as próximas ações de cada cliente." },
   vitrine: { title: "Vitrine de imóveis compartilhados (MLS)", description: "MLS é uma rede em que corretores compartilham imóveis e oportunidades. Consulte as condições com o captador; o endereço completo e os dados do proprietário ficam restritos a ele." },
-  crm: { title: "CRM de Leads", description: "Organize clientes e parceiros, acompanhe cada oportunidade por etapa, registre contatos e programe retornos. Os leads ficam privados na sua carteira." },
+  crm: { title: "CRM interno do corretor", description: "Organize clientes e parceiros, acompanhe cada oportunidade por etapa, registre contatos e programe retornos. Os leads ficam privados na sua carteira." },
   radar: { title: "Radar de Compradores", description: "Compare as preferências de compradores cadastrados com os imóveis disponíveis. Confira os critérios do match antes de falar com o corretor responsável." },
   termo: { title: "Termo de Parceria", description: "Veja um exemplo de como uma parceria pode ser combinada. Esta tela não coleta o aceite dos corretores nem gera contrato; formalizem o acordo fora da plataforma." },
-  dvp: { title: "Registro de visita · DVP em desenvolvimento", description: "Salve os dados da visita para consulta e acompanhamento. O rascunho não é assinado por ninguém, não confirma um acordo e não garante comissão." },
-  cadastrar: { title: "Nova Captação", description: "Cadastre um imóvel e suas condições de parceria. Os dados completos de endereço e do proprietário ficam visíveis apenas para o corretor captador." },
+  dvp: { title: "Registro de visita · DVP", description: "Salve os dados da visita para consulta e acompanhamento. O rascunho não é assinado por ninguém, não confirma um acordo e não garante comissão." },
+  cadastrar: { title: "Meus imóveis", description: "Edite, arquive ou cadastre imóveis e suas condições de parceria. Os dados completos de endereço e do proprietário ficam visíveis apenas para o corretor captador." },
   admin: { title: "Gestão e Faturamento", description: "Área administrativa para revisar cadastros e acompanhar informações de assinatura. Pagamentos ainda não são processados pela plataforma." },
 };
-
-interface Property {
-  id: string;
-  title: string;
-  propertyType: string;
-  salePrice: string;
-  purpose?: string;
-  acceptsTrade?: boolean;
-  tradeDetails?: string | null;
-  condition?: string;
-  hotelRoomsCount?: number | null;
-  condoFee: string | null;
-  iptu: string | null;
-  iptuPeriod?: string | null;
-  city: string;
-  neighborhood: string;
-  cep?: string | null;
-  street?: string | null;
-  streetNumber?: string | null;
-  block?: string | null;
-  floor?: string | null;
-  condoName?: string | null;
-  hideStreet?: boolean;
-  bedrooms: number;
-  suites: number;
-  bathrooms: number;
-  parkingSpots: number;
-  garageType?: string | null;
-  areaM2: string;
-  usefulAreaM2?: string | null;
-  totalAreaM2?: string | null;
-  solarPosition?: string | null;
-  viewType?: string | null;
-  propertyAge?: number | null;
-  documentationStatus?: string | null;
-  acceptsFinancing?: boolean;
-  privateAmenities?: string[];
-  condoAmenities?: string[];
-  description: string;
-  videoUrl?: string | null;
-  coverPhoto?: string | null;
-  photos: string[];
-  floorPlanPhotos?: string[];
-  acceptsPartnership: boolean;
-  splitPercentage: string;
-  status: string;
-  broker: {
-    id: string;
-    name: string;
-    creci: string;
-    whatsapp: string;
-    avatarUrl: string | null;
-    city: string;
-  };
-}
 
 interface BuyerProfile {
   id: string;
@@ -260,6 +217,7 @@ interface UserItem {
 
 interface TransactionItem {
   id: string;
+  userId: string;
   amount: string;
   type: string;
   paymentMethod: string;
@@ -298,16 +256,21 @@ export const PRIVATE_AMENITIES_LIST = [
   "Churrasqueira privativa",
   "Despensa",
   "Dependência de empregada (DCE)",
-  "Escritório / Home office",
+  "Escritório",
+  "Home office",
   "Lavabo",
   "Mezanino",
   "Internet / Wi-Fi",
   "TV a cabo instalada",
-  "Sofá retrátil / Mobiliado",
+  "Sofá retrátil",
+  "Mobiliado",
   "Piscina privativa",
-  "Sacada / Sacada gourmet",
-  "Varanda / Varanda gourmet",
-  "Ofurô / Hidromassagem",
+  "Sacada",
+  "Sacada gourmet",
+  "Varanda",
+  "Varanda gourmet",
+  "Ofurô",
+  "Hidromassagem",
   "Sauna privativa",
   "Ventilador de teto",
   "Ar-condicionado central",
@@ -378,6 +341,7 @@ export const CONDO_AMENITIES_GROUPS = [
 
 export default function NegociaLarApp({
   initialProperties,
+  initialPropertyTotal = initialProperties.length,
   initialRadar,
   initialUsers,
   initialTransactions,
@@ -391,6 +355,7 @@ export default function NegociaLarApp({
   initialFeedback = [],
 }: {
   initialProperties: Property[];
+  initialPropertyTotal?: number;
   initialRadar: BuyerProfile[];
   initialUsers: UserItem[];
   initialTransactions: TransactionItem[];
@@ -403,23 +368,72 @@ export default function NegociaLarApp({
   initialLeadActivities?: React.ComponentProps<typeof LeadCRM>["initialActivities"];
   initialFeedback?: PilotFeedbackItem[];
 }) {
-  const [currentView, setCurrentView] = useState<"app" | "landing">("landing");
-  const [activeTab, setActiveTab] = useState<"vitrine" | "crm" | "radar" | "cadastrar" | "termo" | "dvp" | "admin">("vitrine");
+  const [currentView, setCurrentView] = useState<"app" | "landing">(initialCurrentUser ? "app" : "landing");
+  type WorkspaceTab = "vitrine" | "crm" | "radar" | "atendimento" | "cadastrar" | "termo" | "dvp" | "admin";
+  const [activeTab, setActiveTabState] = useState<WorkspaceTab>("vitrine");
+  const setActiveTab = (tab: WorkspaceTab) => {
+    document.querySelectorAll<HTMLDetailsElement>(".workspace-navigation details[open]").forEach(menu => { menu.open = false; });
+    setActiveTabState(tab);
+    if (currentUser) {
+      try { sessionStorage.setItem(`negocialar-tab:${currentUser.id}`, tab); } catch {}
+    }
+  };
+  useEffect(() => {
+    if (!initialCurrentUser) return;
+    let saved: string | null = null;
+    try { saved = sessionStorage.getItem(`negocialar-tab:${initialCurrentUser.id}`); } catch {}
+    const allowed = ["vitrine", "crm", "radar", "atendimento", "cadastrar", "termo", "dvp", ...(initialCurrentUser.role === "admin" ? ["admin"] : [])];
+    if (!saved || !allowed.includes(saved)) return;
+    const tab = saved as WorkspaceTab;
+    const frame = requestAnimationFrame(() => setActiveTabState(tab));
+    return () => cancelAnimationFrame(frame);
+  }, [initialCurrentUser]);
+  useEffect(() => {
+    const closeMenus = () => document.querySelectorAll<HTMLDetailsElement>(".workspace-navigation details[open]").forEach(menu => { menu.open = false; });
+    const handlePointer = (event: PointerEvent) => {
+      if (!(event.target instanceof Element) || !event.target.closest(".workspace-navigation details")) closeMenus();
+    };
+    const handleKey = (event: KeyboardEvent) => { if (event.key === "Escape") closeMenus(); };
+    document.addEventListener("pointerdown", handlePointer);
+    document.addEventListener("keydown", handleKey);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointer);
+      document.removeEventListener("keydown", handleKey);
+    };
+  }, []);
   const [userList, setUserList] = useState<UserItem[]>(initialUsers);
+  const [transactionList, setTransactionList] = useState<TransactionItem[]>(initialTransactions);
   const [currentUser, setCurrentUser] = useState<UserItem | null>(
-    initialCurrentUser || initialUsers[0] || null
+    initialCurrentUser || null
   );
   const [propertyList, setPropertyList] = useState<Property[]>(initialProperties);
+  const [propertyTotal, setPropertyTotal] = useState(initialPropertyTotal);
+  const [propertyPage, setPropertyPage] = useState(1);
+  const [leadList, setLeadList] = useState(initialLeads);
+  const [leadActivityList, setLeadActivityList] = useState(initialLeadActivities);
+  const [workspaceError, setWorkspaceError] = useState<string | null>(null);
+  const [reloadKey, setReloadKey] = useState(0);
+  const [pendingPropertyId, setPendingPropertyId] = useState<string | null>(null);
   const [radarList, setRadarList] = useState<BuyerProfile[]>(initialRadar);
   const [selectedPropertyForWhiteLabel, setSelectedPropertyForWhiteLabel] = useState<Property | null>(null);
   const [selectedPropertyForTerm, setSelectedPropertyForTerm] = useState<Property | null>(null);
-  const [copiedLink, setCopiedLink] = useState(false);
   const [dvpEmitted, setDvpEmitted] = useState(false);
   const [commissionModel, setCommissionModel] = useState<"two_party_50_50" | "three_party_referral_40_40_20">("two_party_50_50");
   const [userSearch, setUserSearch] = useState("");
   const [isUserSwitcherOpen, setIsUserSwitcherOpen] = useState(false);
   const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+  const [isSubscriptionOpen, setIsSubscriptionOpen] = useState(false);
+  const [defaultVisitDate, setDefaultVisitDate] = useState("");
+
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => {
+      const tomorrow = new Date(Date.now() + 24 * 60 * 60 * 1000);
+      const localDate = new Date(tomorrow.getTime() - tomorrow.getTimezoneOffset() * 60_000);
+      setDefaultVisitDate(localDate.toISOString().slice(0, 16));
+    });
+    return () => cancelAnimationFrame(frame);
+  }, []);
   const [feedbackBusy, setFeedbackBusy] = useState(false);
 
   // Notificações e Sininho da IA (Reais do Banco)
@@ -435,11 +449,61 @@ export default function NegociaLarApp({
   const [pilotFeedbackList, setPilotFeedbackList] = useState<PilotFeedbackItem[]>(initialFeedback);
 
   // Filtros da Vitrine MLS
-  const [propertyFilterPurpose, setPropertyFilterPurpose] = useState<string>("todos");
-  const [propertyFilterType, setPropertyFilterType] = useState<string>("todos");
-  const [propertyFilterSearch, setPropertyFilterSearch] = useState<string>("");
+  const [propertyFilterPurpose, updatePropertyFilterPurpose] = useState<string>("todos");
+  const [propertyFilterType, updatePropertyFilterType] = useState<string>("todos");
+  const [propertyFilterSearch, updatePropertyFilterSearch] = useState<string>("");
 
   // Formulário Completo de Cadastro de Imóvel (4 Páginas das Imobiliárias)
+  const setPropertyFilterPurpose = (value: string) => { updatePropertyFilterPurpose(value); setPropertyPage(1); };
+  const setPropertyFilterType = (value: string) => { updatePropertyFilterType(value); setPropertyPage(1); };
+  const setPropertyFilterSearch = (value: string) => { updatePropertyFilterSearch(value); setPropertyPage(1); };
+  const requestKey = JSON.stringify([currentUser?.id, activeTab, propertyPage, propertyFilterPurpose, propertyFilterType, propertyFilterSearch, reloadKey]);
+  const [loadedRequest, setLoadedRequest] = useState(requestKey);
+  const workspaceReady = loadedRequest === requestKey;
+
+  useEffect(() => {
+    let cancelled = false;
+    const timer = window.setTimeout(async () => {
+      setWorkspaceError(null);
+      try {
+        const data = await getMarketplaceData({ section: activeTab, page: propertyPage,
+          purpose: propertyFilterPurpose, propertyType: propertyFilterType, search: propertyFilterSearch });
+        if (cancelled) return;
+        setCurrentUser(data.currentUser);
+        if (!data.currentUser) setCurrentView("landing");
+        setPropertyList(data.properties);
+        if (activeTab === "vitrine") {
+          const lastPage = Math.max(1, Math.ceil(data.propertyTotal / PROPERTY_PAGE_SIZE));
+          if (propertyPage > lastPage) { setPropertyPage(lastPage); return; }
+        }
+        if (["vitrine", "radar", "crm", "atendimento", "cadastrar", "dvp"].includes(activeTab)) setPropertyTotal(data.propertyTotal);
+        setRadarList(data.radarList);
+        setUserList(data.users);
+        setTransactionList(data.transactions);
+        setNotifications(data.notifications);
+        setDvpList(data.dvpList);
+        setPartnershipList(data.partnerships);
+        setPartnershipActivityList(data.partnershipActivities);
+        setPilotFeedbackList(data.pilotFeedback);
+        setLeadList(data.leads);
+        setLeadActivityList(data.leadActivities);
+        setLoadedRequest(requestKey);
+      } catch (error) {
+        if (!cancelled) setWorkspaceError(error instanceof Error ? error.message : "Não foi possível carregar esta área.");
+      }
+    }, activeTab === "vitrine" ? 250 : 0);
+    return () => { cancelled = true; window.clearTimeout(timer); };
+  }, [requestKey, activeTab, propertyPage, propertyFilterPurpose, propertyFilterType, propertyFilterSearch]);
+
+  useEffect(() => {
+    if (!workspaceReady || activeTab !== "vitrine" || !pendingPropertyId) return;
+    const frame = requestAnimationFrame(() => {
+      document.querySelector(`[data-property-id="${pendingPropertyId}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      setPendingPropertyId(null);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [workspaceReady, activeTab, pendingPropertyId]);
+
   const [formPurpose, setFormPurpose] = useState<"venda" | "aluguel" | "temporada">("venda");
   const [formAcceptsTrade, setFormAcceptsTrade] = useState(false);
   const [formPropertyType, setFormPropertyType] = useState("Apartamento");
@@ -460,7 +524,8 @@ export default function NegociaLarApp({
     "Ar-condicionado",
     "Armário embutido / Closet",
     "Cozinha planejada",
-    "Varanda / Varanda gourmet",
+    "Varanda",
+    "Varanda gourmet",
   ]);
   const [formCondoAmenities, setFormCondoAmenities] = useState<string[]>([
     "Piscina adulto",
@@ -538,8 +603,8 @@ export default function NegociaLarApp({
 
   const handleAddPhoto = () => {
     if (!newPhotoInput.trim()) return;
-    if (formGalleryPhotos.length >= 30) {
-      setToastMessage("Limite de 30 fotos atingido!");
+    if (formGalleryPhotos.length >= 40) {
+      setToastMessage("Limite de 40 fotos atingido!");
       setTimeout(() => setToastMessage(null), 3000);
       return;
     }
@@ -652,17 +717,28 @@ export default function NegociaLarApp({
     return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(num);
   };
 
-  const handleCopyWhiteLabelLink = () => {
-    navigator.clipboard.writeText(`https://negocialar.com.br/imovel/${selectedPropertyForWhiteLabel?.id}?ref=${currentBroker.creci}`);
-    setCopiedLink(true);
-    setTimeout(() => setCopiedLink(false), 3000);
-  };
-
   const handleToggleUserModeration = async (userId: string, newStatus: string) => {
     await updateUserStatus(userId, newStatus);
     setUserList((prev) =>
       prev.map((u) => (u.id === userId ? { ...u, verificationStatus: newStatus, isVerified: newStatus === "aprovado" } : u))
     );
+  };
+
+  const handleConfirmPixPayment = async (transaction: TransactionItem) => {
+    const confirmed = window.confirm(
+      `Confirma que você conferiu no Banco Inter o recebimento de ${formatBRL(transaction.amount)} para ${transaction.userName}?`,
+    );
+    if (!confirmed) return;
+    try {
+      await confirmPixSubscriptionPayment(transaction.id);
+      setTransactionList((items) => items.map((item) => item.id === transaction.id ? { ...item, status: "pago" } : item));
+      setUserList((items) => items.map((item) => item.id === transaction.userId ? { ...item, subscriptionStatus: "ativo" } : item));
+      setToastMessage("Pix confirmado. A aprovação do CRECI continua independente.");
+      setTimeout(() => setToastMessage(null), 6000);
+    } catch (error) {
+      setToastMessage(error instanceof Error ? error.message : "Não foi possível confirmar o Pix.");
+      setTimeout(() => setToastMessage(null), 6000);
+    }
   };
 
   const handlePartnershipStatus = async (partnership: PartnershipItem, newStatus: string) => {
@@ -771,7 +847,7 @@ export default function NegociaLarApp({
   const activeProperty = selectedPropertyForTerm;
 
   // Métricas do Admin
-  const totalRevenue = initialTransactions
+  const totalRevenue = transactionList
     .filter((transaction) => transaction.status === "pago")
     .reduce((acc, t) => acc + parseFloat(t.amount), 0);
   const mrrEstimated = userList
@@ -785,23 +861,6 @@ export default function NegociaLarApp({
       u.city.toLowerCase().includes(userSearch.toLowerCase())
   );
 
-  const filteredProperties = propertyList.filter((prop) => {
-    if (propertyFilterPurpose !== "todos" && prop.purpose && prop.purpose !== propertyFilterPurpose) {
-      return false;
-    }
-    if (propertyFilterType !== "todos" && prop.propertyType !== propertyFilterType) {
-      return false;
-    }
-    if (propertyFilterSearch.trim()) {
-      const q = propertyFilterSearch.toLowerCase();
-      const matchTitle = prop.title?.toLowerCase().includes(q);
-      const matchCity = prop.city?.toLowerCase().includes(q);
-      const matchNeigh = prop.neighborhood?.toLowerCase().includes(q);
-      const matchCondo = prop.condoName?.toLowerCase().includes(q);
-      if (!matchTitle && !matchCity && !matchNeigh && !matchCondo) return false;
-    }
-    return true;
-  });
 
   if (currentView === "landing") {
     return (
@@ -818,7 +877,7 @@ export default function NegociaLarApp({
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100">
+    <div className="negocialar-interior min-h-screen bg-slate-950 text-slate-100">
       {/* Top Banner quando não há usuário logado */}
       {!currentUser && (
         <div className="bg-gradient-to-r from-amber-600 via-amber-500 to-amber-600 text-slate-950 px-4 py-2.5 font-medium text-xs sm:text-sm flex flex-col sm:flex-row items-center justify-between gap-2 shadow-inner">
@@ -847,16 +906,16 @@ export default function NegociaLarApp({
                 src="/logo-negocialar.png"
                 alt="Negocia Lar"
                 fill
-                className="object-cover"
+                className="object-contain"
               />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-extrabold text-xl tracking-tight text-white">Negocia<span className="text-amber-500">lar</span></span>
-                <span className="text-[10px] bg-amber-500/20 text-amber-300 font-semibold px-2 py-0.5 rounded-full border border-amber-500/30" title="Rede de imóveis compartilhados entre corretores">Rede de corretores</span>
+                <span className="font-extrabold text-xl tracking-tight text-slate-900 bg-white rounded-md px-2 py-0.5">Negocia<span className="text-amber-500">lar</span></span>
+
               </div>
               <p className="hidden text-[11px] text-slate-400 sm:block">
-                Rede de Co-corretagem Segura • <span className="text-amber-400 font-semibold">Um produto SNNtech</span>
+                Rede de Co-corretagem Segura
               </p>
             </div>
           </div>
@@ -869,7 +928,8 @@ export default function NegociaLarApp({
             >
               <span>🌐 Ver Landing Page</span>
             </button>
-            {currentUser && <button type="button" onClick={() => setIsFeedbackOpen(true)} aria-label="Enviar feedback" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/90 px-2.5 py-1.5 text-xs text-slate-300 transition hover:border-amber-500/40 hover:text-amber-300 sm:px-3"><MessageSquarePlus className="h-3.5 w-3.5" /><span className="hidden sm:inline">Enviar feedback</span></button>}
+            {currentUser && <button type="button" onClick={() => setIsSubscriptionOpen(true)} className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-amber-300">Minha assinatura</button>}
+            {currentUser && <button type="button" onClick={() => setIsFeedbackOpen(true)} aria-label="Ajuda e fale conosco" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/90 px-2.5 py-1.5 text-xs text-slate-300 transition hover:border-amber-500/40 hover:text-amber-300 sm:px-3"><MessageSquarePlus className="h-3.5 w-3.5" /><span className="hidden sm:inline">Ajuda / Fale conosco</span></button>}
 
             {/* Sininho de Notificações com IA */}
             <div className="relative">
@@ -1015,18 +1075,19 @@ export default function NegociaLarApp({
         </div>
 
         {/* Navigation Tabs */}
-        <div className="max-w-7xl mx-auto flex items-center gap-2 border-t border-slate-800/60 px-4 py-1.5 sm:px-6 lg:px-8">
-          <button onClick={() => setActiveTab("vitrine")} className={`shrink-0 rounded-md px-2.5 py-1.5 text-xs font-semibold transition ${activeTab === "vitrine" ? "bg-amber-500 text-slate-950" : "text-slate-400 hover:bg-slate-800 hover:text-white"}`}>
-            <Building2 className="mr-1.5 inline h-3.5 w-3.5" />Vitrine ({initialProperties.length})
+        <div className="workspace-navigation max-w-7xl mx-auto flex flex-wrap items-center gap-2 border-t border-slate-800/60 px-4 py-1.5 sm:px-6 lg:px-8">
+          <button onClick={() => setActiveTab("vitrine")} className={`inline-flex h-9 items-center shrink-0 rounded-md px-2.5 py-1.5 text-xs font-semibold transition ${activeTab === "vitrine" ? "bg-amber-500 text-slate-950" : "text-slate-400 hover:bg-slate-800 hover:text-white"}`}>
+            <Building2 className="mr-1.5 inline h-3.5 w-3.5" />Vitrine ({propertyTotal})
           </button>
           {[
-            { title: "Atendimento", active: ["crm", "radar"], items: [{ id: "crm", label: `CRM de Leads (${initialLeads.length})`, icon: Users }, { id: "radar", label: "Radar de Compradores", icon: Radar }] },
+            { title: "CRM", active: ["crm", "radar"], items: [{ id: "crm", label: "Minha carteira", icon: Users }, { id: "radar", label: "Radar de Compradores", icon: Radar }] },
+            { title: "Atendimento", active: ["atendimento"], items: [{ id: "atendimento", label: "Funil de atendimento", icon: Users }] },
             { title: "Documentos", active: ["termo", "dvp"], items: [{ id: "termo", label: "Prévia do Termo de Parceria", icon: FileText }, { id: "dvp", label: "Registro de Visita", icon: Stamp }] },
-            { title: "Imóveis", active: ["cadastrar"], items: [{ id: "cadastrar", label: "Nova Captação", icon: PlusCircle }] },
+            { title: "Imóveis", active: ["cadastrar"], items: [{ id: "cadastrar", label: "Meus imóveis", icon: PlusCircle }] },
             ...(currentUser?.role === "admin" ? [{ title: "Administração", active: ["admin"], items: [{ id: "admin", label: "Gestão e Faturamento", icon: DollarSign }] }] : []),
           ].map((menu) => (
-            <details key={menu.title} className="group relative shrink-0">
-              <summary className={`flex cursor-pointer list-none items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition [&::-webkit-details-marker]:hidden ${menu.active.includes(activeTab) ? "bg-amber-500/15 text-amber-300" : "text-slate-400 hover:bg-slate-800 hover:text-white"}`}>
+            <details key={menu.title} name="workspace-navigation-menu" className="group relative shrink-0">
+              <summary className={`flex h-9 cursor-pointer list-none items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition [&::-webkit-details-marker]:hidden ${menu.active.includes(activeTab) ? "bg-slate-800 text-white" : "text-slate-400 hover:bg-slate-800 hover:text-white"}`}>
                 {menu.title}<ChevronDown className="h-3.5 w-3.5 transition group-open:rotate-180" />
               </summary>
               <div className="absolute left-0 top-full z-50 mt-1 min-w-56 rounded-xl border border-slate-700 bg-slate-900 p-1.5 shadow-xl">
@@ -1048,20 +1109,25 @@ export default function NegociaLarApp({
           </div>
         )}
         {SCREEN_GUIDANCE[activeTab] && (
-          <div className={`mb-6 flex items-start gap-3 rounded-xl border px-4 py-3 ${activeTab === "dvp" ? "border-amber-500/40 bg-amber-950/25" : "border-sky-500/25 bg-sky-950/20"}`}>
-            <Info className={`mt-0.5 h-4 w-4 shrink-0 ${activeTab === "dvp" ? "text-amber-300" : "text-sky-300"}`} />
+          <div className={`mb-6 flex items-start gap-3 rounded-xl border px-4 py-3 ${activeTab === "dvp" ? "border-amber-500/40 bg-amber-950/25" : "border-sky-200 bg-sky-50"}`}>
+            <Info className={`mt-0.5 h-4 w-4 shrink-0 ${activeTab === "dvp" ? "text-amber-300" : "text-sky-700"}`} />
             <div>
-              <h2 className={`text-xs font-bold ${activeTab === "dvp" ? "text-amber-200" : "text-sky-200"}`}>{SCREEN_GUIDANCE[activeTab].title}</h2>
+              <h2 className={`text-xs font-bold ${activeTab === "vitrine" ? "mls-guidance-title" : activeTab === "dvp" ? "text-amber-200" : "text-sky-900"}`}>{SCREEN_GUIDANCE[activeTab].title}</h2>
               <p className="mt-1 text-xs leading-relaxed text-slate-300">{SCREEN_GUIDANCE[activeTab].description}</p>
             </div>
           </div>
         )}
-        {activeTab === "crm" && (
+        {activeTab !== "vitrine" && !workspaceReady && !workspaceError && <p role="status" className="mb-6 rounded-xl border border-slate-700 bg-slate-900 p-5 text-sm text-slate-300">Carregando esta área...</p>}
+        {workspaceError && <div role="alert" className="mb-6 rounded-xl border border-rose-500/40 p-5 text-sm text-rose-300"><p>{workspaceError}</p><button type="button" onClick={() => setReloadKey(key => key + 1)} className="mt-3 rounded-lg bg-slate-800 px-4 py-2 text-white">Tentar novamente</button></div>}
+        {workspaceReady && (activeTab === "crm" || activeTab === "atendimento") && (
           <LeadCRM
-            initialLeads={initialLeads}
-            initialActivities={initialLeadActivities}
+            key={activeTab}
+            initialView={activeTab === "atendimento" ? "pipeline" : "overview"}
+            initialLeads={leadList}
+            initialActivities={leadActivityList}
             properties={propertyList.map((property) => ({ ...property, brokerId: property.broker.id }))}
             currentUserId={currentUser?.id || null}
+            onCreateProperty={() => setActiveTab("cadastrar")}
             onOpenProperty={(propertyId) => {
               const property = propertyList.find((item) => item.id === propertyId);
               if (!property) return;
@@ -1069,14 +1135,12 @@ export default function NegociaLarApp({
               setPropertyFilterType("todos");
               setPropertyFilterSearch(property.title);
               setActiveTab("vitrine");
-              window.setTimeout(() => {
-                document.querySelector(`[data-property-id="${propertyId}"]`)?.scrollIntoView({ behavior: "smooth", block: "center" });
-              }, 100);
+              setPendingPropertyId(propertyId);
             }}
           />
         )}
         {/* TAB ADMIN: PAINEL DE CONTROLE DE USUÁRIOS E FATURAMENTO */}
-        {activeTab === "admin" && (
+        {workspaceReady && activeTab === "admin" && (
           <div className="space-y-8">
             {/* Header Admin */}
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -1314,7 +1378,7 @@ export default function NegociaLarApp({
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800/60 text-slate-300">
-                    {initialTransactions.map((tx) => (
+                    {transactionList.map((tx) => (
                       <tr key={tx.id} className="hover:bg-slate-800/30 transition">
                         <td className="py-3.5 px-4 font-medium text-white">
                           {tx.description}
@@ -1330,9 +1394,22 @@ export default function NegociaLarApp({
                           {formatBRL(tx.amount)}
                         </td>
                         <td className="py-3.5 px-4">
-                          <span className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase">
-                            {tx.status}
-                          </span>
+                          <div className="flex items-center justify-between gap-3">
+                            <span className={tx.status === "pago"
+                              ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase"
+                              : "bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-0.5 rounded-full text-[10px] font-bold uppercase"}>
+                              {tx.status}
+                            </span>
+                            {tx.status === "pendente" && tx.paymentMethod === "pix" && tx.type.startsWith("mensalidade_") && (
+                              <button
+                                type="button"
+                                onClick={() => void handleConfirmPixPayment(tx)}
+                                className="rounded-lg bg-emerald-600 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-emerald-500"
+                              >
+                                Confirmar no Inter
+                              </button>
+                            )}
+                          </div>
                         </td>
                       </tr>
                     ))}
@@ -1349,275 +1426,23 @@ export default function NegociaLarApp({
         )}
 
         {/* TAB 1: VITRINE MLS */}
-        {activeTab === "vitrine" && (
-          <div className="space-y-6">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
-              <div>
-                <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                  <Building2 className="w-5 h-5 text-amber-500" />
-                  Imóveis Disponíveis para Parceria
-                </h2>
-            <p className="text-sm text-slate-400">Imóveis cadastrados por corretores; condições de parceria devem ser confirmadas entre as partes</p>
-              </div>
-              <div className="flex items-center gap-2 text-xs text-slate-300 bg-slate-900 border border-slate-800 px-3 py-2 rounded-lg">
-                <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                Endereço exato oculto para proteger o captador
-              </div>
-            </div>
-
-            {/* BARRA DE FILTROS DA VITRINE MLS */}
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-4 space-y-3 shadow-lg">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                {/* Filtro por Finalidade */}
-                <div className="flex items-center gap-1.5 bg-slate-950 p-1 rounded-xl border border-slate-800 text-xs">
-                  {[
-                    { id: "todos", label: "Todos" },
-                    { id: "venda", label: "🏷️ Venda" },
-                    { id: "aluguel", label: "🔑 Aluguel" },
-                    { id: "temporada", label: "🏖️ Temporada" },
-                  ].map((tab) => (
-                    <button
-                      key={tab.id}
-                      onClick={() => setPropertyFilterPurpose(tab.id)}
-                      className={`px-3 py-1.5 rounded-lg font-semibold transition ${
-                        propertyFilterPurpose === tab.id
-                          ? "bg-amber-500 text-slate-950 shadow-sm"
-                          : "text-slate-400 hover:text-white"
-                      }`}
-                    >
-                      {tab.label}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Filtro por Tipo de Imóvel */}
-                <div className="flex items-center gap-2">
-                  <select
-                    value={propertyFilterType}
-                    onChange={(e) => setPropertyFilterType(e.target.value)}
-                    className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500"
-                  >
-                    <option value="todos">Todos os 14 Tipos</option>
-                    {PROPERTY_TYPES.map((t) => (
-                      <option key={t} value={t}>
-                        {t}
-                      </option>
-                    ))}
-                  </select>
-
-                  {/* Busca Rápida */}
-                  <div className="relative">
-                    <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2" />
-                    <input
-                      type="text"
-                      value={propertyFilterSearch}
-                      onChange={(e) => setPropertyFilterSearch(e.target.value)}
-                      placeholder="Bairro, condomínio, cidade..."
-                      className="bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 w-44 sm:w-56"
-                    />
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {filteredProperties.length === 0 ? (
-              <div className="bg-slate-900 border border-slate-800 rounded-3xl p-12 text-center max-w-xl mx-auto space-y-4 shadow-2xl">
-                <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-amber-400 mx-auto">
-                  <Building2 className="w-8 h-8" />
-                </div>
-                <div className="space-y-1">
-                  <h3 className="text-lg font-bold text-white">Nenhum Imóvel Encontrado</h3>
-                  <p className="text-xs text-slate-400">
-                    {propertyList.length === 0
-                      ? "O banco de dados está limpo e zerado. Cadastre o seu primeiro imóvel blindado para inaugurar a rede de parcerias!"
-                      : "Nenhum imóvel corresponde aos filtros selecionados. Tente alterar o tipo ou a finalidade."}
-                  </p>
-                </div>
-                {propertyList.length === 0 ? (
-                  <button
-                    onClick={() => setActiveTab("cadastrar")}
-                    className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs py-3 px-6 rounded-xl transition inline-flex items-center gap-2 shadow-lg shadow-amber-500/20"
-                  >
-                    <PlusCircle className="w-4 h-4" />
-                    <span>Cadastrar 1º Imóvel na Rede</span>
-                  </button>
-                ) : (
-                  <button
-                    onClick={() => {
-                      setPropertyFilterPurpose("todos");
-                      setPropertyFilterType("todos");
-                      setPropertyFilterSearch("");
-                    }}
-                    className="text-amber-400 hover:underline text-xs font-semibold"
-                  >
-                    Limpar todos os filtros
-                  </button>
-                )}
-              </div>
-            ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {filteredProperties.map((prop) => (
-                  <div
-                    key={prop.id}
-                    data-property-id={prop.id}
-                    className="bg-slate-900 rounded-2xl overflow-hidden border border-slate-800 hover:border-amber-500/40 transition duration-300 shadow-lg flex flex-col justify-between"
-                  >
-                    <div>
-                      {/* Imagem principal com badges */}
-                      <div className="relative h-64 w-full bg-slate-950 overflow-hidden">
-                        <img
-                          src={prop.coverPhoto || prop.photos[0] || "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200"}
-                          alt={prop.title}
-                          className="w-full h-full object-cover group-hover:scale-105 transition duration-500"
-                        />
-                        <div className="absolute top-3 left-3 flex flex-wrap gap-1.5 max-w-[85%]">
-                          <span className="bg-amber-500 text-slate-950 text-xs font-black px-2.5 py-1 rounded-md shadow-lg flex items-center gap-1">
-                            🤝 Parceria {prop.splitPercentage}% / {100 - parseFloat(prop.splitPercentage)}%
-                          </span>
-                          <span className="bg-slate-900/90 backdrop-blur text-white text-xs font-medium px-2.5 py-1 rounded-md border border-slate-700">
-                            {prop.propertyType}
-                          </span>
-                          {prop.purpose && prop.purpose !== "venda" && (
-                            <span className="bg-blue-600/90 backdrop-blur text-white text-[11px] font-bold px-2 py-0.5 rounded-md uppercase">
-                              {prop.purpose}
-                            </span>
-                          )}
-                          {prop.acceptsTrade && (
-                            <span className="bg-purple-600/90 backdrop-blur text-white text-[11px] font-bold px-2 py-0.5 rounded-md">
-                              🔄 Aceita Permuta
-                            </span>
-                          )}
-                          {prop.condition && prop.condition !== "usado" && (
-                            <span className="bg-emerald-600/90 backdrop-blur text-white text-[11px] font-bold px-2 py-0.5 rounded-md capitalize">
-                              {prop.condition.replace("_", " ")}
-                            </span>
-                          )}
-                        </div>
-
-                        <div className="absolute bottom-3 left-3 bg-slate-950/80 backdrop-blur px-3 py-1 rounded-lg border border-slate-800 text-xs flex items-center gap-1 text-slate-300">
-                          <Lock className="w-3.5 h-3.5 text-amber-400" />
-                          {prop.hideStreet ? "Rua Ocultada (Blindagem Ativa)" : "Endereço Blindado"}
-                        </div>
-
-                        {prop.photos && prop.photos.length > 1 && (
-                          <div className="absolute bottom-3 right-3 bg-slate-950/80 backdrop-blur px-2.5 py-1 rounded-lg border border-slate-800 text-[11px] text-slate-300 flex items-center gap-1 font-mono">
-                            <ImageIcon className="w-3 h-3 text-amber-400" />
-                            {prop.photos.length} fotos
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Conteúdo */}
-                      <div className="p-5 space-y-4">
-                        <div className="flex items-start justify-between gap-2">
-                          <div>
-                            <div className="flex items-center gap-1.5 text-xs font-medium text-amber-400 mb-1">
-                              <MapPin className="w-3.5 h-3.5" />
-                              {prop.condoName ? `${prop.condoName} • ` : ""}
-                              {prop.neighborhood}, {prop.city}
-                            </div>
-                            <h3 className="font-bold text-lg text-white leading-snug">{prop.title}</h3>
-                          </div>
-                          <div className="text-right shrink-0">
-                            <div className="text-xl font-black text-amber-400">{formatBRL(prop.salePrice)}</div>
-                            {prop.condoFee && parseFloat(prop.condoFee) > 0 && (
-                              <div className="text-xs text-slate-400">Cond: {formatBRL(prop.condoFee)}</div>
-                            )}
-                          </div>
-                        </div>
-
-                        <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">{prop.description}</p>
-
-                        {/* Características */}
-                        <div className="grid grid-cols-4 gap-2 pt-3 border-t border-slate-800/80 text-xs text-slate-300">
-                          <div className="flex items-center gap-1.5 bg-slate-800/40 p-2 rounded-lg">
-                            <Bed className="w-3.5 h-3.5 text-amber-400" />
-                            <span>{prop.bedrooms} Quartos</span>
-                          </div>
-                          <div className="flex items-center gap-1.5 bg-slate-800/40 p-2 rounded-lg">
-                            <Bath className="w-3.5 h-3.5 text-amber-400" />
-                            <span>{prop.bathrooms} Banheiros</span>
-                          </div>
-                          <div className="flex items-center gap-1.5 bg-slate-800/40 p-2 rounded-lg">
-                            <Car className="w-3.5 h-3.5 text-amber-400" />
-                            <span>{prop.parkingSpots} Vagas</span>
-                          </div>
-                          <div className="flex items-center gap-1.5 bg-slate-800/40 p-2 rounded-lg">
-                            <Maximize2 className="w-3.5 h-3.5 text-amber-400" />
-                            <span>{prop.usefulAreaM2 || prop.areaM2} m²</span>
-                          </div>
-                        </div>
-
-                        {/* Comodidades em destaque (se houver) */}
-                        {prop.privateAmenities && prop.privateAmenities.length > 0 && (
-                          <div className="flex flex-wrap gap-1 pt-1">
-                            {prop.privateAmenities.slice(0, 3).map((am) => (
-                              <span
-                                key={am}
-                                className="text-[10px] bg-slate-800/60 text-slate-300 border border-slate-700/60 px-2 py-0.5 rounded-md"
-                              >
-                                {am}
-                              </span>
-                            ))}
-                            {prop.privateAmenities.length > 3 && (
-                              <span className="text-[10px] text-amber-400 font-semibold px-1 py-0.5">
-                                +{prop.privateAmenities.length - 3} itens
-                              </span>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Info do Captador */}
-                        <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80 flex items-center justify-between">
-                          <div className="flex items-center gap-2.5">
-                            <img
-                              src={prop.broker.avatarUrl || "https://images.unsplash.com/photo-1560250097-0b93528c311a?w=400"}
-                              alt={prop.broker.name}
-                              className="w-8 h-8 rounded-full object-cover border border-slate-700"
-                            />
-                            <div>
-                              <div className="text-xs font-semibold text-white">{prop.broker.name}</div>
-                              <div className="text-[10px] text-slate-400">Captador Oficial • CRECI {prop.broker.creci}</div>
-                            </div>
-                          </div>
-                          <span className="text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
-                            <CheckCircle2 className="w-3 h-3" /> Verificado
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Ações de Co-corretagem */}
-                    <div className="p-5 pt-0 grid grid-cols-2 gap-3">
-                      <button
-                        onClick={() => setSelectedPropertyForWhiteLabel(prop)}
-                        className="flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs py-2.5 px-3 rounded-xl transition shadow-md shadow-amber-500/10"
-                      >
-                        <Share2 className="w-4 h-4" />
-                        Ficha White-Label
-                      </button>
-                      {prop.broker.id !== currentBroker.id && prop.acceptsPartnership ? <button
-                        onClick={() => { setSelectedPropertyForTerm(prop); setActiveTab("dvp"); window.scrollTo({ top: 0, behavior: "smooth" }); }}
-                        className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs py-2.5 px-3 rounded-xl transition border border-slate-700"
-                      ><Stamp className="w-4 h-4 text-emerald-400" />Agendar visita</button> : <button type="button" disabled className="flex cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-xs font-semibold text-slate-500" title={prop.broker.id === currentBroker.id ? "Esta é uma captação sua; escolha um imóvel de outro corretor para iniciar uma parceria." : "Este imóvel não está aceitando parcerias."}><Stamp className="h-4 w-4" />{prop.broker.id === currentBroker.id ? "Imóvel da sua carteira" : "Parceria indisponível"}</button>}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </div>
-        )}
+        {activeTab === "vitrine" && <PropertyMarketplace properties={propertyList} propertyTotal={propertyTotal}
+          propertyPage={propertyPage} loading={!workspaceReady} currentUserId={currentUser?.id || null} propertyTypes={PROPERTY_TYPES}
+          propertyFilterPurpose={propertyFilterPurpose} propertyFilterType={propertyFilterType} propertyFilterSearch={propertyFilterSearch}
+          setPropertyFilterPurpose={setPropertyFilterPurpose} setPropertyFilterType={setPropertyFilterType} setPropertyFilterSearch={setPropertyFilterSearch}
+          setPropertyPage={setPropertyPage} onCreate={() => setActiveTab("cadastrar")} onShare={setSelectedPropertyForWhiteLabel}
+          onSchedule={property => { setSelectedPropertyForTerm(property); setActiveTab("dvp"); window.scrollTo({ top: 0, behavior: "smooth" }); }} />}
 
         {/* TAB 2: RADAR DE COMPRADORES (MATCH REVERSO) */}
-        {activeTab === "radar" && (
+        {workspaceReady && activeTab === "radar" && (
           <div className="space-y-6">
             <div>
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <Radar className="w-5 h-5 text-amber-500 animate-spin" />
+                <Radar className="w-5 h-5 text-orange-700 animate-spin" />
                 Radar de Compradores (Match Reverso Ativo)
               </h2>
               <p className="text-sm text-slate-400">
-                O algoritmo cruza os imóveis recém-captados com os clientes com crédito aprovado cadastrados na rede.
+                O algoritmo cruza os imóveis recém-captados com os perfis de busca cadastrados na rede.
               </p>
             </div>
 
@@ -1630,8 +1455,8 @@ export default function NegociaLarApp({
                     Radar em Linguagem Natural com IA
                   </span>
                 </div>
-                <span className="text-[10px] bg-amber-500/20 text-amber-300 font-semibold px-2 py-0.5 rounded-full border border-amber-500/30 flex items-center gap-1">
-                  <Bell className="w-3 h-3" /> Notifica no Sininho
+                <span className="text-[10px] bg-amber-50 text-amber-900 font-semibold px-2 py-0.5 rounded-full border border-amber-300 flex items-center gap-1">
+                  <Bell className="w-3 h-3 text-amber-900" /> Notifica no Sininho
                 </span>
               </div>
               <p className="text-xs text-slate-400">
@@ -1669,75 +1494,17 @@ export default function NegociaLarApp({
               </form>
             </div>
 
-            {/* Cartão de Match em Destaque */}
-            <div className="bg-gradient-to-br from-amber-950/30 via-slate-900 to-slate-900 border-2 border-amber-500/40 rounded-2xl p-6 shadow-2xl relative overflow-hidden">
-              <div className="absolute top-0 right-0 bg-amber-500 text-slate-950 text-xs font-black px-4 py-1 rounded-bl-xl shadow-lg">
-                🔥 MATCH 98% COMPATÍVEL
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-center">
-                {/* Lado Esquerdo: O Comprador da Mariana */}
-                <div className="bg-slate-950/80 p-4 rounded-xl border border-slate-800 space-y-2">
-                  <div className="text-xs text-amber-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
-                    <UserCheck className="w-4 h-4" /> Demanda de Comprador
-                  </div>
-                  <div className="text-base font-bold text-white">Dr. Marcelo (Investidor)</div>
-                  <div className="text-xs text-slate-400 space-y-1">
-                    <div><strong>Busca:</strong> Apartamento em Moema</div>
-                    <div><strong>Orçamento:</strong> Até R$ 1.500.000</div>
-                    <div><strong>Mínimo:</strong> 2 Quartos, 2 Vagas</div>
-                  </div>
-                  <div className="pt-2 border-t border-slate-800 text-[11px] text-slate-400">
-                    Cadastrado por: <span className="text-white font-medium">Mariana Costa</span>
-                  </div>
-                </div>
-
-                {/* Centro: O Ícone de Conexão */}
-                <div className="flex flex-col items-center justify-center text-center space-y-2">
-                  <div className="w-12 h-12 rounded-full bg-amber-500/20 border border-amber-500/40 flex items-center justify-center text-amber-400">
-                    <Sparkles className="w-6 h-6 animate-pulse" />
-                  </div>
-                  <div className="text-xs font-bold text-amber-400">CRUZAMENTO AUTOMÁTICO</div>
-                  <div className="text-[11px] text-slate-400">
-                    O imóvel atende 100% dos requisitos de bairro, tipologia e orçamento.
-                  </div>
-                </div>
-
-                {/* Lado Direito: O Imóvel do Carlos */}
-                <div className="bg-slate-950/80 p-4 rounded-xl border border-slate-800 space-y-2">
-                  <div className="text-xs text-emerald-400 font-bold uppercase tracking-wider flex items-center gap-1.5">
-                    <Building2 className="w-4 h-4" /> Imóvel Captado na Rede
-                  </div>
-                  <div className="text-base font-bold text-white">Apto Alto Padrão Moema</div>
-                  <div className="text-xs text-slate-400 space-y-1">
-                    <div><strong>Valor:</strong> R$ 1.280.000 (Dentro da margem)</div>
-                    <div><strong>Configuração:</strong> 3 Quartos (2 suítes), 2 Vagas</div>
-                    <div><strong>Comissão Estimada:</strong> R$ 76.800 (R$ 38.400 para cada)</div>
-                  </div>
-                  <div className="pt-2 border-t border-slate-800 text-[11px] text-slate-400">
-                    Captado por: <span className="text-white font-medium">Carlos Eduardo Silva</span>
-                  </div>
-                </div>
-              </div>
-
-              {/* Botões de Ação do Match */}
-              <div className="mt-6 pt-4 border-t border-slate-800/80 flex flex-col sm:flex-row items-center justify-between gap-3">
-                <div className="text-xs text-slate-400 flex items-center gap-2">
-                  <Clock className="w-4 h-4 text-amber-400" />
-                  Exemplo demonstrativo com dados fictícios
-                </div>
-                <button
-                  onClick={() => {
-                    const prop = initialProperties[0];
-                    if (prop) setSelectedPropertyForWhiteLabel(prop);
-                  }}
-                  className="w-full sm:w-auto bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs py-2.5 px-5 rounded-xl transition flex items-center justify-center gap-2 shadow-lg shadow-amber-500/20"
-                >
-                  <Share2 className="w-4 h-4" />
-                  Gerar Ficha White-Label para o Dr. Marcelo
-                </button>
-              </div>
-            </div>
+            <RadarMatches properties={propertyList} profiles={radarList} currentUserId={currentUser?.id || null}
+              onOpenProperty={(propertyId) => {
+                const property = propertyList.find(item => item.id === propertyId);
+                if (!property) return;
+                setPropertyFilterPurpose("todos"); setPropertyFilterType("todos"); setPropertyFilterSearch(property.title);
+                setPendingPropertyId(propertyId); setActiveTab("vitrine");
+              }}
+              onShareProperty={(propertyId) => {
+                const property = propertyList.find(item => item.id === propertyId);
+                if (property) setSelectedPropertyForWhiteLabel(property);
+              }} />
 
             {/* LISTA DE PROCURAS REAIS CADASTRADAS NO BANCO */}
             <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
@@ -1769,7 +1536,7 @@ export default function NegociaLarApp({
                       <div>
                         <strong className="text-slate-300">Mínimo:</strong> {bp.minBedrooms} quartos, {bp.minParkingSpots} vagas
                       </div>
-                      {bp.notes && <div className="text-[11px] text-slate-400 italic bg-slate-900/60 p-2 rounded-lg border border-slate-800/60">"{bp.notes}"</div>}
+                      {bp.notes && <div className="text-[11px] text-slate-400 italic bg-slate-900/60 p-2 rounded-lg border border-slate-800/60">&ldquo;{bp.notes}&rdquo;</div>}
                     </div>
                     <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
                       <span>Corretor: <span className="text-white font-medium">{bp.broker.name}</span></span>
@@ -1783,7 +1550,7 @@ export default function NegociaLarApp({
         )}
 
         {/* TAB 3: TERMO DE CO-CORRETAGEM ANTI-BYPASS */}
-        {activeTab === "termo" && (
+        {workspaceReady && activeTab === "termo" && (
           <div className="max-w-3xl mx-auto space-y-6">
             <div>
               <h2 className="text-xl font-bold text-white flex items-center gap-2">
@@ -1832,7 +1599,7 @@ export default function NegociaLarApp({
                 </div>
               </div>
 
-              <div className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-4 text-center text-xs leading-relaxed text-amber-100/80">
+              <div className="rounded-xl border border-red-500/40 bg-red-950/30 p-4 text-center text-xs leading-relaxed text-slate-300">
                 O aceite eletrônico ainda não está disponível. Esta tela é apenas uma prévia para conversa; revise e formalize qualquer parceria fora da plataforma.
               </div>
             </div>
@@ -1840,15 +1607,15 @@ export default function NegociaLarApp({
         )}
 
         {/* TAB 4: DVP DIGITAL (DOCUMENTO DE VISITA PRESENCIAL) */}
-        {activeTab === "dvp" && (
+        {workspaceReady && activeTab === "dvp" && (
           <div className="max-w-3xl mx-auto space-y-6">
             <div>
               <h2 className="text-xl font-bold text-white flex items-center gap-2"><Stamp className="w-5 h-5 text-emerald-400" />Registrar uma visita</h2>
               <p className="text-sm text-slate-400">Este registro interno ainda não é um contrato e não tem assinatura eletrônica.</p>
               <ol className="mt-4 grid gap-2 rounded-xl border border-sky-500/20 bg-sky-950/20 p-4 text-xs text-slate-300 sm:grid-cols-3">
-                <li><strong className="text-sky-200">1. Escolha o imóvel</strong><br />Na Vitrine, abra um imóvel de outro corretor que aceite parceria e clique em “Agendar visita”.</li>
-                <li><strong className="text-sky-200">2. Preencha os dados</strong><br />Informe o cliente, CPF parcialmente oculto e data da visita. Depois clique em “Registrar visita em rascunho”.</li>
-                <li><strong className="text-sky-200">3. Acompanhe aqui</strong><br />O registro de visita e a parceria aparecem nesta tela para consulta e acompanhamento.</li>
+                <li><strong className="text-sky-900">1. Escolha o imóvel</strong><br />Na Vitrine, abra um imóvel de outro corretor que aceite parceria e clique em “Agendar visita”.</li>
+                <li><strong className="text-sky-900">2. Preencha os dados</strong><br />Informe o cliente, CPF parcialmente oculto e data da visita. Depois clique em “Registrar visita em rascunho”.</li>
+                <li><strong className="text-sky-900">3. Acompanhe aqui</strong><br />O registro de visita e a parceria aparecem nesta tela para consulta e acompanhamento.</li>
               </ol>
             </div>
 
@@ -2013,7 +1780,7 @@ export default function NegociaLarApp({
                   <input
                     name="visitDate"
                     type="datetime-local"
-                    defaultValue={new Date(Date.now() + 24 * 60 * 60 * 1000).toISOString().slice(0, 16)}
+                    defaultValue={defaultVisitDate}
                     className="w-full sm:w-64 bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
                   />
                 </div>
@@ -2077,7 +1844,7 @@ export default function NegociaLarApp({
                 <ArrowRight className="h-4 w-4 shrink-0 text-sky-300" />
               </div>
               <div className="rounded-lg border border-amber-500/25 bg-amber-950/20 p-3 text-[11px] leading-relaxed text-amber-100/80">Você ou o outro corretor podem atualizar a etapa; o histórico mostra quem alterou e quando. Nas propostas 50/50 e 40/40/20, cada um dos dois corretores pode confirmar ou recusar a divisão. Essa confirmação interna não é assinatura eletrônica nem garante comissão; formalizem o acordo fora da plataforma.</div>
-              {partnershipList.length === 0 ? <div className="rounded-xl border border-dashed border-slate-700 px-5 py-6 text-center"><p className="text-sm font-semibold text-white">Ainda não há parcerias para acompanhar</p><p className="mx-auto mt-2 max-w-lg text-xs leading-relaxed text-slate-400">Os registros aparecem aqui depois que você salva uma visita a um imóvel de outro corretor. Na Vitrine, escolha um imóvel que aceite parceria, clique em “Agendar visita” e preencha os dados do cliente. Salvar como rascunho só guarda essas informações; nenhum corretor dá aceite por essa ação.</p><button type="button" onClick={() => { setActiveTab("vitrine"); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2.5 text-xs font-bold text-slate-950 hover:bg-amber-400"><Building2 className="h-4 w-4" />Escolher imóvel na Vitrine</button></div> : (
+              {partnershipList.length === 0 ? <div className="rounded-xl border border-dashed border-slate-700 px-5 py-6 text-center"><p className="text-sm font-semibold text-white">Ainda não há parcerias para acompanhar.</p><p className="mx-auto mt-2 max-w-lg text-xs leading-relaxed text-slate-400">Os registros aparecem aqui depois que você salva uma visita a um imóvel de outro corretor. Na Vitrine, escolha um imóvel que aceite parceria, clique em “Agendar visita” e preencha os dados do cliente. Salvar como rascunho só guarda essas informações; nenhum corretor dá aceite por essa ação.</p><button type="button" onClick={() => { setActiveTab("vitrine"); window.scrollTo({ top: 0, behavior: "smooth" }); }} className="mt-4 inline-flex items-center gap-2 rounded-lg bg-amber-500 px-4 py-2.5 text-xs font-bold text-slate-950 hover:bg-amber-400"><Building2 className="h-4 w-4" />Escolher imóvel na Vitrine</button></div> : (
                 <div className="space-y-3">
                   {partnershipList.map((partnership) => {
                     const transitions: Record<string, string[]> = { proposta: ["visita_agendada", "recusado"], visita_agendada: ["em_negociacao", "recusado"], em_negociacao: ["fechado", "recusado"] };
@@ -2126,6 +1893,7 @@ export default function NegociaLarApp({
         {/* TAB 5: CADASTRAR CAPTAÇÃO BLINDADA */}
         {activeTab === "cadastrar" && (
           <div className="max-w-3xl mx-auto space-y-6">
+            {currentUser && <PropertyInventory reloadKey={reloadKey} onChanged={() => setReloadKey(value => value + 1)} />}
             {!currentUser ? (
               <div className="bg-slate-900 border-2 border-dashed border-amber-500/40 rounded-3xl p-8 text-center space-y-4 shadow-xl">
                 <div className="w-16 h-16 rounded-2xl bg-amber-500/10 text-amber-400 flex items-center justify-center mx-auto border border-amber-500/20">
@@ -2236,6 +2004,7 @@ export default function NegociaLarApp({
                       });
 
                       if (res && res.property) {
+                        setPropertyTotal(total => total + 1);
                         setPropertyList((prev) => [
                           {
                             ...res.property,
@@ -2250,6 +2019,7 @@ export default function NegociaLarApp({
                           },
                           ...prev,
                         ]);
+                        setReloadKey(value => value + 1);
                         setToastMessage("🏠 Imóvel cadastrado com sucesso e publicado na Vitrine MLS!");
                         setTimeout(() => setToastMessage(null), 5000);
                         setActiveTab("vitrine");
@@ -2273,9 +2043,9 @@ export default function NegociaLarApp({
                       <label className="block text-xs font-semibold text-slate-300 mb-2">Finalidade do Imóvel</label>
                       <div className="grid grid-cols-3 gap-2">
                         {[
-                          { id: "venda", label: "🏷️ Venda" },
-                          { id: "aluguel", label: "🔑 Aluguel" },
-                          { id: "temporada", label: "🏖️ Temporada" },
+                          { id: "venda", label: "Venda" },
+                          { id: "aluguel", label: "Aluguel" },
+                          { id: "temporada", label: "Temporada" },
                         ].map((p) => (
                           <button
                             key={p.id}
@@ -2449,7 +2219,9 @@ export default function NegociaLarApp({
                             key={type}
                             type="button"
                             onClick={() => setFormPropertyType(type)}
-                            className={`py-2 px-2 rounded-xl text-[11px] font-semibold text-center border transition truncate ${
+                            title={type}
+                            aria-pressed={formPropertyType === type}
+                            className={`min-h-12 py-2 px-2 rounded-xl text-[11px] font-semibold text-center leading-snug border transition whitespace-normal break-words ${
                               formPropertyType === type
                                 ? "bg-amber-500 text-slate-950 border-amber-400 font-bold shadow-sm"
                                 : "bg-slate-950 text-slate-400 border-slate-800 hover:text-white hover:border-slate-700"
@@ -2737,6 +2509,7 @@ export default function NegociaLarApp({
                         return (
                           <button
                             key={item}
+                            title={item}
                             type="button"
                             onClick={() => togglePrivateAmenity(item)}
                             className={`p-2.5 rounded-xl text-left text-xs font-medium border flex items-center gap-2 transition ${
@@ -2750,7 +2523,7 @@ export default function NegociaLarApp({
                             ) : (
                               <Square className="w-4 h-4 text-slate-600 shrink-0" />
                             )}
-                            <span className="truncate">{item}</span>
+                            <span className="whitespace-normal break-words">{item}</span>
                           </button>
                         );
                       })}
@@ -2763,7 +2536,7 @@ export default function NegociaLarApp({
                       <div>
                         <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2">
                           <Layers className="w-4 h-4 text-amber-500" />
-                          4. Estrutura & Lazer do Condomínio (32 Itens)
+                          4. Estrutura & Lazer do Condomínio ({CONDO_AMENITIES_GROUPS.reduce((total, group) => total + group.items.length, 0)} itens)
                         </h3>
                         <p className="text-[11px] text-slate-400">
                           Itens de conveniência, segurança e entretenimento das áreas comuns.
@@ -2786,6 +2559,7 @@ export default function NegociaLarApp({
                               return (
                                 <button
                                   key={item}
+                            title={item}
                                   type="button"
                                   onClick={() => toggleCondoAmenity(item)}
                                   className={`p-2 rounded-xl text-left text-[11px] font-medium border flex items-center gap-2 transition ${
@@ -2799,7 +2573,7 @@ export default function NegociaLarApp({
                                   ) : (
                                     <Square className="w-3.5 h-3.5 text-slate-600 shrink-0" />
                                   )}
-                                  <span className="truncate">{item}</span>
+                                  <span className="whitespace-normal break-words">{item}</span>
                                 </button>
                               );
                             })}
@@ -2932,7 +2706,7 @@ export default function NegociaLarApp({
                           <Lock className="w-3.5 h-3.5 text-amber-400" />
                         </div>
                         <p className="text-[11px] leading-relaxed text-slate-300">
-                          Oculte rua e número na vitrine pública. O DVP ainda está em desenvolvimento e não controla a liberação desses dados por assinatura.
+                          Oculte rua e número na vitrine pública. O registro de visita não libera esses dados por assinatura eletrônica.
                         </p>
                       </div>
                     </div>
@@ -2970,7 +2744,7 @@ export default function NegociaLarApp({
                   <div className="bg-slate-900 p-6 rounded-2xl border border-slate-800 space-y-5 shadow-lg">
                     <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2 border-b border-slate-800 pb-3">
                       <ImageIcon className="w-4 h-4 text-amber-500" />
-                      6. Mídias, Fotos (até 30 fotos), Planta Baixa & Vídeo Tour
+                      6. Mídias, Fotos (até 40 fotos), Planta Baixa & Vídeo Tour
                     </h3>
 
                     {/* Foto de Capa */}
@@ -2988,11 +2762,11 @@ export default function NegociaLarApp({
                       </div>
                     </div>
 
-                    {/* Galeria de Fotos (até 30 fotos) */}
+                    {/* Galeria de Fotos (até 40 fotos) */}
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
                         <label className="text-xs font-medium text-slate-300">
-                          Galeria de Fotos do Imóvel ({formGalleryPhotos.length}/30 fotos)
+                          Galeria de Fotos do Imóvel ({formGalleryPhotos.length}/40 fotos)
                         </label>
                         <span className="text-[11px] text-slate-500">Insira a URL de cada foto</span>
                       </div>
@@ -3187,104 +2961,7 @@ export default function NegociaLarApp({
       </main>
 
       {/* MODAL DE COMPARTILHAMENTO WHITE-LABEL */}
-      {selectedPropertyForWhiteLabel && (
-        <div className="fixed inset-0 z-50 bg-black/80 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-3xl max-w-2xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="p-5 border-b border-slate-800 flex items-center justify-between">
-              <div>
-                <div className="text-xs font-bold text-amber-400 uppercase tracking-wider flex items-center gap-1.5">
-                  <Share2 className="w-4 h-4" /> Gerador White-Label Inteligente
-                </div>
-                <h3 className="text-lg font-bold text-white">Compartilhar com Seu Cliente Final</h3>
-              </div>
-              <button
-                onClick={() => setSelectedPropertyForWhiteLabel(null)}
-                className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800"
-              >
-                ✕
-              </button>
-            </div>
-
-            <div className="p-6 space-y-6">
-              <div className="bg-amber-950/20 border border-amber-500/30 p-3 rounded-xl text-xs text-amber-300">
-                ✨ <strong>Como seu cliente vai ver:</strong> A página e o PDF exibem exclusivamente os <strong>seus dados</strong> (Mariana Costa, seu CRECI e seu WhatsApp). Os dados do corretor captador e do proprietário nunca aparecem!
-              </div>
-
-              <div className="bg-slate-950 rounded-2xl border border-slate-800 p-4 space-y-4">
-                <div className="flex items-center justify-between pb-3 border-b border-slate-800">
-                  <div className="flex items-center gap-3">
-                    <img
-                      src={currentBroker.avatar}
-                      alt={currentBroker.name}
-                      className="w-10 h-10 rounded-full object-cover border border-amber-500/40"
-                    />
-                    <div>
-                      <div className="text-sm font-bold text-white">{currentBroker.name}</div>
-                      <div className="text-xs text-slate-400">CRECI {currentBroker.creci} • Corretora de Imóveis</div>
-                    </div>
-                  </div>
-                  <div className="text-right">
-                    <span className="text-[10px] bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 rounded-full font-medium">
-                      Atendimento Exclusivo
-                    </span>
-                  </div>
-                </div>
-
-                <div className="relative h-48 rounded-xl overflow-hidden">
-                  <img
-                    src={selectedPropertyForWhiteLabel.photos[0]}
-                    alt={selectedPropertyForWhiteLabel.title}
-                    className="w-full h-full object-cover"
-                  />
-                  <div className="absolute top-2 left-2 bg-slate-900/90 text-white text-xs px-2.5 py-1 rounded-md">
-                    {selectedPropertyForWhiteLabel.neighborhood}, {selectedPropertyForWhiteLabel.city}
-                  </div>
-                </div>
-
-                <div>
-                  <h4 className="font-bold text-white text-base">{selectedPropertyForWhiteLabel.title}</h4>
-                  <div className="text-amber-400 font-extrabold text-xl mt-1">
-                    {formatBRL(selectedPropertyForWhiteLabel.salePrice)}
-                  </div>
-                </div>
-
-                <div className="bg-emerald-600/20 border border-emerald-500/40 p-3 rounded-xl flex items-center justify-between">
-                  <div className="text-xs text-slate-300">
-                    Fale direto com a corretora pelo WhatsApp:
-                  </div>
-                  <a
-                    href={`https://wa.me/5511991238877?text=Olá Mariana, vi o imóvel em ${selectedPropertyForWhiteLabel.neighborhood} e tenho interesse.`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="bg-emerald-500 hover:bg-emerald-400 text-slate-950 font-bold text-xs px-3 py-1.5 rounded-lg flex items-center gap-1.5 transition"
-                  >
-                    <Phone className="w-3.5 h-3.5" />
-                    (11) 99123-8877
-                  </a>
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
-                <button
-                  onClick={handleCopyWhiteLabelLink}
-                  className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition"
-                >
-                  {copiedLink ? <CheckCircle2 className="w-4 h-4 text-slate-950" /> : <Copy className="w-4 h-4" />}
-                  {copiedLink ? "Link Copiado para o WhatsApp!" : "Copiar Link para Enviar no WhatsApp"}
-                </button>
-
-                <button
-                  onClick={() => alert("PDF White-Label gerado com sua logomarca e seus dados para impressão ou envio!")}
-                  className="bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition border border-slate-700"
-                >
-                  <FileText className="w-4 h-4 text-amber-400" />
-                  Baixar Ficha em PDF (Sem Captador)
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
+      {selectedPropertyForWhiteLabel && <WhiteLabelSheet key={selectedPropertyForWhiteLabel.id} property={selectedPropertyForWhiteLabel} broker={currentBroker} onClose={() => setSelectedPropertyForWhiteLabel(null)} />}
 
       {/* Toast de Notificação Flutuante do Sininho */}
       {toastMessage && (
@@ -3309,8 +2986,9 @@ export default function NegociaLarApp({
       )}
 
       {/* Modal de Onboarding Direto */}
-      {isFeedbackOpen && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 p-4" role="dialog" aria-modal="true" aria-labelledby="pilot-feedback-title"><form onSubmit={(event) => void handlePilotFeedbackSubmit(event)} className="w-full max-w-lg space-y-4 rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl"><div className="flex items-start justify-between gap-4"><div><h2 id="pilot-feedback-title" className="text-lg font-bold text-white">Conte como foi usar esta tela</h2><p className="mt-1 text-xs text-slate-400">O feedback será enviado à equipe do piloto junto com a tela atual.</p></div><button type="button" aria-label="Fechar" onClick={() => setIsFeedbackOpen(false)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white">✕</button></div><label className="block text-xs font-semibold text-slate-300">Tipo<select name="category" required className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white"><option value="duvida">Dúvida</option><option value="erro">Encontrei um erro</option><option value="ideia">Sugestão de melhoria</option></select></label><label className="block text-xs font-semibold text-slate-300">O que aconteceu ou o que você sugere?<textarea name="message" required minLength={10} maxLength={2000} rows={5} placeholder="Descreva o que tentou fazer e o que ficou confuso…" className="mt-1 w-full resize-y rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white placeholder:text-slate-500" /></label><div className="flex justify-end gap-2"><button type="button" onClick={() => setIsFeedbackOpen(false)} className="rounded-lg px-3 py-2 text-xs text-slate-300 hover:bg-slate-800">Cancelar</button><button disabled={feedbackBusy} className="rounded-lg bg-amber-500 px-4 py-2 text-xs font-bold text-slate-950 disabled:opacity-50">{feedbackBusy ? "Enviando…" : "Enviar feedback"}</button></div></form></div>}
-      <OnboardingModal
+      {isSubscriptionOpen && <SubscriptionPanel onClose={() => setIsSubscriptionOpen(false)} />}
+      {isFeedbackOpen && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 p-4" role="dialog" aria-modal="true" aria-labelledby="pilot-feedback-title"><form onSubmit={(event) => void handlePilotFeedbackSubmit(event)} className="w-full max-w-lg space-y-4 rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl"><div className="flex items-start justify-between gap-4"><div><h2 id="pilot-feedback-title" className="text-lg font-bold text-white">Ajuda e fale conosco</h2><p className="mt-1 text-xs text-slate-400">Envie uma dúvida, relate um problema ou sugira uma melhoria. Sua mensagem e a tela atual ficam disponíveis para a equipe no painel administrativo.</p></div><button type="button" aria-label="Fechar" onClick={() => setIsFeedbackOpen(false)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white">✕</button></div><label className="block text-xs font-semibold text-slate-300">Tipo<select name="category" required className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white"><option value="duvida">Dúvida</option><option value="erro">Encontrei um erro</option><option value="ideia">Sugestão de melhoria</option></select></label><label className="block text-xs font-semibold text-slate-300">O que aconteceu ou o que você sugere?<textarea name="message" required minLength={10} maxLength={2000} rows={5} placeholder="Descreva o que tentou fazer e o que ficou confuso…" className="mt-1 w-full resize-y rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white placeholder:text-slate-500" /></label><div className="flex justify-end gap-2"><button type="button" onClick={() => setIsFeedbackOpen(false)} className="rounded-lg px-3 py-2 text-xs text-slate-300 hover:bg-slate-800">Cancelar</button><button disabled={feedbackBusy} className="rounded-lg bg-amber-500 px-4 py-2 text-xs font-bold text-slate-950 disabled:opacity-50">{feedbackBusy ? "Enviando…" : "Enviar feedback"}</button></div></form></div>}
+      {isOnboardingModalOpen && <OnboardingModal
         isOpen={isOnboardingModalOpen}
         onClose={() => setIsOnboardingModalOpen(false)}
         onComplete={(newUserData) => {
@@ -3320,7 +2998,7 @@ export default function NegociaLarApp({
           setToastMessage(`🎉 Usuário Master criado com sucesso! Bem-vindo(a), ${newUserData.name}.`);
           setTimeout(() => setToastMessage(null), 6000);
         }}
-      />
+      />}
     </div>
   );
 }

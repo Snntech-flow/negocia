@@ -1,5 +1,7 @@
 "use server";
 
+import { validateNegotiationDocuments, type NegotiationDocuments } from "./negotiation-documents";
+
 import {
   db,
   properties,
@@ -15,717 +17,30 @@ import {
   dvpCertificates,
   authLoginAttempts,
 } from "./db";
-import { eq, desc, and, lte, gte, or, sql } from "drizzle-orm";
-import { alias } from "drizzle-orm/pg-core";
+import { eq, desc, and, lte, gte, or, sql, inArray } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
-import { cookies, headers } from "next/headers";
+import { cookies } from "next/headers";
 import crypto from "crypto";
+import { generateBrokerAnswer, validateBrokerAssistantInput, type BrokerAssistantInput } from "./broker-assistant";
+import { addFreeDays, extendPaidPeriod } from "./subscription";
+import { getCurrentUserId as readCurrentUserId, requireCurrentUser, requireActiveBroker, requestAddress,
+  limitRegistrationAttempts, setBrokerSession, hashPassword, verifyPassword, SESSION_COOKIE } from "./auth";
+export async function getCurrentUserId() { return readCurrentUserId(); }
+import { networkPropertyScope, networkProfileScope, canUseProperty } from "./property-access";
+import type { PropertyInput } from "./property-input";
+import { validateBuyerProfileInput, validatePropertyInput } from "./input-validation";
 
-const LEAD_STAGES = ["novo", "contato", "qualificado", "visita", "proposta", "negociacao", "fechado", "perdido"] as const;
-const LEAD_ACTIVITY_TYPES = ["ligacao", "mensagem", "visita", "proposta", "nota"] as const;
-const partnershipCaptor = alias(users, "partnership_captor");
-const partnershipPartner = alias(users, "partnership_partner");
+import { getMarketplaceData as readMarketplaceData } from "./queries/marketplace";
+import type { MarketplaceQuery } from "./marketplace-query";
+export async function getMarketplaceData(input: MarketplaceQuery = {}) { return readMarketplaceData(input); }
 
-function normalizePhone(phone: string) {
-  return phone.replace(/\D/g, "");
-}
-
-function parseLeadDate(value?: string) {
-  if (!value?.trim()) return null;
-  const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) throw new Error("Informe uma data válida para o próximo retorno.");
-  return date;
-}
-
-const SESSION_COOKIE = "negocialar_session";
-const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
-
-function sessionSecret() {
-  const secret = process.env.NEGOCIAR_LAR_SESSION_SECRET;
-  if (secret && secret.length < 32) {
-    throw new Error("NEGOCIAR_LAR_SESSION_SECRET deve ter pelo menos 32 caracteres.");
-  }
-  if (secret) return secret;
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("NEGOCIAR_LAR_SESSION_SECRET precisa estar configurado em produção.");
-  }
-  return "negociar-lar-local-development-secret-change-before-deploy";
-}
-
-function signUserId(userId: string, expiresAt: number, sessionVersion?: number) {
-  const payload = sessionVersion === undefined ? `${userId}.${expiresAt}` : `${userId}.${sessionVersion}.${expiresAt}`;
-  return crypto.createHmac("sha256", sessionSecret()).update(payload).digest("hex");
-}
-
-async function setBrokerSession(userId: string) {
-  const cookieStore = cookies();
-  const [user] = await db.select({ sessionVersion: users.sessionVersion }).from(users).where(eq(users.id, userId)).limit(1);
-  if (!user) throw new Error("Conta não encontrada.");
-  const expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
-  cookieStore.set(SESSION_COOKIE, `${userId}.${user.sessionVersion}.${expiresAt}.${signUserId(userId, expiresAt, user.sessionVersion)}`, {
-    path: "/",
-    httpOnly: true,
-    sameSite: "lax",
-    secure: process.env.NODE_ENV === "production",
-    maxAge: SESSION_TTL_SECONDS,
-  });
-}
-
-function hashPassword(password: string) {
-  if (password.length < 12 || password.length > 200) {
-    throw new Error("A senha precisa ter entre 12 e 200 caracteres.");
-  }
-  const salt = crypto.randomBytes(16).toString("hex");
-  const derived = crypto.scryptSync(password, salt, 64).toString("hex");
-  return `scrypt:${salt}:${derived}`;
-}
-
-function verifyPassword(password: string, stored: string | null) {
-  if (!stored) return false;
-  const [scheme, salt, expectedHex] = stored.split(":");
-  if (scheme !== "scrypt" || !salt || !expectedHex) return false;
-  const actual = crypto.scryptSync(password, salt, 64);
-  const expected = Buffer.from(expectedHex, "hex");
-  return actual.length === expected.length && crypto.timingSafeEqual(actual, expected);
-}
-
-async function requireCurrentUser() {
-  const id = await getCurrentUserId();
-  if (!id) throw new Error("Faça login para continuar.");
-  const [user] = await db.select({ id: users.id, role: users.role, verificationStatus: users.verificationStatus, subscriptionStatus: users.subscriptionStatus }).from(users).where(eq(users.id, id)).limit(1);
-  if (!user || user.verificationStatus === "suspenso") throw new Error("A conta não está autorizada.");
-  return user;
-}
-
-function requireActiveBroker(actor: Awaited<ReturnType<typeof requireCurrentUser>>) {
-  if (actor.verificationStatus !== "aprovado") throw new Error("Seu cadastro ainda aguarda verificação.");
-  if (actor.subscriptionStatus !== "ativo") throw new Error("Ative sua assinatura para usar esta função.");
-}
-
-export async function getCurrentUserId(): Promise<string | null> {
-  const cookieStore = cookies();
-  const value = cookieStore.get(SESSION_COOKIE)?.value;
-  if (!value) return null;
-  const parts = value.split(".");
-  const isCurrentCookie = parts.length === 4;
-  if (!isCurrentCookie && parts.length !== 3) return null;
-  const userId = parts[0];
-  const sessionVersion = isCurrentCookie ? Number(parts[1]) : 0;
-  const expiresAtText = isCurrentCookie ? parts[2] : parts[1];
-  const signature = isCurrentCookie ? parts[3] : parts[2];
-  if (!userId || !Number.isSafeInteger(sessionVersion) || sessionVersion < 0 || !expiresAtText || !signature) return null;
-  const expiresAt = Number(expiresAtText);
-  if (!Number.isSafeInteger(expiresAt) || expiresAt <= Math.floor(Date.now() / 1000)) return null;
-  const expected = isCurrentCookie ? signUserId(userId, expiresAt, sessionVersion) : signUserId(userId, expiresAt);
-  const actualBuffer = Buffer.from(signature, "hex");
-  const expectedBuffer = Buffer.from(expected, "hex");
-  if (actualBuffer.length !== expectedBuffer.length || !crypto.timingSafeEqual(actualBuffer, expectedBuffer)) return null;
-  const [user] = await db.select({ sessionVersion: users.sessionVersion }).from(users).where(eq(users.id, userId)).limit(1);
-  if (!user || user.sessionVersion !== sessionVersion) return null;
-  return userId;
-}
-
-export async function getMarketplaceData() {
-  try {
-    const currentUserId = await getCurrentUserId();
-    const [currentUser] = currentUserId
-      ? await db.select({
-          id: users.id, name: users.name, email: users.email, creci: users.creci,
-          whatsapp: users.whatsapp, avatarUrl: users.avatarUrl, city: users.city,
-          state: users.state, isVerified: users.isVerified,
-          verificationStatus: users.verificationStatus, plan: users.plan,
-          subscriptionStatus: users.subscriptionStatus, monthlyFee: users.monthlyFee,
-          role: users.role, trustScore: users.trustScore,
-          successfulDeals: users.successfulDeals, bypassReports: users.bypassReports,
-          createdAt: users.createdAt,
-        }).from(users).where(eq(users.id, currentUserId)).limit(1)
-      : [];
-    const isAdmin = currentUser?.role === "admin";
-    const emptySessionId = "00000000-0000-0000-0000-000000000000";
-    const ownsProperty = sql<boolean>`${properties.brokerId} = ${currentUser?.id ?? emptySessionId}`;
-    const ownsProfile = sql<boolean>`${buyerProfiles.brokerId} = ${currentUser?.id ?? emptySessionId}`;
-
-    const propertyList = await db
-      .select({
-        id: properties.id,
-        title: properties.title,
-        propertyType: properties.propertyType,
-        salePrice: properties.salePrice,
-        condoFee: properties.condoFee,
-        iptu: properties.iptu,
-        city: properties.city,
-        neighborhood: properties.neighborhood,
-        bedrooms: properties.bedrooms,
-        suites: properties.suites,
-        bathrooms: properties.bathrooms,
-        parkingSpots: properties.parkingSpots,
-        areaM2: properties.areaM2,
-        description: properties.description,
-        photos: properties.photos,
-        purpose: properties.purpose,
-        acceptsTrade: properties.acceptsTrade,
-        tradeDetails: properties.tradeDetails,
-        condition: properties.condition,
-        hotelRoomsCount: properties.hotelRoomsCount,
-        usefulAreaM2: properties.usefulAreaM2,
-        totalAreaM2: properties.totalAreaM2,
-        solarPosition: properties.solarPosition,
-        viewType: properties.viewType,
-        propertyAge: properties.propertyAge,
-        iptuPeriod: properties.iptuPeriod,
-        documentationStatus: properties.documentationStatus,
-        acceptsFinancing: properties.acceptsFinancing,
-        privateAmenities: properties.privateAmenities,
-        condoAmenities: properties.condoAmenities,
-        garageType: properties.garageType,
-        cep: sql<string | null>`CASE WHEN ${ownsProperty} THEN ${properties.cep} ELSE NULL END`,
-        street: sql<string | null>`CASE WHEN ${ownsProperty} THEN ${properties.street} ELSE NULL END`,
-        streetNumber: sql<string | null>`CASE WHEN ${ownsProperty} THEN ${properties.streetNumber} ELSE NULL END`,
-        block: sql<string | null>`CASE WHEN ${ownsProperty} THEN ${properties.block} ELSE NULL END`,
-        floor: sql<string | null>`CASE WHEN ${ownsProperty} THEN ${properties.floor} ELSE NULL END`,
-        condoName: sql<string | null>`CASE WHEN ${ownsProperty} THEN ${properties.condoName} ELSE NULL END`,
-        hideStreet: properties.hideStreet,
-        videoUrl: properties.videoUrl,
-        coverPhoto: properties.coverPhoto,
-        floorPlanPhotos: properties.floorPlanPhotos,
-        acceptsPartnership: properties.acceptsPartnership,
-        splitPercentage: properties.splitPercentage,
-        status: properties.status,
-        confidentialAddress: sql<string | null>`CASE WHEN ${ownsProperty} THEN ${properties.confidentialAddress} ELSE NULL END`,
-        ownerName: sql<string | null>`CASE WHEN ${ownsProperty} THEN ${properties.ownerName} ELSE NULL END`,
-        ownerPhone: sql<string | null>`CASE WHEN ${ownsProperty} THEN ${properties.ownerPhone} ELSE NULL END`,
-        createdAt: properties.createdAt,
-        broker: {
-          id: users.id,
-          name: users.name,
-          creci: users.creci,
-          whatsapp: users.whatsapp,
-          avatarUrl: users.avatarUrl,
-          city: users.city,
-        },
-      })
-      .from(properties)
-      .innerJoin(users, eq(properties.brokerId, users.id))
-      .orderBy(desc(properties.createdAt));
-
-    const radarScope = currentUser?.verificationStatus === "aprovado"
-      ? eq(buyerProfiles.active, true)
-      : currentUser
-        ? and(eq(buyerProfiles.active, true), eq(buyerProfiles.brokerId, currentUser.id))
-        : eq(buyerProfiles.id, "00000000-0000-0000-0000-000000000000");
-    const radarList = await db
-      .select({
-        id: buyerProfiles.id,
-        clientInternalName: sql<string>`CASE WHEN ${ownsProfile} THEN ${buyerProfiles.clientInternalName} ELSE 'Cliente parceiro' END`,
-        propertyType: buyerProfiles.propertyType,
-        city: buyerProfiles.city,
-        neighborhoods: buyerProfiles.neighborhoods,
-        maxBudget: buyerProfiles.maxBudget,
-        minBedrooms: buyerProfiles.minBedrooms,
-        minParkingSpots: buyerProfiles.minParkingSpots,
-        notes: sql<string | null>`CASE WHEN ${ownsProfile} THEN ${buyerProfiles.notes} ELSE NULL END`,
-        active: buyerProfiles.active,
-        createdAt: buyerProfiles.createdAt,
-        broker: {
-          id: users.id,
-          name: users.name,
-          creci: users.creci,
-          whatsapp: users.whatsapp,
-          avatarUrl: users.avatarUrl,
-        },
-      })
-      .from(buyerProfiles)
-      .innerJoin(users, eq(buyerProfiles.brokerId, users.id))
-      .where(radarScope)
-      .orderBy(desc(buyerProfiles.createdAt));
-
-    const allUsers = await db
-      .select({
-        id: users.id, name: users.name, email: users.email, creci: users.creci,
-        whatsapp: users.whatsapp, avatarUrl: users.avatarUrl, city: users.city,
-        state: users.state, isVerified: users.isVerified,
-        verificationStatus: users.verificationStatus, plan: users.plan,
-        subscriptionStatus: users.subscriptionStatus, monthlyFee: users.monthlyFee,
-        role: users.role, trustScore: users.trustScore,
-        successfulDeals: users.successfulDeals, bypassReports: users.bypassReports,
-        createdAt: users.createdAt,
-      })
-      .from(users)
-      .where(isAdmin ? undefined : currentUser ? eq(users.id, currentUser.id) : eq(users.id, "00000000-0000-0000-0000-000000000000"))
-      .orderBy(desc(users.createdAt));
-
-    const allTransactions = isAdmin ? await db
-      .select({
-        id: transactions.id,
-        amount: transactions.amount,
-        type: transactions.type,
-        paymentMethod: transactions.paymentMethod,
-        status: transactions.status,
-        description: transactions.description,
-        createdAt: transactions.createdAt,
-        userName: users.name,
-        userCreci: users.creci,
-      })
-      .from(transactions)
-      .innerJoin(users, eq(transactions.userId, users.id))
-      .orderBy(desc(transactions.createdAt)) : [];
-
-    // Busca notificações reais do usuário ativo
-    let userNotifications: any[] = [];
-    if (currentUser) {
-      userNotifications = await db
-        .select({
-          id: notifications.id,
-          userId: notifications.userId,
-          title: notifications.title,
-          message: notifications.message,
-          type: notifications.type,
-          read: notifications.read,
-          propertyId: notifications.propertyId,
-          createdAt: notifications.createdAt,
-        })
-        .from(notifications)
-        .where(eq(notifications.userId, currentUser.id))
-        .orderBy(desc(notifications.createdAt))
-        .limit(20);
-    }
-
-    // Busca DVPs cadastrados
-    const dvpList = currentUser ? await db
-      .select({
-        id: dvpCertificates.id,
-        certificateHash: dvpCertificates.certificateHash,
-        propertyId: dvpCertificates.propertyId,
-        captorBrokerId: dvpCertificates.captorBrokerId,
-        partnerBrokerId: dvpCertificates.partnerBrokerId,
-        leadId: dvpCertificates.leadId,
-        clientName: dvpCertificates.clientName,
-        clientCpfPartial: dvpCertificates.clientCpfPartial,
-        visitDate: dvpCertificates.visitDate,
-        lockExpirationDate: dvpCertificates.lockExpirationDate,
-        commissionSplit: dvpCertificates.commissionSplit,
-        commissionModel: dvpCertificates.commissionModel,
-        captorCommissionPercent: dvpCertificates.captorCommissionPercent,
-        partnerCommissionPercent: dvpCertificates.partnerCommissionPercent,
-        referrerCommissionPercent: dvpCertificates.referrerCommissionPercent,
-        externalReferrerName: dvpCertificates.externalReferrerName,
-        externalReferrerCreci: dvpCertificates.externalReferrerCreci,
-        externalReferrerWhatsapp: dvpCertificates.externalReferrerWhatsapp,
-        status: sql<string>`'rascunho'`,
-        createdAt: dvpCertificates.createdAt,
-      })
-      .from(dvpCertificates)
-      .where(isAdmin ? undefined : or(eq(dvpCertificates.captorBrokerId, currentUser.id), eq(dvpCertificates.partnerBrokerId, currentUser.id)))
-      .orderBy(desc(dvpCertificates.createdAt))
-      : [];
-
-    const partnershipList = currentUser ? await db
-      .select({
-        id: partnerships.id,
-        propertyId: partnerships.propertyId,
-        propertyTitle: properties.title,
-        captorBrokerId: partnerships.captorBrokerId,
-        captorName: partnershipCaptor.name,
-        partnerBrokerId: partnerships.partnerBrokerId,
-        partnerName: partnershipPartner.name,
-        status: partnerships.status,
-        commissionSplit: partnerships.commissionSplit,
-        commissionStatus: partnerships.commissionStatus,
-        commissionRevision: partnerships.commissionRevision,
-        captorAcceptedAt: partnerships.captorAcceptedAt,
-        partnerAcceptedAt: partnerships.partnerAcceptedAt,
-        commissionModel: partnerships.commissionModel,
-        captorCommissionPercent: partnerships.captorCommissionPercent,
-        partnerCommissionPercent: partnerships.partnerCommissionPercent,
-        referrerCommissionPercent: partnerships.referrerCommissionPercent,
-        externalReferrerName: partnerships.externalReferrerName,
-        externalReferrerCreci: partnerships.externalReferrerCreci,
-        externalReferrerWhatsapp: partnerships.externalReferrerWhatsapp,
-        visitScheduledDate: partnerships.visitScheduledDate,
-        notes: partnerships.notes,
-        createdAt: partnerships.createdAt,
-        updatedAt: partnerships.updatedAt,
-      })
-      .from(partnerships)
-      .innerJoin(properties, eq(partnerships.propertyId, properties.id))
-      .innerJoin(partnershipCaptor, eq(partnerships.captorBrokerId, partnershipCaptor.id))
-      .innerJoin(partnershipPartner, eq(partnerships.partnerBrokerId, partnershipPartner.id))
-      .where(isAdmin ? undefined : or(eq(partnerships.captorBrokerId, currentUser.id), eq(partnerships.partnerBrokerId, currentUser.id)))
-      .orderBy(desc(partnerships.updatedAt))
-      .limit(200)
-      : [];
-
-    const partnershipActivityList = currentUser && partnershipList.length ? await db
-      .select({
-        id: partnershipActivities.id,
-        partnershipId: partnershipActivities.partnershipId,
-        actorUserId: partnershipActivities.actorUserId,
-        actorName: users.name,
-        previousStatus: partnershipActivities.previousStatus,
-        newStatus: partnershipActivities.newStatus,
-        note: partnershipActivities.note,
-        createdAt: partnershipActivities.createdAt,
-      })
-      .from(partnershipActivities)
-      .innerJoin(users, eq(partnershipActivities.actorUserId, users.id))
-      .where(or(...partnershipList.map((partnership) => eq(partnershipActivities.partnershipId, partnership.id))))
-      .orderBy(desc(partnershipActivities.createdAt))
-      .limit(500)
-      : [];
-
-    const leadList = currentUser ? await db
-      .select({
-        id: leads.id,
-        fullName: leads.fullName,
-        phone: leads.phone,
-        email: leads.email,
-        leadType: leads.leadType,
-        stage: leads.stage,
-        source: leads.source,
-        propertyType: leads.propertyType,
-        city: leads.city,
-        neighborhoods: leads.neighborhoods,
-        maxBudget: leads.maxBudget,
-        minBedrooms: leads.minBedrooms,
-        notes: leads.notes,
-        nextAction: leads.nextAction,
-        nextActionAt: leads.nextActionAt,
-        lastContactAt: leads.lastContactAt,
-        lostReason: leads.lostReason,
-        createdAt: leads.createdAt,
-        updatedAt: leads.updatedAt,
-      })
-      .from(leads)
-      .where(eq(leads.ownerUserId, currentUser.id))
-      .orderBy(desc(leads.updatedAt))
-      : [];
-
-    const leadActivityList = currentUser ? await db
-      .select({
-        id: leadActivities.id,
-        leadId: leadActivities.leadId,
-        userId: leadActivities.userId,
-        activityType: leadActivities.activityType,
-        description: leadActivities.description,
-        occurredAt: leadActivities.occurredAt,
-      })
-      .from(leadActivities)
-      .innerJoin(leads, eq(leadActivities.leadId, leads.id))
-      .where(eq(leads.ownerUserId, currentUser.id))
-      .orderBy(desc(leadActivities.occurredAt))
-      .limit(500)
-      : [];
-
-    const pilotFeedbackList = currentUser?.role === "admin" ? await db
-      .select({
-        id: pilotFeedback.id,
-        userId: pilotFeedback.userId,
-        userName: users.name,
-        userCreci: users.creci,
-        screen: pilotFeedback.screen,
-        category: pilotFeedback.category,
-        message: pilotFeedback.message,
-        status: pilotFeedback.status,
-        createdAt: pilotFeedback.createdAt,
-      })
-      .from(pilotFeedback)
-      .innerJoin(users, eq(pilotFeedback.userId, users.id))
-      .orderBy(desc(pilotFeedback.createdAt))
-      .limit(200) : [];
-
-    return {
-      properties: propertyList,
-      radarList,
-      users: allUsers,
-      transactions: allTransactions,
-      currentUser,
-      notifications: userNotifications,
-      dvpList,
-      partnerships: partnershipList,
-      partnershipActivities: partnershipActivityList,
-      leads: leadList,
-      leadActivities: leadActivityList,
-      pilotFeedback: pilotFeedbackList,
-    };
-  } catch (error) {
-    console.error("Erro ao carregar dados do banco:", error);
-    return {
-      properties: [],
-      radarList: [],
-      users: [],
-      transactions: [],
-      currentUser: null,
-      notifications: [],
-      dvpList: [],
-      partnerships: [],
-      partnershipActivities: [],
-      leads: [],
-      leadActivities: [],
-      pilotFeedback: [],
-    };
-  }
-}
-
-export async function createLead(data: {
-  fullName: string;
-  phone: string;
-  email?: string;
-  leadType: string;
-  source: string;
-  propertyType?: string;
-  city?: string;
-  neighborhoods?: string[];
-  maxBudget?: string;
-  minBedrooms?: number;
-  notes?: string;
-  nextAction?: string;
-  nextActionAt?: string;
-}) {
-  const actor = await requireCurrentUser();
-  requireActiveBroker(actor);
-  const fullName = data.fullName.trim();
-  const phone = data.phone.trim();
-  const normalizedPhone = normalizePhone(phone);
-  if (fullName.length < 2 || fullName.length > 120) throw new Error("Informe o nome do lead.");
-  if (normalizedPhone.length < 8 || normalizedPhone.length > 15) throw new Error("Informe um telefone válido com DDD.");
-  if (!(["comprador", "proprietario", "locatario", "parceiro"] as string[]).includes(data.leadType)) throw new Error("Tipo de lead inválido.");
-  if (!(["indicacao", "whatsapp", "portal", "site", "ligacao", "rede_social", "outro"] as string[]).includes(data.source)) throw new Error("Origem do lead inválida.");
-  const email = data.email?.trim().toLowerCase() || null;
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Informe um e-mail válido.");
-  const maxBudget = data.maxBudget?.trim() || null;
-  if (maxBudget && (!Number.isFinite(Number(maxBudget)) || Number(maxBudget) <= 0)) throw new Error("O orçamento deve ser maior que zero.");
-  const nextActionAt = parseLeadDate(data.nextActionAt);
-  const notes = data.notes?.trim() || null;
-  if (notes && notes.length > 3000) throw new Error("As observações devem ter até 3.000 caracteres.");
-
-  try {
-    const result = await db.transaction(async (tx) => {
-      const [created] = await tx.insert(leads).values({
-        ownerUserId: actor.id,
-        fullName,
-        phone,
-        normalizedPhone,
-        email,
-        leadType: data.leadType,
-        source: data.source,
-        propertyType: data.propertyType?.trim() || null,
-        city: data.city?.trim() || null,
-        neighborhoods: (data.neighborhoods || []).map((value) => value.trim()).filter(Boolean).slice(0, 20),
-        maxBudget,
-        minBedrooms: Number.isInteger(data.minBedrooms) && Number(data.minBedrooms) > 0 ? Number(data.minBedrooms) : null,
-        notes,
-        nextAction: data.nextAction?.trim() || null,
-        nextActionAt,
-        stage: "novo",
-        updatedAt: new Date(),
-      }).returning();
-      const [activity] = await tx.insert(leadActivities).values({
-        leadId: created.id,
-        userId: actor.id,
-        activityType: "cadastro",
-        description: "Lead cadastrado no CRM.",
-      }).returning();
-      return { lead: created, activity };
-    });
-    revalidatePath("/");
-    return { success: true, ...result };
-  } catch (error) {
-    if ((error as { code?: string }).code === "23505") throw new Error("Já existe um lead com este telefone na sua carteira.");
-    throw error;
-  }
-}
-
-export async function importLeadsCsv(rows: Array<{
-  fullName: string; phone: string; email?: string; leadType?: string; source?: string;
-  propertyType?: string; city?: string; neighborhoods?: string; maxBudget?: string;
-  minBedrooms?: string; notes?: string;
-}>) {
-  const actor = await requireCurrentUser();
-  requireActiveBroker(actor);
-  if (!Array.isArray(rows) || rows.length < 1 || rows.length > 100) {
-    throw new Error("Importe de 1 a 100 contatos por arquivo.");
-  }
-  const typeMap: Record<string, string> = { comprador: "comprador", proprietario: "proprietario", "proprietário": "proprietario", "proprietario / vendedor": "proprietario", "proprietário / vendedor": "proprietario", locatario: "locatario", "locatário": "locatario", parceiro: "parceiro", "corretor parceiro": "parceiro" };
-  const sourceMap: Record<string, string> = { indicacao: "indicacao", "indicação": "indicacao", whatsapp: "whatsapp", portal: "portal", "portal imobiliario": "portal", "portal imobiliário": "portal", site: "site", ligacao: "ligacao", "ligação": "ligacao", "rede social": "rede_social", rede_social: "rede_social", outro: "outro" };
-  const seen = new Set<string>();
-  const cleaned = rows.map((row, index) => {
-    const fullName = String(row.fullName || "").trim();
-    const phone = String(row.phone || "").trim();
-    const normalizedPhone = normalizePhone(phone);
-    const line = index + 2;
-    if (fullName.length < 2 || fullName.length > 120) throw new Error(`Linha ${line}: nome inválido.`);
-    if (normalizedPhone.length < 8 || normalizedPhone.length > 15) throw new Error(`Linha ${line}: telefone inválido (inclua DDD).`);
-    if (seen.has(normalizedPhone)) throw new Error(`Linha ${line}: telefone repetido no arquivo.`);
-    seen.add(normalizedPhone);
-    const email = String(row.email || "").trim().toLowerCase() || null;
-    if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error(`Linha ${line}: e-mail inválido.`);
-    const leadTypeInput = String(row.leadType || "comprador").trim().toLowerCase();
-    const sourceInput = String(row.source || "outro").trim().toLowerCase();
-    const leadType = typeMap[leadTypeInput];
-    const source = sourceMap[sourceInput];
-    if (!leadType) throw new Error(`Linha ${line}: tipo deve ser comprador, proprietario, locatario ou parceiro.`);
-    if (!source) throw new Error(`Linha ${line}: origem inválida.`);
-    const maxBudget = String(row.maxBudget || "").trim().replace(/[R$\s]/g, "").replace(/\.(?=\d{3}(?:\D|$))/g, "").replace(",", ".") || null;
-    if (maxBudget && (!Number.isFinite(Number(maxBudget)) || Number(maxBudget) <= 0)) throw new Error(`Linha ${line}: orçamento inválido.`);
-    const minBedrooms = String(row.minBedrooms || "").trim() ? Number(row.minBedrooms) : null;
-    if (minBedrooms !== null && (!Number.isInteger(minBedrooms) || minBedrooms < 1 || minBedrooms > 20)) throw new Error(`Linha ${line}: quartos mínimos inválidos.`);
-    const notes = String(row.notes || "").trim() || null;
-    if (notes && notes.length > 3000) throw new Error(`Linha ${line}: observação acima de 3.000 caracteres.`);
-    return {
-      ownerUserId: actor.id, fullName, phone, normalizedPhone, email, leadType, source,
-      propertyType: String(row.propertyType || "").trim() || null,
-      city: String(row.city || "").trim() || null,
-      neighborhoods: String(row.neighborhoods || "").split(/[|,]/).map((part) => part.trim()).filter(Boolean).slice(0, 20),
-      maxBudget, minBedrooms, notes, stage: "novo" as const,
-    };
-  });
-  const result = await db.transaction(async (tx) => {
-    const inserted = await tx.insert(leads).values(cleaned).onConflictDoNothing({ target: [leads.ownerUserId, leads.normalizedPhone] }).returning();
-    const insertedActivities = inserted.length ? await tx.insert(leadActivities).values(inserted.map(({ id }) => ({ leadId: id, userId: actor.id, activityType: "cadastro", description: "Lead importado por arquivo CSV." }))).returning() : [];
-    return { imported: inserted.length, duplicates: rows.length - inserted.length, leads: inserted, activities: insertedActivities };
-  });
-  revalidatePath("/");
-  return { success: true, ...result };
-}
-
-export async function updateLead(leadId: string, data: Parameters<typeof createLead>[0]) {
-  const actor = await requireCurrentUser();
-  requireActiveBroker(actor);
-  const fullName = data.fullName.trim();
-  const phone = data.phone.trim();
-  const normalizedPhone = normalizePhone(phone);
-  if (fullName.length < 2 || fullName.length > 120) throw new Error("Informe o nome do lead.");
-  if (normalizedPhone.length < 8 || normalizedPhone.length > 15) throw new Error("Informe um telefone válido com DDD.");
-  if (!( ["comprador", "proprietario", "locatario", "parceiro"] as string[]).includes(data.leadType)) throw new Error("Tipo de lead inválido.");
-  if (!( ["indicacao", "whatsapp", "portal", "site", "ligacao", "rede_social", "outro"] as string[]).includes(data.source)) throw new Error("Origem do lead inválida.");
-  const email = data.email?.trim().toLowerCase() || null;
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Informe um e-mail válido.");
-  const maxBudget = data.maxBudget?.trim() || null;
-  if (maxBudget && (!Number.isFinite(Number(maxBudget)) || Number(maxBudget) <= 0)) throw new Error("O orçamento deve ser maior que zero.");
-  const nextActionAt = parseLeadDate(data.nextActionAt);
-  const notes = data.notes?.trim() || null;
-  if (notes && notes.length > 3000) throw new Error("As observações devem ter até 3.000 caracteres.");
-  const [ownedLead] = await db.select({ id: leads.id }).from(leads).where(and(eq(leads.id, leadId), eq(leads.ownerUserId, actor.id))).limit(1);
-  if (!ownedLead) throw new Error("Lead não encontrado na sua carteira.");
-
-  try {
-    const result = await db.transaction(async (tx) => {
-      const [updated] = await tx.update(leads).set({
-        fullName,
-        phone,
-        normalizedPhone,
-        email,
-        leadType: data.leadType,
-        source: data.source,
-        propertyType: data.propertyType?.trim() || null,
-        city: data.city?.trim() || null,
-        neighborhoods: (data.neighborhoods || []).map((value) => value.trim()).filter(Boolean).slice(0, 20),
-        maxBudget,
-        minBedrooms: Number.isInteger(data.minBedrooms) && Number(data.minBedrooms) > 0 ? Number(data.minBedrooms) : null,
-        notes,
-        nextAction: data.nextAction?.trim() || null,
-        nextActionAt,
-        updatedAt: new Date(),
-      }).where(and(eq(leads.id, leadId), eq(leads.ownerUserId, actor.id))).returning();
-      const [activity] = await tx.insert(leadActivities).values({
-        leadId,
-        userId: actor.id,
-        activityType: "nota",
-        description: "Dados cadastrais e preferências do lead atualizados.",
-      }).returning();
-      return { lead: updated, activity };
-    });
-    revalidatePath("/");
-    return { success: true, ...result };
-  } catch (error) {
-    if ((error as { code?: string }).code === "23505") throw new Error("Já existe outro lead com este telefone na sua carteira.");
-    throw error;
-  }
-}
-
-export async function updateLeadStage(leadId: string, nextStage: string, lostReason?: string) {
-  const actor = await requireCurrentUser();
-  requireActiveBroker(actor);
-  if (!(LEAD_STAGES as readonly string[]).includes(nextStage)) throw new Error("Etapa inválida.");
-  const [lead] = await db.select({ id: leads.id, stage: leads.stage }).from(leads).where(and(eq(leads.id, leadId), eq(leads.ownerUserId, actor.id))).limit(1);
-  if (!lead) throw new Error("Lead não encontrado na sua carteira.");
-  const cleanLostReason = lostReason?.trim() || null;
-  if (nextStage === "perdido" && !cleanLostReason) throw new Error("Informe o motivo da perda.");
-  const result = await db.transaction(async (tx) => {
-    const [saved] = await tx.update(leads).set({ stage: nextStage, lostReason: nextStage === "perdido" ? cleanLostReason : null, updatedAt: new Date() }).where(and(eq(leads.id, leadId), eq(leads.ownerUserId, actor.id))).returning();
-    const [activity] = await tx.insert(leadActivities).values({
-      leadId,
-      userId: actor.id,
-      activityType: "etapa",
-      description: `Etapa alterada: ${lead.stage} → ${nextStage}${cleanLostReason ? `. Motivo: ${cleanLostReason}` : ""}.`,
-    }).returning();
-    return { lead: saved, activity };
-  });
-  revalidatePath("/");
-  return { success: true, ...result };
-}
-
-export async function addLeadActivity(data: {
-  leadId: string;
-  activityType: string;
-  description: string;
-  nextAction?: string;
-  nextActionAt?: string;
-}) {
-  const actor = await requireCurrentUser();
-  requireActiveBroker(actor);
-  if (!(LEAD_ACTIVITY_TYPES as readonly string[]).includes(data.activityType)) throw new Error("Tipo de atividade inválido.");
-  const description = data.description.trim();
-  if (description.length < 2 || description.length > 2000) throw new Error("Descreva o contato em até 2.000 caracteres.");
-  const [lead] = await db.select({ id: leads.id }).from(leads).where(and(eq(leads.id, data.leadId), eq(leads.ownerUserId, actor.id))).limit(1);
-  if (!lead) throw new Error("Lead não encontrado na sua carteira.");
-  const nextAction = data.nextAction?.trim() || null;
-  const nextActionAt = parseLeadDate(data.nextActionAt);
-  const [activity] = await db.transaction(async (tx) => {
-    const [created] = await tx.insert(leadActivities).values({ leadId: lead.id, userId: actor.id, activityType: data.activityType, description }).returning();
-    await tx.update(leads).set({
-      ...(data.activityType === "nota" ? {} : { lastContactAt: new Date() }),
-      nextAction,
-      nextActionAt,
-      updatedAt: new Date(),
-    }).where(and(eq(leads.id, lead.id), eq(leads.ownerUserId, actor.id)));
-    return [created];
-  });
-  revalidatePath("/");
-  return { success: true, activity };
-}
-
-export async function completeLeadFollowUp(leadId: string) {
-  const actor = await requireCurrentUser();
-  requireActiveBroker(actor);
-  const [lead] = await db.select({
-    id: leads.id,
-    stage: leads.stage,
-    nextAction: leads.nextAction,
-    nextActionAt: leads.nextActionAt,
-  }).from(leads).where(and(eq(leads.id, leadId), eq(leads.ownerUserId, actor.id))).limit(1);
-  if (!lead) throw new Error("Lead não encontrado na sua carteira.");
-  if (["fechado", "perdido"].includes(lead.stage)) throw new Error("Leads encerrados não têm retornos ativos.");
-  if (!lead.nextActionAt) throw new Error("Este lead não tem retorno agendado.");
-
-  const result = await db.transaction(async (tx) => {
-    const [updated] = await tx.update(leads).set({
-      nextAction: null,
-      nextActionAt: null,
-      lastContactAt: new Date(),
-      updatedAt: new Date(),
-    }).where(and(eq(leads.id, leadId), eq(leads.ownerUserId, actor.id))).returning();
-    const [activity] = await tx.insert(leadActivities).values({
-      leadId,
-      userId: actor.id,
-      activityType: "nota",
-      description: `Retorno concluído${lead.nextAction ? `: ${lead.nextAction}` : ""}.`,
-    }).returning();
-    return { lead: updated, activity };
-  });
-  revalidatePath("/");
-  return { success: true, ...result };
-}
+import * as crmActions from "./actions/crm";
+export async function createLead(...args: Parameters<typeof crmActions.createLead>) { return crmActions.createLead(...args); }
+export async function importLeadsCsv(...args: Parameters<typeof crmActions.importLeadsCsv>) { return crmActions.importLeadsCsv(...args); }
+export async function updateLead(...args: Parameters<typeof crmActions.updateLead>) { return crmActions.updateLead(...args); }
+export async function updateLeadStage(...args: Parameters<typeof crmActions.updateLeadStage>) { return crmActions.updateLeadStage(...args); }
+export async function addLeadActivity(...args: Parameters<typeof crmActions.addLeadActivity>) { return crmActions.addLeadActivity(...args); }
+export async function completeLeadFollowUp(...args: Parameters<typeof crmActions.completeLeadFollowUp>) { return crmActions.completeLeadFollowUp(...args); }
 
 export async function updateUserStatus(userId: string, newStatus: string) {
   const actor = await requireCurrentUser();
@@ -736,6 +51,7 @@ export async function updateUserStatus(userId: string, newStatus: string) {
     .set({
       verificationStatus: newStatus,
       isVerified: newStatus === "aprovado",
+      ...(newStatus === "suspenso" ? { sessionVersion: sql`${users.sessionVersion} + 1` } : {}),
       updatedAt: new Date(),
     })
     .where(eq(users.id, userId));
@@ -744,56 +60,63 @@ export async function updateUserStatus(userId: string, newStatus: string) {
   return { success: true };
 }
 
-export async function createProperty(formData: {
-  title: string;
-  propertyType: string;
-  salePrice: string;
-  purpose?: string;
-  acceptsTrade?: boolean;
-  tradeDetails?: string;
-  condition?: string;
-  hotelRoomsCount?: number;
-  condoFee?: string;
-  iptu?: string;
-  iptuPeriod?: string;
-  city: string;
-  state?: string;
-  neighborhood: string;
-  cep?: string;
-  street?: string;
-  streetNumber?: string;
-  block?: string;
-  floor?: string;
-  condoName?: string;
-  hideStreet?: boolean;
-  bedrooms: number;
-  suites: number;
-  bathrooms: number;
-  parkingSpots: number;
-  garageType?: string;
-  areaM2: string;
-  usefulAreaM2?: string;
-  totalAreaM2?: string;
-  solarPosition?: string;
-  viewType?: string;
-  propertyAge?: number;
-  documentationStatus?: string;
-  acceptsFinancing?: boolean;
-  privateAmenities?: string[];
-  condoAmenities?: string[];
-  description: string;
-  videoUrl?: string;
-  coverPhoto?: string;
-  photos: string[];
-  floorPlanPhotos?: string[];
-  confidentialAddress: string;
-  ownerName: string;
-  ownerPhone: string;
-  acceptsPartnership: boolean;
-  splitPercentage: string;
-}) {
+export async function confirmPixSubscriptionPayment(transactionId: string) {
+  const actor = await requireCurrentUser();
+  if (actor.role !== "admin") throw new Error("Ação restrita à administração.");
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(transactionId)) {
+    throw new Error("Transação inválida.");
+  }
+
+  const payment = await db.transaction(async (tx) => {
+    const [pending] = await tx.select({
+      id: transactions.id,
+      userId: transactions.userId,
+      type: transactions.type,
+      paymentMethod: transactions.paymentMethod,
+      status: transactions.status,
+    }).from(transactions).where(eq(transactions.id, transactionId)).for("update").limit(1);
+    if (!pending) throw new Error("Transação não encontrada.");
+    if (!pending.type.startsWith("mensalidade_") || pending.paymentMethod !== "pix") {
+      throw new Error("Apenas mensalidades via Pix podem ser confirmadas nesta tela.");
+    }
+    if (pending.status !== "pendente") throw new Error("Esta transação não está pendente.");
+
+    const [confirmed] = await tx.update(transactions)
+      .set({ status: "pago" })
+      .where(and(eq(transactions.id, pending.id), eq(transactions.status, "pendente")))
+      .returning({ id: transactions.id, userId: transactions.userId, amount: transactions.amount });
+    if (!confirmed) throw new Error("A transação já foi atualizada.");
+
+    const [subscriber] = await tx.select().from(users).where(eq(users.id, pending.userId)).for("update").limit(1);
+    if (!subscriber) throw new Error("Assinante não encontrado.");
+    await tx.update(users).set({ subscriptionStatus: "ativo", nextBillingDate: extendPaidPeriod(subscriber.nextBillingDate, subscriber.billingCycle), updatedAt: new Date() }).where(eq(users.id, pending.userId));
+    if (subscriber.referredBy && !subscriber.referralRewardedAt) {
+      const [referrer] = await tx.select().from(users).where(eq(users.id, subscriber.referredBy)).for("update").limit(1);
+      if (referrer && referrer.verificationStatus !== "suspenso") {
+        const start = referrer.nextBillingDate && referrer.nextBillingDate > new Date() ? referrer.nextBillingDate : new Date();
+        await tx.update(users).set({ nextBillingDate: addFreeDays(start), subscriptionStatus: referrer.subscriptionStatus === "teste" ? "teste" : "ativo", updatedAt: new Date() }).where(eq(users.id, referrer.id));
+        await tx.update(users).set({ referralRewardedAt: new Date() }).where(eq(users.id, subscriber.id));
+        await tx.insert(notifications).values({ userId: referrer.id, title: "Você ganhou 30 dias grátis!", message: "O primeiro pagamento de um corretor indicado foi confirmado. Adicionamos 30 dias ao seu acesso.", type: "sistema", read: false });
+      }
+    }
+    await tx.insert(notifications).values({
+      userId: pending.userId,
+      title: "Pagamento Pix confirmado",
+      message: "A equipe confirmou o recebimento do Pix. Seu acesso será liberado assim que o CRECI também for aprovado.",
+      type: "sistema",
+      read: false,
+    });
+    return confirmed;
+  });
+
+  revalidatePath("/");
+  return { success: true, payment };
+}
+
+export async function createProperty(formData: PropertyInput) {
   const actor = await requireCurrentUser();
   requireActiveBroker(actor);
+  validatePropertyInput(formData);
   const targetBrokerId = actor.id;
 
   const [newProperty] = await db
@@ -855,8 +178,9 @@ export async function createProperty(formData: {
     })
     .returning();
 
-  // 🤖 MOTOR DE IA: Cruzamento automático com o Radar de Compradores
+  // Cruzamento dos critérios cadastrados para imóveis de venda compartilhados.
   try {
+    if (formData.acceptsPartnership && (formData.purpose || "venda") === "venda") {
     const matchingProfiles = await db
       .select({
         id: buyerProfiles.id,
@@ -868,12 +192,8 @@ export async function createProperty(formData: {
         minParkingSpots: buyerProfiles.minParkingSpots,
       })
       .from(buyerProfiles)
-      .where(
-        and(
-          eq(buyerProfiles.active, true),
-          eq(buyerProfiles.city, formData.city)
-        )
-      );
+      .innerJoin(users, eq(buyerProfiles.brokerId, users.id))
+      .where(and(networkProfileScope(), eq(buyerProfiles.city, formData.city)));
 
     const actualMatches = matchingProfiles.filter((bp) => {
       const maxBudget = Number(bp.maxBudget);
@@ -897,6 +217,7 @@ export async function createProperty(formData: {
         });
       }
     }
+    }
   } catch (matchErr) {
     console.warn("Aviso ao cruzar radar:", matchErr);
   }
@@ -917,6 +238,7 @@ export async function createBuyerProfile(profileData: {
 }) {
   const actor = await requireCurrentUser();
   requireActiveBroker(actor);
+  validateBuyerProfileInput(profileData);
   const targetBrokerId = actor.id;
 
   const [newProfile] = await db
@@ -944,10 +266,14 @@ export async function createBuyerProfile(profileData: {
         neighborhood: properties.neighborhood,
       })
       .from(properties)
+      .innerJoin(users, eq(properties.brokerId, users.id))
       .where(
         and(
+          networkPropertyScope(),
           eq(properties.city, profileData.city),
-          eq(properties.acceptsPartnership, true),
+          eq(properties.purpose, "venda"),
+          eq(properties.propertyType, profileData.propertyType),
+          ...(profileData.neighborhoods.length ? [inArray(properties.neighborhood, profileData.neighborhoods)] : []),
           lte(properties.salePrice, profileData.maxBudget),
           gte(properties.bedrooms, profileData.minBedrooms),
           gte(properties.parkingSpots, profileData.minParkingSpots),
@@ -991,8 +317,9 @@ export async function createDvpCertificate(data: {
   const actor = await requireCurrentUser();
   requireActiveBroker(actor);
   if (data.partnerBrokerId !== actor.id) throw new Error("O corretor parceiro deve ser o usuário conectado.");
-  const [property] = await db.select({ brokerId: properties.brokerId, acceptsPartnership: properties.acceptsPartnership, title: properties.title }).from(properties).where(eq(properties.id, data.propertyId)).limit(1);
-  if (!property || property.brokerId !== data.captorBrokerId || !property.acceptsPartnership || property.brokerId === actor.id) {
+  const [property] = await db.select({ brokerId: properties.brokerId, acceptsPartnership: properties.acceptsPartnership, title: properties.title, status: properties.status, verificationStatus: users.verificationStatus })
+    .from(properties).innerJoin(users, eq(properties.brokerId, users.id)).where(eq(properties.id, data.propertyId)).limit(1);
+  if (!property || property.brokerId !== data.captorBrokerId || property.brokerId === actor.id || !canUseProperty(property, actor.id)) {
     throw new Error("Imóvel ou parceria inválidos para este registro.");
   }
   const [lead] = data.leadId
@@ -1401,6 +728,7 @@ export async function registerUserWithPix(userData: {
   plan: string;
   billingCycle: "monthly" | "annual";
   password: string;
+  referralCode?: string;
 }) {
   const cleanEmail = userData.email.trim().toLowerCase();
   const cleanCreci = userData.creci.trim().toUpperCase();
@@ -1411,16 +739,22 @@ export async function registerUserWithPix(userData: {
   };
   const selectedPlan = prices[userData.plan];
   if (!selectedPlan) throw new Error("Plano inválido.");
-  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) throw new Error("E-mail inválido.");
-  if (userData.name.trim().length < 2 || userData.city.trim().length < 2 || !/^[A-Z]{2}$/.test(userData.state.toUpperCase())) throw new Error("Confira nome, cidade e estado.");
+  if (!['monthly', 'annual'].includes(userData.billingCycle)) throw new Error("Ciclo de cobrança inválido.");
+  if (cleanEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) throw new Error("E-mail inválido.");
+  if (userData.name.trim().length < 2 || userData.name.length > 120 || userData.city.trim().length < 2 || userData.city.length > 120 || !/^[A-Z]{2}$/.test(userData.state.toUpperCase())) throw new Error("Confira nome, cidade e estado.");
+  const phoneDigits = userData.whatsapp.replace(/\D/g, "");
+  if (phoneDigits.length < 10 || phoneDigits.length > 15 || userData.whatsapp.length > 30) throw new Error("WhatsApp inválido.");
   if (!/^[0-9]{3,7}-?[FJ]?$/.test(cleanCreci)) throw new Error("Informe um CRECI no formato numérico aceito.");
   const monthlyFee = selectedPlan[userData.billingCycle];
-  const amountDue = userData.billingCycle === "annual" ? selectedPlan.annualTotal : selectedPlan.monthly;
-  const passwordHash = hashPassword(userData.password);
+  const referralCode = userData.referralCode?.trim() || null;
+  if (referralCode && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(referralCode)) throw new Error("Código de indicação inválido.");
+  const [referrer] = referralCode ? await db.select({ id: users.id, email: users.email, verificationStatus: users.verificationStatus }).from(users).where(eq(users.id, referralCode)).limit(1) : [];
+  if (referralCode && (!referrer || referrer.verificationStatus === "suspenso" || referrer.email === cleanEmail)) throw new Error("Código de indicação indisponível.");
+  await limitRegistrationAttempts();
+  const passwordHash = await hashPassword(userData.password);
 
-  const [newUser] = await db
-    .insert(users)
-    .values({
+  const newUser = await db.transaction(async (tx) => {
+    const [created] = await tx.insert(users).values({
       name: userData.name,
       email: cleanEmail,
       whatsapp: userData.whatsapp,
@@ -1432,30 +766,24 @@ export async function registerUserWithPix(userData: {
       isVerified: false,
       verificationStatus: "pendente",
       plan: userData.plan,
-      subscriptionStatus: "pendente",
+      subscriptionStatus: "teste",
+      nextBillingDate: addFreeDays(new Date()),
+      billingCycle: userData.billingCycle,
+      referredBy: referrer?.id || null,
       monthlyFee,
       trustScore: 0,
       avatarUrl:
         "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80",
-    })
-    .returning();
+    }).returning();
 
-  await db.insert(transactions).values({
-    userId: newUser.id,
-    amount: amountDue,
-    type: userData.plan === "imobiliaria" ? "mensalidade_imobiliaria" : "mensalidade_pro",
-    paymentMethod: "pix",
-    status: "pendente",
-    description: `Plano ${userData.plan} (${userData.billingCycle}) — pagamento Pix aguardando confirmação manual`,
-  });
-
-  // Notificação de boas-vindas do sistema
-  await db.insert(notifications).values({
-    userId: newUser.id,
-    title: `🎉 Bem-vindo ao Negocia Lar!`,
-    message: "Recebemos seu cadastro. O acesso e a assinatura ficam pendentes até validação do CRECI e confirmação de pagamento.",
-    type: "sistema",
-    read: false,
+    await tx.insert(notifications).values({
+      userId: created.id,
+      title: "🎉 Bem-vindo ao Negocia Lar!",
+      message: "Você tem 30 dias grátis a partir do cadastro, sem pagamento inicial. O uso da rede depende da aprovação do CRECI. Ao terminar, renove seu plano via Pix.",
+      type: "sistema",
+      read: false,
+    });
+    return created;
   });
 
   // Salva a sessão do corretor
@@ -1466,33 +794,39 @@ export async function registerUserWithPix(userData: {
   return { success: true, user: safeUser };
 }
 
+async function reserveLoginAttempt(email: string, address: string) {
+  const buckets = [
+    { key: `login-account:${email}`, limit: 8, clearOnSuccess: true },
+    { key: `login-pair:${email}:${address}`, limit: 5, clearOnSuccess: true },
+    { key: `login-address:${address}`, limit: address === "unknown" ? 100 : 50, clearOnSuccess: false },
+  ];
+  const successfulLoginKeys: string[] = [];
+  for (const bucket of buckets) {
+    const keyHash = crypto.createHash("sha256").update(bucket.key).digest("hex");
+    // Reserve before hashing: concurrent requests cannot all pass an old counter.
+    const [counter] = await db.insert(authLoginAttempts).values({keyHash, attempts: 1, updatedAt: new Date()}).onConflictDoUpdate({
+      target: authLoginAttempts.keyHash,
+      set: {
+        attempts: sql`case when ${authLoginAttempts.blockedUntil} > now() then ${authLoginAttempts.attempts} when ${authLoginAttempts.updatedAt} < now() - interval '15 minutes' then 1 else ${authLoginAttempts.attempts} + 1 end`,
+        blockedUntil: sql`case when ${authLoginAttempts.blockedUntil} > now() then ${authLoginAttempts.blockedUntil} when ${authLoginAttempts.updatedAt} < now() - interval '15 minutes' then null when ${authLoginAttempts.attempts} + 1 > ${bucket.limit} then now() + interval '15 minutes' else null end`,
+        updatedAt: sql`case when ${authLoginAttempts.blockedUntil} > now() then ${authLoginAttempts.updatedAt} else now() end`,
+      },
+    }).returning({blockedUntil:authLoginAttempts.blockedUntil});
+    if (counter.blockedUntil && counter.blockedUntil.getTime() > Date.now()) throw new Error("Muitas tentativas de acesso. Aguarde 15 minutos e tente novamente.");
+    if (bucket.clearOnSuccess) successfulLoginKeys.push(keyHash);
+  }
+  return successfulLoginKeys;
+}
+
 export async function loginUser(email: string, password: string) {
   const cleanEmail = email.trim().toLowerCase();
   if (cleanEmail.length > 254 || password.length > 200) throw new Error("E-mail ou senha incorretos.");
-  const requestHeaders = headers();
-  const remoteAddress = requestHeaders.get("x-vercel-forwarded-for")?.split(",")[0]?.trim()
-    || requestHeaders.get("x-real-ip")?.trim()
-    || "unknown";
-  const rateLimitKey = crypto.createHash("sha256").update(`${cleanEmail}\n${remoteAddress}`).digest("hex");
-  const [attemptState] = await db.select({ attempts: authLoginAttempts.attempts, blockedUntil: authLoginAttempts.blockedUntil, updatedAt: authLoginAttempts.updatedAt })
-    .from(authLoginAttempts).where(eq(authLoginAttempts.keyHash, rateLimitKey)).limit(1);
-  if (attemptState?.blockedUntil && attemptState.blockedUntil.getTime() > Date.now()) {
-    throw new Error("Muitas tentativas de acesso. Aguarde 15 minutos e tente novamente.");
-  }
+  const loginKeys = await reserveLoginAttempt(cleanEmail, await requestAddress());
   const [user] = await db.select().from(users).where(eq(users.email, cleanEmail)).limit(1);
-  if (!user || !verifyPassword(password, user.passwordHash)) {
-    await db.insert(authLoginAttempts).values({ keyHash: rateLimitKey, attempts: 1, updatedAt: new Date() }).onConflictDoUpdate({
-      target: authLoginAttempts.keyHash,
-      set: {
-        attempts: sql`case when ${authLoginAttempts.updatedAt} < now() - interval '24 hours' or ${authLoginAttempts.blockedUntil} <= now() then 1 else ${authLoginAttempts.attempts} + 1 end`,
-        blockedUntil: sql`case when ${authLoginAttempts.updatedAt} < now() - interval '24 hours' or ${authLoginAttempts.blockedUntil} <= now() then null when ${authLoginAttempts.attempts} + 1 >= 5 then now() + interval '15 minutes' else null end`,
-        updatedAt: new Date(),
-      },
-    });
-    throw new Error("E-mail ou senha incorretos.");
-  }
+  const passwordMatches = await verifyPassword(password, user?.passwordHash ?? null);
+  if (!user || !passwordMatches) throw new Error("E-mail ou senha incorretos.");
   if (user.verificationStatus === "suspenso") throw new Error("Esta conta está suspensa.");
-  await db.delete(authLoginAttempts).where(eq(authLoginAttempts.keyHash, rateLimitKey));
+  await db.delete(authLoginAttempts).where(inArray(authLoginAttempts.keyHash, loginKeys));
   await setBrokerSession(user.id);
   const { passwordHash: _passwordHash, ...safeUser } = user;
   revalidatePath("/");
@@ -1500,8 +834,83 @@ export async function loginUser(email: string, password: string) {
 }
 
 export async function logoutUser() {
-  const cookieStore = cookies();
+  const userId = await getCurrentUserId();
+  if (userId) await db.update(users).set({sessionVersion:sql`${users.sessionVersion} + 1`}).where(eq(users.id, userId));
+  const cookieStore = await cookies();
   cookieStore.delete(SESSION_COOKIE);
   revalidatePath("/");
   return { success: true };
+}
+
+
+export async function getMySubscription() {
+  const actor = await requireCurrentUser();
+  const [user] = await db.select({ id: users.id, plan: users.plan, status: users.subscriptionStatus, expiresAt: users.nextBillingDate, billingCycle: users.billingCycle }).from(users).where(eq(users.id, actor.id)).limit(1);
+  const payments = await db.select({ id: transactions.id, amount: transactions.amount, status: transactions.status, type: transactions.type, paymentMethod: transactions.paymentMethod, description: transactions.description, createdAt: transactions.createdAt }).from(transactions).where(eq(transactions.userId, actor.id)).orderBy(desc(transactions.createdAt));
+  return { user, payments };
+}
+
+export async function requestSubscriptionRenewal() {
+  const actor = await requireCurrentUser();
+  const payment = await db.transaction(async (tx) => {
+    const [user] = await tx.select().from(users).where(eq(users.id, actor.id)).for("update").limit(1);
+    const prices: Record<string, { monthly: string; annual: string }> = { "10": { monthly: "59.90", annual: "658.90" }, "20": { monthly: "89.90", annual: "988.90" }, "40": { monthly: "150.00", annual: "1650.00" } };
+    if (!user || !prices[user.plan]) throw new Error("Consulte a equipe para renovar este plano.");
+    const [existing] = await tx.select({ id: transactions.id }).from(transactions).where(and(eq(transactions.userId, actor.id), eq(transactions.status, "pendente"), eq(transactions.paymentMethod, "pix"), eq(transactions.type, "mensalidade_pro"))).limit(1);
+    if (existing) return existing;
+    const [created] = await tx.insert(transactions).values({ userId: actor.id, amount: prices[user.plan][user.billingCycle === "annual" ? "annual" : "monthly"], type: "mensalidade_pro", paymentMethod: "pix", status: "pendente", description: `Renovação do plano ${user.plan} (${user.billingCycle}) — confirmação manual` }).returning({ id: transactions.id });
+    return created;
+  });
+  revalidatePath("/");
+  return { success: true, payment };
+}
+
+
+export async function getBrokerAssistantStatus() {
+  await requireCurrentUser();
+  return { enabled: !!process.env.GEMINI_API_KEY };
+}
+
+export async function askBrokerAssistant(input: BrokerAssistantInput) {
+  const actor = await requireCurrentUser();
+  requireActiveBroker(actor);
+  const cleaned = validateBrokerAssistantInput(input);
+  if (!process.env.GEMINI_API_KEY) throw new Error("O Bartolomeu aguarda a configuração da IA pela equipe.");
+  const day = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
+  const keyHash = crypto.createHash("sha256").update(`broker-assistant:${actor.id}:${day}`).digest("hex");
+  const [counter] = await db.insert(authLoginAttempts).values({ keyHash, attempts: 1, updatedAt: new Date() }).onConflictDoUpdate({ target: authLoginAttempts.keyHash, set: { attempts: sql`${authLoginAttempts.attempts} + 1`, updatedAt: new Date() } }).returning({ attempts: authLoginAttempts.attempts });
+  if (counter.attempts > 60) throw new Error("Você atingiu as 60 perguntas de hoje. Seu acesso ao CRM continua normal; novas perguntas serão liberadas amanhã.");
+  const rows = await db.select({ stage: leads.stage, total: sql<number>`count(*)::int` }).from(leads).where(eq(leads.ownerUserId, actor.id)).groupBy(leads.stage);
+  const summary = JSON.stringify(rows);
+  return generateBrokerAnswer(cleaned, summary);
+}
+
+export async function saveNegotiationDocuments(leadId: string, input: NegotiationDocuments) {
+  const actor = await requireCurrentUser();
+  requireActiveBroker(actor);
+  const data = validateNegotiationDocuments(input);
+  const [owned] = await db.select({id: leads.id}).from(leads).where(and(eq(leads.id, leadId), eq(leads.ownerUserId, actor.id))).limit(1);
+  if (!owned) throw new Error("Cliente não encontrado na sua carteira.");
+  if (data.propertyId) {
+    const [property] = await db.select({title: properties.title, city: properties.city, brokerId: properties.brokerId, acceptsPartnership: properties.acceptsPartnership, status: properties.status, verificationStatus: users.verificationStatus})
+      .from(properties).innerJoin(users, eq(properties.brokerId, users.id)).where(eq(properties.id, data.propertyId)).limit(1);
+    if (!property || !canUseProperty(property, actor.id)) throw new Error("Imóvel não disponível para esta negociação.");
+    data.propertyTitle = property.title; data.city = data.city.trim();
+  }
+  const [saved] = await db.update(leads).set({documentation: data, updatedAt: new Date()}).where(and(eq(leads.id, leadId), eq(leads.ownerUserId, actor.id))).returning({documentation: leads.documentation});
+  revalidatePath("/");
+  return {documentation: saved.documentation!};
+}
+
+export async function saveMyDocumentationTemplate(input: NegotiationDocuments) {
+  const actor = await requireCurrentUser(); requireActiveBroker(actor);
+  const data = validateNegotiationDocuments(input);
+  const template = {...data, propertyId: null, propertyTitle: "", statuses: {}};
+  await db.update(users).set({documentationTemplate: template}).where(eq(users.id, actor.id));
+  return {success:true};
+}
+export async function getMyDocumentationTemplate() {
+  const actor = await requireCurrentUser(); requireActiveBroker(actor);
+  const [row] = await db.select({template: users.documentationTemplate}).from(users).where(eq(users.id, actor.id)).limit(1);
+  return row?.template || null;
 }
