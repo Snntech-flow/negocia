@@ -28,6 +28,9 @@ export const users = pgTable("users", {
   billingCycle: text("billing_cycle").default("monthly").notNull(),
   referredBy: uuid("referred_by").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
   referralRewardedAt: timestamp("referral_rewarded_at"),
+  // Conta sem cobrança (sócios, cortesia): quem da equipe isentou e quando. Isenta = ativa, sem vencimento e sem mensalidade.
+  billingExemptBy: uuid("billing_exempt_by").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
+  billingExemptAt: timestamp("billing_exempt_at"),
   
   // Reputação Ética (Anti-Laranja Podre)
   trustScore: integer("trust_score").default(100).notNull(), // 0 a 100

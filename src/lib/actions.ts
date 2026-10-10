@@ -33,7 +33,7 @@ import type { PropertyInput } from "./property-input";
 import { validateBuyerProfileInput, validatePropertyInput } from "./input-validation";
 import { isBrazilianState } from "./brazil-states";
 import { reserveListingSlot } from "./listing-limit";
-import { isPlanId, planCharge, planMonthlyEquivalent, planName } from "./plans";
+import { isPlanId, planCharge, planMonthlyEquivalent, planName, type BillingCycle } from "./plans";
 import { normalizedSql, normalizeText } from "./text-match";
 
 import { getMarketplaceData as readMarketplaceData } from "./queries/marketplace";
@@ -72,6 +72,23 @@ async function updateUserStatusImpl(userId: string, newStatus: string) {
   return { success: true, reviewedBy: actor.id, reviewedAt };
 }
 
+// Conta sem cobrança (sócios, cortesia): ativa, sem vencimento e sem mensalidade; grava quem isentou e quando.
+async function exemptUserFromBillingImpl(userId: string) {
+  const actor = await requireCurrentUser();
+  if (actor.role !== "admin") throw new ActionError("Ação restrita à administração.");
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)) throw new ActionError("Corretor inválido.");
+  const exemptAt = new Date();
+  await db.transaction(async (tx) => {
+    const [user] = await tx.select({ id: users.id, billingExemptAt: users.billingExemptAt }).from(users).where(eq(users.id, userId)).for("update").limit(1);
+    if (!user) throw new ActionError("Corretor não encontrado.");
+    if (user.billingExemptAt) throw new ActionError("Esta conta já está sem cobrança.");
+    await tx.update(users).set({ subscriptionStatus: "ativo", nextBillingDate: null, monthlyFee: "0.00", billingExemptBy: actor.id, billingExemptAt: exemptAt, updatedAt: exemptAt }).where(eq(users.id, userId));
+    await tx.insert(notifications).values({ userId, title: "Sua conta não tem cobrança", message: "A equipe isentou sua conta de mensalidade. O acesso continua sem vencimento.", type: "sistema", read: false });
+  });
+  revalidatePath("/");
+  return { success: true, exemptBy: actor.id, exemptAt };
+}
+
 async function confirmPixSubscriptionPaymentImpl(transactionId: string) {
   const actor = await requireCurrentUser();
   if (actor.role !== "admin") throw new ActionError("Ação restrita à administração.");
@@ -95,6 +112,7 @@ async function confirmPixSubscriptionPaymentImpl(transactionId: string) {
 
     const [subscriber] = await tx.select().from(users).where(eq(users.id, pending.userId)).for("update").limit(1);
     if (!subscriber) throw new ActionError("Assinante não encontrado.");
+    if (subscriber.billingExemptAt) throw new ActionError("Esta conta não tem cobrança: não há Pix a confirmar.");
     const now = new Date();
     const periodEnd = extendPaidPeriod(subscriber.nextBillingDate, subscriber.billingCycle, now);
     let referral: { userId: string; previous: Date | null; end: Date } | null = null;
@@ -146,16 +164,19 @@ async function refundPixSubscriptionPaymentImpl(transactionId: string, reason: s
     const [payment] = await tx.select().from(transactions).where(eq(transactions.id, transactionId)).for("update").limit(1);
     if (!payment) throw new ActionError("Transação não encontrada.");
     if (payment.status !== "pago" || !payment.type.startsWith("mensalidade_") || payment.paymentMethod !== "pix") throw new ActionError("Só mensalidades Pix confirmadas podem ser estornadas.");
-    if (!payment.confirmedAt || !payment.periodEnd) throw new ActionError("Este Pix foi confirmado antes do registro de estorno. Ajuste o acesso do corretor manualmente.");
     const [subscriber] = await tx.select().from(users).where(eq(users.id, payment.userId)).for("update").limit(1);
     if (!subscriber) throw new ActionError("Assinante não encontrado.");
-    if (subscriber.nextBillingDate?.getTime() !== payment.periodEnd.getTime()) {
-      throw new ActionError("Houve outra renovação depois deste pagamento. Estorne primeiro o pagamento mais recente.");
+    // Conta sem cobrança: o estorno só registra a devolução; o acesso não depende de pagamento.
+    const exempt = !!subscriber.billingExemptAt;
+    if (!exempt) {
+      if (!payment.confirmedAt || !payment.periodEnd) throw new ActionError("Este Pix foi confirmado antes do registro de estorno. Ajuste o acesso do corretor manualmente.");
+      if (subscriber.nextBillingDate?.getTime() !== payment.periodEnd.getTime()) {
+        throw new ActionError("Houve outra renovação depois deste pagamento. Estorne primeiro o pagamento mais recente.");
+      }
     }
     const now = new Date();
     await tx.update(users).set({
-      nextBillingDate: payment.previousBillingDate,
-      subscriptionStatus: payment.previousSubscriptionStatus || "pendente",
+      ...(exempt ? {} : { nextBillingDate: payment.previousBillingDate, subscriptionStatus: payment.previousSubscriptionStatus || "pendente" }),
       ...(payment.referralRewardedUserId ? { referralRewardedAt: null } : {}),
       updatedAt: now,
     }).where(eq(users.id, subscriber.id));
@@ -176,7 +197,9 @@ async function refundPixSubscriptionPaymentImpl(transactionId: string, reason: s
       .returning({ id: transactions.id, userId: transactions.userId, status: transactions.status });
     if (!updated) throw new ActionError("A transação já foi atualizada.");
     await tx.insert(notifications).values({ userId: subscriber.id, title: "Pagamento estornado", message: `O pagamento Pix foi estornado pela equipe. Motivo: ${cleanReason}`, type: "sistema", read: false });
-    return { ...updated, nextBillingDate: payment.previousBillingDate, subscriptionStatus: payment.previousSubscriptionStatus || "pendente" };
+    return exempt
+      ? { ...updated, nextBillingDate: subscriber.nextBillingDate, subscriptionStatus: subscriber.subscriptionStatus }
+      : { ...updated, nextBillingDate: payment.previousBillingDate, subscriptionStatus: payment.previousSubscriptionStatus || "pendente" };
   });
   revalidatePath("/");
   return { success: true, payment: refunded };
@@ -956,19 +979,31 @@ async function logoutUserImpl() {
 
 async function getMySubscriptionImpl() {
   const actor = await requireCurrentUser();
-  const [user] = await db.select({ id: users.id, plan: users.plan, status: users.subscriptionStatus, expiresAt: users.nextBillingDate, billingCycle: users.billingCycle }).from(users).where(eq(users.id, actor.id)).limit(1);
+  const [user] = await db.select({ id: users.id, plan: users.plan, status: users.subscriptionStatus, expiresAt: users.nextBillingDate, billingCycle: users.billingCycle, exemptAt: users.billingExemptAt }).from(users).where(eq(users.id, actor.id)).limit(1);
   const payments = await db.select({ id: transactions.id, amount: transactions.amount, status: transactions.status, type: transactions.type, paymentMethod: transactions.paymentMethod, description: transactions.description, createdAt: transactions.createdAt }).from(transactions).where(eq(transactions.userId, actor.id)).orderBy(desc(transactions.createdAt));
   return { user, payments };
 }
 
-async function requestSubscriptionRenewalImpl() {
+async function requestSubscriptionRenewalImpl(chosenCycle?: string) {
   const actor = await requireCurrentUser();
   const payment = await db.transaction(async (tx) => {
     const [user] = await tx.select().from(users).where(eq(users.id, actor.id)).for("update").limit(1);
+    if (user?.billingExemptAt) throw new ActionError("Sua conta não tem cobrança.");
     if (!user || !isPlanId(user.plan)) throw new ActionError("Consulte a equipe para renovar este plano.");
     const [existing] = await tx.select({ id: transactions.id }).from(transactions).where(and(eq(transactions.userId, actor.id), eq(transactions.status, "pendente"), eq(transactions.paymentMethod, "pix"), eq(transactions.type, "mensalidade_pro"))).limit(1);
-    if (existing) return existing;
-    const cycle = user.billingCycle === "annual" ? "annual" : "monthly";
+    // Primeira cobrança: o corretor escolhe mensal ou anual. Depois do primeiro pagamento, vale o ciclo escolhido.
+    let cycle: BillingCycle = user.billingCycle === "annual" ? "annual" : "monthly";
+    if (existing) {
+      if (chosenCycle !== undefined && chosenCycle !== cycle) throw new ActionError("Já há um Pix aguardando a conferência da equipe. Aguarde para mudar entre mensal e anual.");
+      return existing;
+    }
+    if (chosenCycle !== undefined && chosenCycle !== cycle) {
+      if (chosenCycle !== "monthly" && chosenCycle !== "annual") throw new ActionError("Escolha mensal ou anual.");
+      const [paid] = await tx.select({ id: transactions.id }).from(transactions).where(and(eq(transactions.userId, actor.id), eq(transactions.status, "pago"), sql`${transactions.type} like 'mensalidade\\_%'`)).limit(1);
+      if (paid) throw new ActionError(`Sua assinatura é ${cycle === "annual" ? "anual" : "mensal"}: o ciclo é escolhido no primeiro pagamento.`);
+      cycle = chosenCycle;
+      await tx.update(users).set({ billingCycle: cycle, monthlyFee: planMonthlyEquivalent(user.plan, cycle), updatedAt: new Date() }).where(eq(users.id, actor.id));
+    }
     const [created] = await tx.insert(transactions).values({ userId: actor.id, amount: planCharge(user.plan, cycle), type: "mensalidade_pro", paymentMethod: "pix", status: "pendente", description: `Renovação do plano ${planName(user.plan)} (${cycle === "annual" ? "anual" : "mensal"}) — confirmação manual` }).returning({ id: transactions.id });
     return created;
   });
@@ -1036,6 +1071,7 @@ export async function addLeadActivity(...args: Parameters<typeof addLeadActivity
 export async function completeLeadFollowUp(...args: Parameters<typeof completeLeadFollowUpImpl>) { return runAction(() => completeLeadFollowUpImpl(...args)); }
 export async function updateUserStatus(...args: Parameters<typeof updateUserStatusImpl>) { return runAction(() => updateUserStatusImpl(...args)); }
 export async function confirmPixSubscriptionPayment(...args: Parameters<typeof confirmPixSubscriptionPaymentImpl>) { return runAction(() => confirmPixSubscriptionPaymentImpl(...args)); }
+export async function exemptUserFromBilling(...args: Parameters<typeof exemptUserFromBillingImpl>) { return runAction(() => exemptUserFromBillingImpl(...args)); }
 export async function refundPixSubscriptionPayment(...args: Parameters<typeof refundPixSubscriptionPaymentImpl>) { return runAction(() => refundPixSubscriptionPaymentImpl(...args)); }
 export async function createProperty(...args: Parameters<typeof createPropertyImpl>) { return runAction(() => createPropertyImpl(...args)); }
 export async function createBuyerProfile(...args: Parameters<typeof createBuyerProfileImpl>) { return runAction(() => createBuyerProfileImpl(...args)); }

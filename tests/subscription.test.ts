@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { addFreeDays, extendPaidPeriod, hasSubscriptionAccess } from "../src/lib/subscription";
+import { addFreeDays, billingNotice, extendPaidPeriod, hasSubscriptionAccess } from "../src/lib/subscription";
 test("30 dias gratuitos expiram exatamente no limite e não concedem acesso após a data", () => {
   const start = new Date("2026-10-01T12:00:00Z");
   const end = addFreeDays(start);
@@ -17,4 +17,40 @@ test("renovação preserva dias restantes e ajusta fim de mês e ano bissexto", 
   assert.equal(extendPaidPeriod(new Date("2026-01-31T12:00:00Z"), "monthly", now).toISOString(), "2026-02-28T12:00:00.000Z");
   assert.equal(extendPaidPeriod(new Date("2024-02-29T12:00:00Z"), "annual", new Date("2024-01-01T12:00:00Z")).toISOString(), "2025-02-28T12:00:00.000Z");
   assert.equal(extendPaidPeriod(new Date("2025-12-01T12:00:00Z"), "monthly", now).toISOString(), "2026-02-01T12:00:00.000Z");
+});
+
+const account = (changes: Partial<Parameters<typeof billingNotice>[0]> = {}) => ({
+  role: "corretor", subscriptionStatus: "ativo", nextBillingDate: new Date("2026-10-13T15:00:00Z"), billingExemptAt: null,
+  plan: "40", billingCycle: "monthly", hasPaid: true, pendingPix: false, ...changes,
+});
+test("aviso da mensalidade no sino aparece de 3 dias antes até pagar, contando o dia de Brasília", () => {
+  const now = new Date("2026-10-10T15:00:00Z");
+  assert.equal(billingNotice(account({ nextBillingDate: new Date("2026-10-14T15:00:00Z") }), now), null);
+  assert.equal(billingNotice(account(), now)?.title, "Sua mensalidade vence em 3 dias");
+  // 09/10 às 23h em Brasília (10/10 em UTC): o vencimento de 10/10 ainda é amanhã para o corretor.
+  assert.equal(billingNotice(account({ nextBillingDate: new Date("2026-10-10T12:00:00Z") }), new Date("2026-10-10T02:00:00Z"))?.title, "Sua mensalidade vence amanhã");
+  assert.equal(billingNotice(account({ nextBillingDate: new Date("2026-10-10T20:00:00Z") }), now)?.title, "Sua mensalidade vence hoje");
+  const expired = billingNotice(account({ nextBillingDate: new Date("2026-10-01T15:00:00Z") }), now)!;
+  assert.equal(expired.tone, "vencido");
+  assert.equal(expired.title, "Sua assinatura venceu");
+  assert.match(expired.message, /Venceu em 01\/10\/2026/);
+});
+test("conta isenta, administração e conta sem vencimento nunca veem cobrança", () => {
+  const now = new Date("2026-10-10T15:00:00Z");
+  assert.equal(billingNotice(account({ billingExemptAt: new Date("2026-10-10T12:00:00Z") }), now), null);
+  assert.equal(billingNotice(account({ role: "admin" }), now), null);
+  assert.equal(billingNotice(account({ nextBillingDate: null }), now), null);
+});
+test("primeira cobrança oferece mensal ou anual; depois cobra só o ciclo escolhido", () => {
+  const now = new Date("2026-10-10T15:00:00Z");
+  const first = billingNotice(account({ subscriptionStatus: "teste", hasPaid: false }), now)!;
+  assert.equal(first.title, "Seu período grátis termina em 3 dias");
+  assert.match(first.message, /mensal R\$\s150,00 ou anual R\$\s1\.650,00/);
+  const monthly = billingNotice(account(), now)!;
+  assert.match(monthly.message, /mensalidade R\$\s150,00\.$/);
+  assert.doesNotMatch(monthly.message, /anual/);
+  const annual = billingNotice(account({ billingCycle: "annual" }), now)!;
+  assert.equal(annual.title, "Sua anuidade vence em 3 dias");
+  assert.match(annual.message, /anuidade R\$\s1\.650,00\.$/);
+  assert.equal(billingNotice(account({ pendingPix: true }), now)?.title, "Pix aguardando confirmação");
 });

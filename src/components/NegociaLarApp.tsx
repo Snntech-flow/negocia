@@ -8,9 +8,9 @@ import PropertyMarketplace from "./PropertyMarketplace";
 import type { Property } from "@/lib/property-types";
 import { PROPERTY_TYPES } from "@/lib/property-options";
 import { unwrap } from "@/lib/action-result";
-import { hasSubscriptionAccess } from "@/lib/subscription";
+import { billingNotice, hasSubscriptionAccess } from "@/lib/subscription";
 import { planName } from "@/lib/plans";
-import type { WorkspaceFeedback, WorkspaceNotification, WorkspaceTransaction, WorkspaceUser } from "@/lib/workspace-types";
+import type { WorkspaceSessionUser, WorkspaceFeedback, WorkspaceNotification, WorkspaceTransaction, WorkspaceUser } from "@/lib/workspace-types";
 import Avatar from "./Avatar";
 import BuyerProfileForm from "./BuyerProfileForm";
 import PropertyCreateForm from "./PropertyCreateForm";
@@ -19,6 +19,7 @@ const AdminPanel = dynamic(() => import("./AdminPanel"));
 import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import {
+  CreditCard,
   Radar,
   Building2,
   UserCheck,
@@ -172,7 +173,7 @@ export default function NegociaLarApp({
   initialRadar: BuyerProfile[];
   initialUsers: UserItem[];
   initialTransactions: TransactionItem[];
-  initialCurrentUser?: UserItem | null;
+  initialCurrentUser?: WorkspaceSessionUser | null;
   initialNotifications?: NotificationItem[];
   initialDvpList?: DvpCertificateItem[];
   initialPartnerships?: PartnershipItem[];
@@ -203,7 +204,7 @@ export default function NegociaLarApp({
   }, [initialCurrentUser]);
   const [userList, setUserList] = useState<UserItem[]>(initialUsers);
   const [transactionList, setTransactionList] = useState<TransactionItem[]>(initialTransactions);
-  const [currentUser, setCurrentUser] = useState<UserItem | null>(
+  const [currentUser, setCurrentUser] = useState<WorkspaceSessionUser | null>(
     initialCurrentUser || null
   );
   const [propertyList, setPropertyList] = useState<Property[]>(initialProperties);
@@ -225,6 +226,14 @@ export default function NegociaLarApp({
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [isSubscriptionOpen, setIsSubscriptionOpen] = useState(false);
   const [defaultVisitDate, setDefaultVisitDate] = useState("");
+  // Hora lida no navegador depois de montar (o servidor não sabe o "agora" de quem usa); refaz a cada minuto.
+  const [clock, setClock] = useState<number | null>(null);
+  useEffect(() => {
+    const tick = () => setClock(Date.now());
+    const frame = requestAnimationFrame(tick);
+    const timer = window.setInterval(tick, 60_000);
+    return () => { cancelAnimationFrame(frame); window.clearInterval(timer); };
+  }, []);
 
   useEffect(() => {
     const frame = requestAnimationFrame(() => {
@@ -379,6 +388,13 @@ export default function NegociaLarApp({
 
   // CRECI aprovado e acesso em dia: sem isso o servidor recusa cadastros e parcerias, então a tela avisa antes.
   const accessExpiresAt = currentUser?.nextBillingDate ? new Date(currentUser.nextBillingDate) : null;
+  // Aviso da mensalidade: fixo no topo do sino, conta no número vermelho e não some ao "marcar como lidas".
+  const billingAlert = currentUser && clock !== null && currentUser.hasPaid !== undefined ? billingNotice({
+    role: currentUser.role, subscriptionStatus: currentUser.subscriptionStatus, nextBillingDate: accessExpiresAt,
+    billingExemptAt: currentUser.billingExemptAt ? new Date(currentUser.billingExemptAt) : null,
+    plan: currentUser.plan, billingCycle: currentUser.billingCycle, hasPaid: currentUser.hasPaid, pendingPix: !!currentUser.pendingPix,
+  }, new Date(clock)) : null;
+  const bellCount = unreadCount + (billingAlert ? 1 : 0);
   const blockedReason = !currentUser || currentUser.role === "admin" ? null
     : currentUser.verificationStatus !== "aprovado"
       ? "Seu CRECI está em análise pela equipe. Enquanto isso você pode conhecer a plataforma; cadastrar imóveis, clientes, procuras e visitas fica liberado assim que ele for aprovado."
@@ -538,12 +554,12 @@ export default function NegociaLarApp({
               <button
                 type="button"
                 onClick={() => { setIsNotificationsOpen(!isNotificationsOpen); setIsUserSwitcherOpen(false); }}
-                aria-label={unreadCount ? `Notificações: ${unreadCount} não lidas` : "Notificações"}
+                aria-label={bellCount ? `Notificações: ${bellCount} não lidas` : "Notificações"}
                 aria-expanded={isNotificationsOpen}
                 className="relative p-2 rounded-xl bg-slate-800 border border-slate-700 hover:border-amber-500/50 transition"
               >
                 <Bell className="w-4 h-4 text-slate-400" />
-                {unreadCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-black min-w-4 h-4 px-1 rounded-full flex items-center justify-center">{unreadCount}</span>}
+                {bellCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-black min-w-4 h-4 px-1 rounded-full flex items-center justify-center">{bellCount}</span>}
               </button>
               {/* Dropdown do Sininho */}
               {isNotificationsOpen && (
@@ -551,7 +567,7 @@ export default function NegociaLarApp({
                   <div className="p-3.5 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                       <Bell className="w-4 h-4 text-amber-400" />
-                      <span className="text-xs font-bold text-white">Notificações ({notifications.length})</span>
+                      <span className="text-xs font-bold text-white">Notificações ({notifications.length + (billingAlert ? 1 : 0)})</span>
                     </div>
                     {unreadCount > 0 && (
                       <button
@@ -565,7 +581,15 @@ export default function NegociaLarApp({
                   </div>
 
                   <div className="max-h-80 overflow-y-auto divide-y divide-slate-800/60">
+                    {billingAlert && (
+                      <div role="status" className={`p-3.5 space-y-1.5 border-l-2 ${billingAlert.tone === "vencido" ? "border-red-500 bg-red-950/30" : "border-amber-500 bg-amber-950/20"}`}>
+                        <span className="text-xs font-bold text-white flex items-center gap-1.5"><CreditCard className={`w-3.5 h-3.5 ${billingAlert.tone === "vencido" ? "text-red-400" : "text-amber-400"}`} aria-hidden="true" />{billingAlert.title}</span>
+                        <p className="text-xs text-slate-300 leading-relaxed">{billingAlert.message}</p>
+                        <button type="button" onClick={() => { setIsNotificationsOpen(false); setIsSubscriptionOpen(true); }} className="text-[11px] font-bold text-amber-400 hover:underline">Abrir Minha assinatura</button>
+                      </div>
+                    )}
                     {notifications.length === 0 ? (
+                      billingAlert ? null :
                       <div className="p-6 text-center text-xs text-slate-500">
                         Nenhuma notificação no momento.
                       </div>

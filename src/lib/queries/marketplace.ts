@@ -34,6 +34,11 @@ export async function getMarketplaceData(input: MarketplaceQuery = {}) {
           role: users.role, trustScore: users.trustScore,
           successfulDeals: users.successfulDeals, bypassReports: users.bypassReports,
           verificationReviewedAt: users.verificationReviewedAt, verificationReviewedBy: users.verificationReviewedBy,
+          billingExemptAt: users.billingExemptAt,
+          // Para o aviso da mensalidade no sino: primeira cobrança (escolhe mensal ou anual) e Pix aguardando conferência.
+          // "users.id" escrito por extenso: o Drizzle põe só "id" no select de uma tabela, e na subconsulta isso viraria t.id.
+          hasPaid: sql<boolean>`exists (select 1 from transactions t where t.user_id = users.id and t.status = 'pago' and t.type like 'mensalidade\\_%')`,
+          pendingPix: sql<boolean>`exists (select 1 from transactions t where t.user_id = users.id and t.status = 'pendente' and t.payment_method = 'pix' and t.type like 'mensalidade\\_%')`,
           createdAt: users.createdAt,
         }).from(users).where(eq(users.id, currentUserId)).limit(1)
       : [];
@@ -174,6 +179,7 @@ export async function getMarketplaceData(input: MarketplaceQuery = {}) {
           nextBillingDate: users.nextBillingDate, billingCycle: users.billingCycle,
         role: users.role, trustScore: users.trustScore,
         verificationReviewedAt: users.verificationReviewedAt, verificationReviewedBy: users.verificationReviewedBy,
+        billingExemptAt: users.billingExemptAt, billingExemptBy: users.billingExemptBy,
         successfulDeals: users.successfulDeals, bypassReports: users.bypassReports,
         createdAt: users.createdAt,
       })

@@ -618,6 +618,70 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
     assert.equal(after.nextBillingDate!.getTime(), before.nextBillingDate!.getTime());
   });
 
+  await t.test("isenção de cobrança: só admin isenta; conta isenta fica sem vencimento, não confirma Pix e o estorno não corta o acesso", async () => {
+    const [partner] = await db.insert(users).values({
+      name: "Teste Sócia", email: `socia-${suffix}@example.test`, creci: `3${suffix.slice(0, 6)}F`, whatsapp: "11999990006",
+      city: "São Paulo", state: "SP", role: "corretor", verificationStatus: "aprovado", subscriptionStatus: "teste",
+      nextBillingDate: new Date(Date.now() + 2 * 86_400_000), plan: "40", monthlyFee: "150.00",
+    }).returning();
+    registeredIds.push(partner.id);
+    // Pix confirmado antes do registro de estorno (sem confirmed_at e period_end) e um Pix aguardando conferência.
+    const [legacy] = await db.insert(transactions).values({ userId: partner.id, amount: "150.00", type: "mensalidade_pro", paymentMethod: "pix", status: "pago", description: "Pix antigo de teste" }).returning();
+    const [waiting] = await db.insert(transactions).values({ userId: partner.id, amount: "150.00", type: "mensalidade_pro", paymentMethod: "pix", status: "pendente", description: "Pix aguardando" }).returning();
+
+    await assert.rejects(asUser(otherBroker.id, () => actions.exemptUserFromBilling(partner.id)), /restrita à administração/);
+    await assert.rejects(asUser(partner.id, () => actions.exemptUserFromBilling(partner.id)), /restrita à administração/);
+    await asUser(admin.id, () => actions.exemptUserFromBilling(partner.id));
+    const [exempted] = await db.select().from(users).where(eq(users.id, partner.id));
+    assert.equal(exempted.subscriptionStatus, "ativo");
+    assert.equal(exempted.nextBillingDate, null);
+    assert.equal(exempted.monthlyFee, "0.00");
+    assert.equal(exempted.billingExemptBy, admin.id);
+    assert.ok(exempted.billingExemptAt);
+    await assert.rejects(asUser(admin.id, () => actions.exemptUserFromBilling(partner.id)), /já está sem cobrança/);
+
+    await assert.rejects(asUser(admin.id, () => actions.confirmPixSubscriptionPayment(waiting.id)), /não tem cobrança/);
+    await assert.rejects(asUser(partner.id, () => actions.requestSubscriptionRenewal()), /não tem cobrança/);
+    const [stillWaiting] = await db.select().from(users).where(eq(users.id, partner.id));
+    assert.equal(stillWaiting.nextBillingDate, null, "confirmar Pix de conta isenta poria um vencimento de volta");
+
+    await asUser(admin.id, () => actions.refundPixSubscriptionPayment(legacy.id, "Pagamento de teste da equipe"));
+    const [afterRefund] = await db.select().from(users).where(eq(users.id, partner.id));
+    assert.equal(afterRefund.subscriptionStatus, "ativo");
+    assert.equal(afterRefund.nextBillingDate, null);
+    const [refunded] = await db.select().from(transactions).where(eq(transactions.id, legacy.id));
+    assert.equal(refunded.status, "estornado");
+    assert.equal(refunded.refundedBy, admin.id);
+  });
+
+  await t.test("primeira cobrança escolhe mensal ou anual; depois do primeiro pagamento o ciclo fica", async () => {
+    const [trial] = await db.insert(users).values({
+      name: "Teste Ciclo", email: `ciclo-${suffix}@example.test`, creci: `4${suffix.slice(0, 6)}F`, whatsapp: "11999990007",
+      city: "São Paulo", state: "SP", role: "corretor", verificationStatus: "aprovado", subscriptionStatus: "teste",
+      nextBillingDate: new Date(Date.now() + 2 * 86_400_000), plan: "40", billingCycle: "monthly", monthlyFee: "150.00",
+    }).returning();
+    registeredIds.push(trial.id);
+    const first = await asUser(trial.id, () => actions.requestSubscriptionRenewal("annual"));
+    let [charge] = await db.select().from(transactions).where(eq(transactions.id, first.payment.id));
+    assert.equal(charge.amount, "1650.00");
+    const [chosen] = await db.select().from(users).where(eq(users.id, trial.id));
+    assert.equal(chosen.billingCycle, "annual");
+    assert.equal(chosen.monthlyFee, "137.50");
+    let view = await asUser(trial.id, () => actions.getMarketplaceData({ section: "vitrine" }));
+    assert.equal(view.currentUser?.hasPaid, false);
+    assert.equal(view.currentUser?.pendingPix, true);
+    await assert.rejects(asUser(trial.id, () => actions.requestSubscriptionRenewal("monthly")), /aguardando a conferência/);
+
+    await asUser(admin.id, () => actions.confirmPixSubscriptionPayment(first.payment.id));
+    view = await asUser(trial.id, () => actions.getMarketplaceData({ section: "vitrine" }));
+    assert.equal(view.currentUser?.hasPaid, true);
+    assert.equal(view.currentUser?.pendingPix, false);
+    await assert.rejects(asUser(trial.id, () => actions.requestSubscriptionRenewal("monthly")), /ciclo é escolhido no primeiro pagamento/);
+    const renewal = await asUser(trial.id, () => actions.requestSubscriptionRenewal());
+    [charge] = await db.select().from(transactions).where(eq(transactions.id, renewal.payment.id));
+    assert.equal(charge.amount, "1650.00");
+  });
+
   await t.test("sessões adulteradas, expiradas e copiadas após logout são rejeitadas", async () => {
     assert.equal(await asUser(owner.id, () => actions.getCurrentUserId(), {signature:"f".repeat(64)}), null);
     assert.equal(await asUser(owner.id, () => actions.getCurrentUserId(), {signature:"a".repeat(64)+"zz"}), null);
