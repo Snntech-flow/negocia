@@ -165,8 +165,8 @@ export default function BrokerFinance({ blockedReason, onMessage }: { blockedRea
         <div className={card}><p className="text-xs text-slate-400">Despesas</p><p className="mt-1 text-xl font-black text-white">{brl(despesas)}</p>
           <p className="text-[11px] text-slate-400">Pago {brl(summary.paid)} · a pagar {brl(summary.payable)}</p>
           <Delta current={despesas} previous={previousTotal("despesa")} upIsGood={false} /></div>
-        <div className={card}><p className="text-xs text-slate-400">Saldo do período</p><p className={`mt-1 text-xl font-black ${summary.forecast < 0 ? "text-red-700" : "text-white"}`}>{brl(summary.forecast)}</p>
-          <p className="text-[11px] text-slate-400">Já realizado {brl(summary.balance)}</p>
+        <div className={card}><p className="text-xs text-slate-400">Receitas − despesas</p><p className={`mt-1 text-xl font-black ${summary.forecast < 0 ? "text-red-700" : "text-white"}`}>{brl(summary.forecast)}</p>
+          <p className="text-[11px] text-slate-400">Já realizado (recebido − pago) {brl(summary.balance)}</p>
           <Delta current={summary.forecast} previous={previousTotal("receita") - previousTotal("despesa")} upIsGood /></div>
       </div>}
 
@@ -248,6 +248,17 @@ export default function BrokerFinance({ blockedReason, onMessage }: { blockedRea
             </li>;
           })}
         </ul>
+        {/* Total do que está na lista (segue o filtro Todos/Receitas/Despesas). */}
+        {visible.length > 0 && (() => {
+          const income = visible.filter((entry) => entry.kind === "receita").reduce((total, entry) => total + toCents(entry.amount), 0);
+          const expense = visible.filter((entry) => entry.kind === "despesa").reduce((total, entry) => total + toCents(entry.amount), 0);
+          const result = income - expense;
+          return <div className="flex flex-wrap items-center justify-end gap-x-4 gap-y-1 border-t border-slate-700 pt-3 text-sm">
+            <span className="text-slate-400">Receitas <strong className="text-emerald-700">{brl(income)}</strong></span>
+            <span className="text-slate-400">− Despesas <strong className="text-red-700">{brl(expense)}</strong></span>
+            <span className="text-slate-400">= Total <strong className={`text-base ${result < 0 ? "text-red-700" : "text-white"}`}>{brl(result)}</strong></span>
+          </div>;
+        })()}
       </section>
     </div>
   </div>;

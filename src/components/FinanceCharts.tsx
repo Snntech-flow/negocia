@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 // Gráficos do Financeiro em SVG próprio: colunas finas (até 24px) com ponta arredondada, um único eixo em reais,
 // grade em linha fina, legenda sempre presente, dica ao passar o mouse ou focar e tabela como alternativa.
@@ -13,16 +13,18 @@ export const monthShort = (month: string) => `${MONTHS[Number(month.slice(5, 7))
 export const brl = (cents: number) => (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
 const brlCompact = (cents: number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", notation: "compact", maximumFractionDigits: 1 }).format(cents / 100);
 
+// Largura do elemento, medida sempre que ele aparece (o gráfico some e volta: vazio, tabela, troca de período).
 function useWidth<T extends HTMLElement>() {
-  const ref = useRef<T>(null);
   const [width, setWidth] = useState(0);
-  useEffect(() => {
-    const element = ref.current;
+  const observer = useRef<ResizeObserver | null>(null);
+  const ref = useCallback((element: T | null) => {
+    observer.current?.disconnect();
+    observer.current = null;
     if (!element) return;
-    const observer = new ResizeObserver(([entry]) => setWidth(Math.floor(entry.contentRect.width)));
-    observer.observe(element);
-    return () => observer.disconnect();
+    observer.current = new ResizeObserver(([entry]) => setWidth(Math.floor(entry.contentRect.width)));
+    observer.current.observe(element);
   }, []);
+  useEffect(() => () => observer.current?.disconnect(), []);
   return [ref, width] as const;
 }
 
@@ -67,11 +69,13 @@ export function MonthlyChart({ rows, from, to }: { rows: MonthRow[]; from: strin
       </div>
     </div>
     {table ? <div className="overflow-x-auto"><table className="w-full text-left text-xs">
-      <thead className="text-slate-400"><tr><th className="py-2 pr-3">Mês</th><th className="py-2 pr-3 text-right">Receitas</th><th className="py-2 pr-3 text-right">Despesas</th><th className="py-2 pr-3 text-right">Saldo</th><th className="py-2 pr-3 text-right">Recebido</th><th className="py-2 text-right">Pago</th></tr></thead>
+      <thead className="text-slate-400"><tr><th className="py-2 pr-3">Mês</th><th className="py-2 pr-3 text-right">Receitas</th><th className="py-2 pr-3 text-right">Despesas</th><th className="py-2 pr-3 text-right">Receitas − despesas</th><th className="py-2 pr-3 text-right">Recebido</th><th className="py-2 text-right">Pago</th></tr></thead>
       <tbody className="divide-y divide-slate-800 text-slate-300 [font-variant-numeric:tabular-nums]">{rows.map((row) => <tr key={row.month} className={inPeriod(row.month) ? "" : "opacity-60"}>
         <td className="py-2 pr-3 font-semibold">{monthShort(row.month)}</td><td className="py-2 pr-3 text-right">{brl(row.receita)}</td><td className="py-2 pr-3 text-right">{brl(row.despesa)}</td>
         <td className="py-2 pr-3 text-right font-semibold">{brl(row.receita - row.despesa)}</td><td className="py-2 pr-3 text-right">{brl(row.receitaRealizada)}</td><td className="py-2 text-right">{brl(row.despesaRealizada)}</td></tr>)}</tbody>
     </table></div>
+    : rows.every((row) => !row.receita && !row.despesa)
+      ? <p className="rounded-lg border border-dashed border-slate-700 px-3 py-8 text-center text-xs text-slate-400">Sem lançamentos de {monthShort(rows[0]?.month ?? from)} a {monthShort(to)} para comparar.</p>
     : <div ref={ref} className="relative" style={{ height: top + plotHeight + axisBand }} onPointerLeave={() => setHover(null)}>
       {width > 0 && <svg width={width} height={top + plotHeight + axisBand} role="img" aria-label="Receitas e despesas por mês; use Ver tabela para os valores">
         {ticks.map((tick) => <g key={tick}>
@@ -102,10 +106,10 @@ export function MonthlyChart({ rows, from, to }: { rows: MonthRow[]; from: strin
         <p className="mb-1.5 font-bold text-white">{monthShort(hovered.month)}</p>
         {([["Receitas", hovered.receita, "var(--fin-receita)"], ["Despesas", hovered.despesa, "var(--fin-despesa)"]] as const).map(([label, value, color]) =>
           <p key={label} className="flex items-center justify-between gap-3"><span className="flex items-center gap-1.5 text-slate-400"><span className="inline-block h-0.5 w-3" style={{ background: color }} />{label}</span><strong className="text-white">{brl(value)}</strong></p>)}
-        <p className="mt-1 flex justify-between gap-3 border-t border-slate-800 pt-1"><span className="text-slate-400">Saldo</span><strong className="text-white">{brl(hovered.receita - hovered.despesa)}</strong></p>
+        <p className="mt-1 flex justify-between gap-3 border-t border-slate-800 pt-1"><span className="text-slate-400">Receitas − despesas</span><strong className="text-white">{brl(hovered.receita - hovered.despesa)}</strong></p>
       </div>}
     </div>}
-    {!table && rows.some((row) => !inPeriod(row.month)) && <p className="text-[11px] text-slate-400">Meses fora do período escolhido aparecem mais claros, só para comparar.</p>}
+    {!table && rows.some((row) => row.receita || row.despesa) && rows.some((row) => !inPeriod(row.month)) && <p className="text-[11px] text-slate-400">Meses fora do período escolhido aparecem mais claros, só para comparar.</p>}
   </figure>;
 }
 
