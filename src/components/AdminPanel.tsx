@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Ban, Check, CheckCircle2, CreditCard, DollarSign, Gift, MessageSquarePlus, RotateCcw, Search, ShieldCheck, TrendingUp, Users } from "lucide-react";
+import { Ban, Check, CheckCircle2, CreditCard, DollarSign, ExternalLink, Gift, MessageSquarePlus, RotateCcw, Search, ShieldCheck, TrendingUp, Users } from "lucide-react";
 import { confirmPixSubscriptionPayment, exemptUserFromBilling, refundPixSubscriptionPayment, updatePilotFeedbackStatus, updateUserStatus } from "@/lib/actions";
 import { unwrap } from "@/lib/action-result";
 import { askConfirm, askText } from "@/lib/dialogs";
+import { creciConsultaUrl, creciDigits } from "@/lib/creci-consulta";
 import { hasSubscriptionAccess } from "@/lib/subscription";
 import { planName } from "@/lib/plans";
 import type { WorkspaceFeedback, WorkspaceTransaction, WorkspaceUser } from "@/lib/workspace-types";
@@ -67,6 +68,17 @@ export default function AdminPanel({ users, transactions, feedback, currentUserI
       onUsersChange((items) => items.map((user) => user.id === item.userId ? { ...user, subscriptionStatus: result.payment.subscriptionStatus, nextBillingDate: result.payment.nextBillingDate } : user));
     }
   }
+  // Conferência do CRECI: abre a busca do conselho do estado e copia o número (as buscas pedem só os dígitos).
+  async function copyCreci(user: WorkspaceUser) {
+    const digits = creciDigits(user.creci);
+    if (!digits) { onMessage(`Busque ${user.name} pelo nome ou CPF no site do CRECI-${user.state}.`); return; }
+    try {
+      await navigator.clipboard.writeText(digits);
+      onMessage(`Número ${digits} copiado: cole na busca do CRECI-${user.state} e confira se aparece ${user.name}.`);
+    } catch {
+      onMessage(`Busque o número ${digits} no site do CRECI-${user.state} e confira se aparece ${user.name}.`);
+    }
+  }
   async function feedbackStatus(item: WorkspaceFeedback, status: string) {
     const result = await run(`fb:${item.id}`, async () => unwrap(await updatePilotFeedbackStatus(item.id, status)), "Feedback atualizado.");
     if (result) onFeedbackChange((items) => items.map((row) => row.id === item.id ? { ...row, status: result.feedback.status } : row));
@@ -98,7 +110,8 @@ export default function AdminPanel({ users, transactions, feedback, currentUserI
           <tbody className="divide-y divide-slate-800/60 text-slate-300">
             {filtered.map((user) => <tr key={user.id}>
               <td className="py-3.5 px-4"><div className="flex items-center gap-3"><Avatar name={user.name} url={user.avatarUrl} size={36} /><div><div className="font-bold text-white flex items-center gap-1.5">{user.name}{user.isVerified && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" aria-label="CRECI aprovado" />}</div><div className="text-[11px] text-slate-400">{user.email}</div></div></div></td>
-              <td className="py-3.5 px-4"><div className="font-semibold">CRECI {user.creci}</div><div className="text-[11px] text-slate-400">{user.city}/{user.state}</div></td>
+              <td className="py-3.5 px-4"><div className="font-semibold">CRECI {user.creci}</div><div className="text-[11px] text-slate-400">{user.city}/{user.state}</div>
+                {creciConsultaUrl(user.state) && <a href={creciConsultaUrl(user.state)!} target="_blank" rel="noopener noreferrer" onClick={() => void copyCreci(user)} title={`Abre a busca do CRECI-${user.state} e copia o número`} className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-sky-300 hover:underline"><ExternalLink className="h-3 w-3" aria-hidden="true" />Conferir no CRECI-{user.state}</a>}</td>
               <td className="py-3.5 px-4"><div className="font-semibold text-white">{planName(user.plan)}</div>{user.billingExemptAt
                 ? <><div className="text-[11px] font-semibold text-emerald-400">Sem cobrança</div><div className="text-[10px] text-slate-500">por {nameOf(user.billingExemptBy)} em {when(user.billingExemptAt)}</div></>
                 : <div className="text-[11px] text-slate-400">{money(user.monthlyFee)}/mês · {user.subscriptionStatus === "teste" ? "período grátis" : user.subscriptionStatus}</div>}</td>
