@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Ban, Check, CheckCircle2, CreditCard, DollarSign, Gift, MessageSquarePlus, RotateCcw, Search, ShieldCheck, TrendingUp, Users } from "lucide-react";
 import { confirmPixSubscriptionPayment, exemptUserFromBilling, refundPixSubscriptionPayment, updatePilotFeedbackStatus, updateUserStatus } from "@/lib/actions";
 import { unwrap } from "@/lib/action-result";
+import { askConfirm, askText } from "@/lib/dialogs";
 import { hasSubscriptionAccess } from "@/lib/subscription";
 import { planName } from "@/lib/plans";
 import type { WorkspaceFeedback, WorkspaceTransaction, WorkspaceUser } from "@/lib/workspace-types";
@@ -40,17 +41,17 @@ export default function AdminPanel({ users, transactions, feedback, currentUserI
   }
 
   async function moderate(user: WorkspaceUser, status: "aprovado" | "suspenso") {
-    if (status === "suspenso" && !window.confirm(`Suspender ${user.name}? A pessoa perde o acesso na hora.`)) return;
+    if (status === "suspenso" && !(await askConfirm({ title: `Suspender ${user.name}?`, message: "A pessoa perde o acesso na hora.", confirmLabel: "Suspender", danger: true }))) return;
     const result = await run(`user:${user.id}`, async () => unwrap(await updateUserStatus(user.id, status)), status === "aprovado" ? `CRECI de ${user.name} aprovado.` : `${user.name} foi suspenso.`);
     if (result) onUsersChange((items) => items.map((item) => item.id === user.id ? { ...item, verificationStatus: status, isVerified: status === "aprovado", verificationReviewedBy: result.reviewedBy, verificationReviewedAt: new Date(result.reviewedAt) } : item));
   }
   async function exempt(user: WorkspaceUser) {
-    if (!window.confirm(`Isentar ${user.name} de cobrança? A conta fica ativa, sem vencimento e sem mensalidade.`)) return;
+    if (!(await askConfirm({ title: `Isentar ${user.name} de cobrança?`, message: "A conta fica ativa, sem vencimento e sem mensalidade. Esta tela não volta a cobrar depois.", confirmLabel: "Isentar" }))) return;
     const result = await run(`user:${user.id}`, async () => unwrap(await exemptUserFromBilling(user.id)), `${user.name} agora não tem cobrança.`);
     if (result) onUsersChange((items) => items.map((item) => item.id === user.id ? { ...item, subscriptionStatus: "ativo", nextBillingDate: null, monthlyFee: "0.00", billingExemptBy: result.exemptBy, billingExemptAt: new Date(result.exemptAt) } : item));
   }
   async function confirmPix(item: WorkspaceTransaction) {
-    if (!window.confirm(`Você conferiu no extrato do banco o recebimento de ${money(item.amount)} de ${item.userName}?`)) return;
+    if (!(await askConfirm({ title: "Confirmar o recebimento?", message: `Você conferiu no extrato do banco o recebimento de ${money(item.amount)} de ${item.userName}?`, confirmLabel: "Conferi no extrato" }))) return;
     const result = await run(`tx:${item.id}`, async () => unwrap(await confirmPixSubscriptionPayment(item.id)), "Pix confirmado. A aprovação do CRECI continua separada.");
     if (result) {
       onTransactionsChange((items) => items.map((row) => row.id === item.id ? { ...row, status: "pago", confirmedAt: result.payment.confirmedAt, confirmedBy: currentUserId } : row));
@@ -58,7 +59,7 @@ export default function AdminPanel({ users, transactions, feedback, currentUserI
     }
   }
   async function refund(item: WorkspaceTransaction) {
-    const reason = window.prompt(`Estornar ${money(item.amount)} de ${item.userName}? Informe o motivo (fica no histórico e é enviado ao corretor):`, "");
+    const reason = await askText({ title: `Estornar ${money(item.amount)} de ${item.userName}?`, message: "O motivo fica no histórico e é enviado ao corretor.", label: "Motivo do estorno", minLength: 5, maxLength: 300, multiline: true, confirmLabel: "Estornar", danger: true });
     if (reason === null) return;
     const result = await run(`tx:${item.id}`, async () => unwrap(await refundPixSubscriptionPayment(item.id, reason)), "Pagamento estornado e acesso ajustado.");
     if (result) {

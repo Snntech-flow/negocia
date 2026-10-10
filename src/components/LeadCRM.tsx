@@ -13,6 +13,7 @@ import { Calculator, Bot, LayoutDashboard, List, KanbanSquare, Building2, Calend
 import { addLeadActivity, completeLeadFollowUp, createDvpCertificate, createLead, importLeadsCsv, updateLead, updateLeadStage } from "@/lib/actions";
 import { loadStateCities, uniqueCities } from "@/lib/cities";
 import { unwrap } from "@/lib/action-result";
+import { askText } from "@/lib/dialogs";
 
 export interface LeadItem {
   documentation?: NegotiationDocuments | null;
@@ -354,7 +355,7 @@ export default function LeadCRM({
     setError(null);
     let lostReason: string | undefined;
     if (stage === "perdido") {
-      lostReason = window.prompt("Qual foi o motivo da perda?")?.trim() || undefined;
+      lostReason = (await askText({ title: "Marcar como perdido", label: "Qual foi o motivo da perda?", minLength: 1, confirmLabel: "Marcar como perdido", danger: true })) || undefined;
       if (!lostReason) return;
     }
     setBusy(true);

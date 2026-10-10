@@ -4,6 +4,7 @@ import { useEffect, useState, type FormEvent } from "react";
 import { AlertTriangle, ArrowDownRight, ArrowUpRight, CheckCircle2, ChevronLeft, ChevronRight, Pencil, Plus, RotateCcw, Trash2, Wallet } from "lucide-react";
 import { createFinanceEntry, deleteFinanceEntry, getFinancePeriod, setFinanceEntryPaid, updateFinanceEntry } from "@/lib/actions/finance";
 import { unwrap, type ActionData } from "@/lib/action-result";
+import { askConfirm } from "@/lib/dialogs";
 import {
   addMonthsKeepingDay, categoryTotals, chartStart, FINANCE_CATEGORIES, FINANCE_PRESETS, financeCategoryLabel, financeStatus, MAX_REPEAT_MONTHS,
   monthsBetween, percentChange, presetPeriod, shiftMonth, summarizeFinance, toCents, type FinanceKind, type FinancePreset, type FinanceStatus,
@@ -124,7 +125,7 @@ export default function BrokerFinance({ blockedReason, onMessage }: { blockedRea
       paidAt ? (entry.kind === "receita" ? "Marcado como recebido hoje." : "Marcado como pago hoje.") : "Lançamento reaberto.");
   }
   async function remove(entry: Entry) {
-    if (!window.confirm(`Excluir "${entry.description}"? Não dá para desfazer.`)) return;
+    if (!(await askConfirm({ title: `Excluir "${entry.description}"?`, message: "Não dá para desfazer.", confirmLabel: "Excluir", danger: true }))) return;
     await run(`del:${entry.id}`, async () => unwrap(await deleteFinanceEntry(entry.id)), "Lançamento excluído.");
   }
 

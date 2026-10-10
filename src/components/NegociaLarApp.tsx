@@ -18,6 +18,8 @@ import PropertyCreateForm from "./PropertyCreateForm";
 const SubscriptionPanel = dynamic(() => import("./SubscriptionPanel"));
 const BillingPopup = dynamic(() => import("./BillingPopup"));
 const AdminPanel = dynamic(() => import("./AdminPanel"));
+import DialogHost from "./DialogHost";
+import { askConfirm, askText } from "@/lib/dialogs";
 import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import {
@@ -467,8 +469,9 @@ export default function NegociaLarApp({
     return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(num);
   };
 
-  const handlePartnershipStatus = async (partnership: PartnershipItem, newStatus: string) => {
-    const note = window.prompt("Observação para a linha do tempo (opcional):", "");
+  const handlePartnershipStatus = async (partnership: PartnershipItem, newStatus: string, statusLabel: string) => {
+    const refusing = newStatus === "recusado";
+    const note = await askText({ title: refusing ? `Confirmar etapa “${statusLabel}”?` : `Marcar: ${statusLabel}`, label: "Observação para a linha do tempo (opcional)", maxLength: 500, multiline: true, confirmLabel: refusing ? "Recusar" : "Salvar etapa", danger: refusing });
     if (note === null) return;
     try {
       const result = unwrap(await updatePartnershipStatus(partnership.id, newStatus, note));
@@ -512,7 +515,7 @@ export default function NegociaLarApp({
 
   const handlePartnershipSplitResponse = async (partnership: PartnershipItem, accepted: boolean) => {
     const splitName = partnership.commissionModel === "three_party_referral_40_40_20" ? "40/40/20" : "50/50";
-    if (!accepted && !window.confirm(`Recusar a proposta ${splitName}? Ela poderá receber uma nova versão.`)) return;
+    if (!accepted && !(await askConfirm({ title: `Recusar a proposta ${splitName}?`, message: "Ela poderá receber uma nova versão.", confirmLabel: "Recusar", danger: true }))) return;
     try {
       const result = unwrap(await respondToPartnershipSplit(partnership.id, accepted, partnership.commissionRevision));
       setPartnershipList((items) => items.map((item) => item.id === partnership.id ? { ...item, ...result.partnership } : item));
@@ -1242,7 +1245,7 @@ export default function NegociaLarApp({
                           <button className="sm:col-span-2 rounded-lg border border-amber-500/40 px-3 py-2 text-[11px] font-bold text-amber-200 hover:bg-amber-500/10">Salvar nova versão e pedir confirmação dos dois</button>
                         </form></details>}
                       </div>
-                      {nextStatuses.length > 0 && (currentUser?.id === partnership.captorBrokerId || currentUser?.id === partnership.partnerBrokerId) && <div className="mt-3 flex flex-wrap gap-2">{nextStatuses.map((nextStatus) => <button key={nextStatus} type="button" onClick={() => { if (nextStatus === "fechado") { openClosing(partnership); return; } if (nextStatus === "recusado" && !window.confirm(`Confirmar etapa “${labels[nextStatus]}”?`)) return; void handlePartnershipStatus(partnership, nextStatus); }} className={`rounded-lg border px-3 py-2 text-[11px] font-bold ${nextStatus === "recusado" ? "border-rose-500/25 text-rose-300 hover:bg-rose-500/10" : "border-emerald-500/25 text-emerald-300 hover:bg-emerald-500/10"}`}>{nextStatus === "recusado" ? "Recusar" : `Marcar: ${labels[nextStatus]}`}</button>)}</div>}
+                      {nextStatuses.length > 0 && (currentUser?.id === partnership.captorBrokerId || currentUser?.id === partnership.partnerBrokerId) && <div className="mt-3 flex flex-wrap gap-2">{nextStatuses.map((nextStatus) => <button key={nextStatus} type="button" onClick={() => { if (nextStatus === "fechado") { openClosing(partnership); return; } void handlePartnershipStatus(partnership, nextStatus, labels[nextStatus]); }} className={`rounded-lg border px-3 py-2 text-[11px] font-bold ${nextStatus === "recusado" ? "border-rose-500/25 text-rose-300 hover:bg-rose-500/10" : "border-emerald-500/25 text-emerald-300 hover:bg-emerald-500/10"}`}>{nextStatus === "recusado" ? "Recusar" : `Marcar: ${labels[nextStatus]}`}</button>)}</div>}
                       {closing?.id === partnership.id && <PartnershipClosingForm partnership={partnership} value={closing} onChange={setClosing} onSubmit={(event) => void handleClosePartnership(partnership, event)} onCancel={() => setClosing(null)} />}
                       {partnership.status === "fechado" && partnership.commissionTotal && <p className="mt-3 rounded-md border border-emerald-500/25 bg-emerald-950/10 p-2 text-[11px] text-slate-300">Comissão total {Number(partnership.commissionTotal).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}{partnership.commissionExpectedDate ? `, prevista para ${partnership.commissionExpectedDate.split("-").reverse().join("/")}` : ""}. A parte de cada corretor está no Financeiro dele.</p>}
                       <details className="mt-3 border-t border-slate-800 pt-3"><summary className="cursor-pointer text-[11px] font-semibold text-slate-300">Linha do tempo ({history.length})</summary><div className="mt-3 space-y-2">{history.length ? history.map((activity) => <div key={activity.id} className="border-l border-slate-700 pl-3 text-[11px]"><div className="flex flex-wrap items-center justify-between gap-2 text-slate-300"><span>{activity.actorName}: {labels[activity.newStatus] || activity.newStatus}</span><time className="text-slate-500">{new Date(activity.createdAt).toLocaleString("pt-BR")}</time></div>{activity.note && <p className="mt-1 whitespace-pre-wrap text-slate-500">{activity.note}</p>}</div>) : <p className="text-[11px] text-slate-500">Nenhum evento registrado.</p>}</div></details>
@@ -1301,6 +1304,7 @@ export default function NegociaLarApp({
       {currentUser && billingAlert && clock !== null && !isSubscriptionOpen && <BillingPopup userId={currentUser.id} notice={billingAlert} pendingPix={!!currentUser.pendingPix} now={new Date(clock)}
         plan={currentUser.plan} hasPaid={!!currentUser.hasPaid} billingCycle={currentUser.billingCycle}
         onRegistered={() => setCurrentUser((user) => user && { ...user, pendingPix: true })} onOpenSubscription={() => setIsSubscriptionOpen(true)} onMessage={(text) => showToast(text)} />}
+      <DialogHost />
       {isFeedbackOpen && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 p-4" role="dialog" aria-modal="true" aria-labelledby="pilot-feedback-title"><form onSubmit={(event) => void handlePilotFeedbackSubmit(event)} className="w-full max-w-lg space-y-4 rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl"><div className="flex items-start justify-between gap-4"><div><h2 id="pilot-feedback-title" className="text-lg font-bold text-white">Ajuda e fale conosco</h2><p className="mt-1 text-xs text-slate-400">Envie uma dúvida, relate um problema ou sugira uma melhoria. Sua mensagem e a tela atual ficam disponíveis para a equipe no painel administrativo.</p></div><button type="button" aria-label="Fechar" onClick={() => setIsFeedbackOpen(false)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white">✕</button></div><label className="block text-xs font-semibold text-slate-300">Tipo<select name="category" required className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white"><option value="duvida">Dúvida</option><option value="erro">Encontrei um erro</option><option value="ideia">Sugestão de melhoria</option></select></label><label className="block text-xs font-semibold text-slate-300">O que aconteceu ou o que você sugere?<textarea name="message" required minLength={10} maxLength={2000} rows={5} placeholder="Descreva o que tentou fazer e o que ficou confuso…" className="mt-1 w-full resize-y rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white placeholder:text-slate-500" /></label><div className="flex justify-end gap-2"><button type="button" onClick={() => setIsFeedbackOpen(false)} className="rounded-lg px-3 py-2 text-xs text-slate-300 hover:bg-slate-800">Cancelar</button><button disabled={feedbackBusy} className="rounded-lg bg-amber-500 px-4 py-2 text-xs font-bold text-slate-950 disabled:opacity-50">{feedbackBusy ? "Enviando…" : "Enviar feedback"}</button></div></form></div>}
       {isOnboardingModalOpen && <OnboardingModal
         isOpen={isOnboardingModalOpen}
