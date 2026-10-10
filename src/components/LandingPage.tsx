@@ -66,19 +66,20 @@ export default function LandingPage({
       {/* Header Limpo & Autoritário */}
       <header className="border-b border-slate-200 bg-white/95 backdrop-blur sticky top-0 z-40">
         <div className="max-w-6xl mx-auto px-4 sm:px-6 h-20 flex items-center justify-between">
-          <div className="flex items-center gap-3">
-            <div className="relative w-10 h-10 rounded-lg overflow-hidden border border-slate-200 shadow-sm">
-              <Image src="/logo-negocialar.png" alt="Negocia Lar" fill sizes="40px" className="object-contain" />
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="relative w-12 h-12 sm:w-14 sm:h-14 shrink-0 rounded-xl overflow-hidden border border-slate-200 shadow-sm">
+              <Image src="/logo-negocialar.png" alt="Negocia Lar" fill sizes="56px" className="object-contain" />
             </div>
             <div>
               <div className="flex items-center gap-2">
-                <span className="font-extrabold text-2xl tracking-tight text-slate-900">
+                <span className="font-extrabold text-2xl leading-none tracking-tight text-slate-900">
                   Negocia<span className="text-amber-600">lar</span>
                 </span>
               </div>
-              <div className="mt-1 inline-flex items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[9px] sm:text-[11px] font-bold text-amber-800">
+              <div className="mt-0.5 sm:mt-1.5 flex w-fit items-center gap-1 rounded-full border border-amber-200 bg-amber-50 px-2 py-1 text-[9px] sm:text-[11px] leading-3 sm:leading-4 font-bold text-amber-800">
                 <ShieldCheck className="h-3 w-3 shrink-0 text-amber-600" aria-hidden="true" />
-                Rede de parcerias para corretores
+                <span className="hidden sm:inline">Rede de parcerias para corretores</span>
+                <span className="sm:hidden">Parcerias para corretores</span>
               </div>
             </div>
           </div>
@@ -113,14 +114,19 @@ export default function LandingPage({
             
             {/* Texto Principal */}
             <div className="lg:col-span-7 space-y-6 text-left">
-              <p className="inline-flex items-center gap-2 rounded-full border border-amber-200 bg-amber-50 px-3 py-1 text-xs font-bold text-amber-800"><Radar className="h-4 w-4" aria-hidden="true" />Match automático entre imóveis e compradores</p>
+              <div className="rounded-2xl border border-amber-200 bg-amber-50/50 p-5 text-center">
+                <Radar className="mx-auto h-8 w-8 text-orange-500" aria-hidden="true" />
+                <p className="mt-3 text-xs font-bold uppercase tracking-wide text-amber-700">Match automático no Radar</p>
+                <p className="mt-2 text-xl sm:text-2xl font-extrabold text-slate-950">O “<span className="text-orange-500">Tinder</span>” dos corretores</p>
+                <p className="mt-2 text-sm text-slate-600">Você cadastra o que seu cliente procura. Se outro corretor tem o imóvel, a plataforma dá o Match e avisa você.</p>
+              </div>
 
               <h1 className="text-3xl sm:text-4xl lg:text-5xl font-extrabold text-slate-950 tracking-tight leading-[1.15]">
                 Chega de perder comissão e captação.
               </h1>
 
               <p className="text-base sm:text-lg text-slate-600 leading-relaxed max-w-xl">
-                Um corretor tem o imóvel, outro tem o cliente. O Negocia Lar cruza os dois, organiza sua carteira e acompanha a negociação do primeiro contato à documentação.
+                Cansado de perder tempo procurando o imóvel do seu cliente? Um corretor tem o imóvel, outro tem o cliente. O Negocia Lar cruza os dois, organiza sua carteira e acompanha a negociação do primeiro contato à documentação.
               </p>
 
               <div className="pt-2 flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
@@ -230,7 +236,7 @@ export default function LandingPage({
         <div className="mx-auto max-w-5xl px-4 sm:px-6">
           <div className="mx-auto max-w-3xl text-center">
             <p className="text-xs font-bold uppercase tracking-widest text-amber-600">Muito além de uma vitrine de imóveis</p>
-            <h2 className="mt-3 text-2xl font-extrabold leading-tight text-slate-950 sm:text-3xl">O match certo para seus imóveis.<br className="hidden sm:block" /> Um CRM para organizar seus negócios.</h2>
+            <h2 className="mt-3 text-2xl font-extrabold leading-tight text-slate-950 sm:text-3xl">O Match certo para seus imóveis.<br className="hidden sm:block" /> Um CRM para organizar seus negócios.</h2>
             <p className="mt-4 text-sm leading-relaxed text-slate-600">Encontre oportunidades de parceria, organize seus clientes e prepare a documentação da negociação em um só lugar.</p>
           </div>
           <div className="mt-8 grid gap-4 md:grid-cols-3">
@@ -254,7 +260,7 @@ export default function LandingPage({
               <p className="mt-3 text-sm leading-relaxed text-slate-600">Personalize a lista de documentos e os custos da operação, acompanhe pendências e compartilhe a lista com o cliente pelo WhatsApp ou PDF. Salve seu modelo para reutilizar.</p>
             </article>
           </div>
-          <p className="mt-5 text-center text-xs leading-relaxed text-slate-500">O cruzamento acontece ao cadastrar uma busca no Radar ou um novo imóvel de venda para parceria. O match indica compatibilidade; os corretores confirmam os detalhes e combinam a parceria.</p>
+          <p className="mt-5 text-center text-xs leading-relaxed text-slate-500">O cruzamento acontece ao cadastrar uma busca no Radar ou um novo imóvel de venda para parceria. O Match indica compatibilidade; os corretores confirmam os detalhes e combinam a parceria.</p>
           <div className="mt-6 text-center"><button onClick={() => { setSelectedPlanForOnboarding("40"); setOnboardingMode("register"); setIsOnboardingOpen(true); }} className="inline-flex items-center gap-2 rounded-xl bg-amber-500 px-6 py-3 text-sm font-bold text-slate-950 transition hover:bg-amber-400">Conhecer o sistema por 30 dias grátis <ArrowRight className="h-4 w-4" aria-hidden="true" /></button></div>
         </div>
       </section>
@@ -307,7 +313,7 @@ export default function LandingPage({
         <div className="mx-auto max-w-5xl space-y-3 px-4 sm:px-6">
           <Radar className="h-8 w-8 text-amber-600" aria-hidden="true" />
           <h2 className="text-2xl font-extrabold text-slate-950">Radar de compradores: encontre oportunidades para seus imóveis</h2>
-          <p className="max-w-3xl text-sm leading-relaxed text-slate-600">Cadastre o que seu cliente procura e compare com os imóveis disponíveis. O match indica a compatibilidade entre as preferências do comprador e as características do imóvel, ajudando você a encontrar possíveis parcerias. Confira os critérios e converse com o corretor responsável para confirmar os detalhes.</p>
+          <p className="max-w-3xl text-sm leading-relaxed text-slate-600">Cadastre o que seu cliente procura e compare com os imóveis disponíveis. O Match indica a compatibilidade entre as preferências do comprador e as características do imóvel, ajudando você a encontrar possíveis parcerias. Confira os critérios e converse com o corretor responsável para confirmar os detalhes.</p>
         </div>
       </section>
 
@@ -501,7 +507,7 @@ export default function LandingPage({
               {"q": "Meus clientes ficam visíveis para outros corretores?", "a": "Sua carteira do CRM, contatos e histórico são privados. No Radar, preferências de busca podem ajudar a encontrar parcerias, sem expor o nome interno e as observações particulares do cliente."},
               {"q": "O que posso fazer no CRM?", "a": "Cadastrar clientes, organizar oportunidades no funil, registrar contatos, agendar retornos, filtrar a carteira e importar ou exportar contatos em CSV. Acesse CRM → Minha carteira."},
               {"q": "O que é importar CSV?", "a": "É trazer contatos de uma planilha para o CRM. CSV é um formato de arquivo que você pode salvar no Excel ou Google Planilhas. Na opção Importar contatos de uma planilha, confira as instruções e o modelo antes de enviar."},
-              {"q": "Como funciona o Radar de compradores?", "a": "Ao cadastrar uma busca no Radar ou um novo imóvel de venda para parceria, o sistema cruza cidade, tipo, bairros, orçamento, quartos e vagas. Quando encontra compatibilidade, gera um aviso dentro do sistema para o corretor que procura. O match não fecha a venda nem envia documentos automaticamente; os corretores confirmam os detalhes e combinam a parceria."},
+              {"q": "Como funciona o Radar de compradores?", "a": "Ao cadastrar uma busca no Radar ou um novo imóvel de venda para parceria, o sistema cruza cidade, tipo, bairros, orçamento, quartos e vagas. Quando encontra compatibilidade, gera um aviso dentro do sistema para o corretor que procura. O Match não fecha a venda nem envia documentos automaticamente; os corretores confirmam os detalhes e combinam a parceria."},
               {"q": "O Bartolomeu pode ajudar com financiamento?", "a": "Sim. Ele ajuda com atendimento, organização do CRM e dúvidas sobre MCMV, SBPE, FGTS e financiamento. Pode pesquisar e apresentar fontes consultadas. Confirme regras e valores com o banco; a IA não aprova crédito nem garante subsídio. Não envie documentos ou dados pessoais de clientes."},
               {"q": "A simulação de amortização é uma proposta do banco?", "a": "Não. É uma estimativa matemática em SAC ou Price para comparar aportes que reduzem o prazo ou a parcela. Não inclui seguros, tarifas, TR/IPCA ou regras específicas da instituição. Confirme as condições no contrato e no banco."},
               {"q": "O que é DVP? Ele vale como contrato assinado?", "a": "DVP significa Documento de Visita Presencial. Na plataforma, ele registra os dados da visita como rascunho para acompanhamento. Esse registro não é assinatura eletrônica nem garante comissão; formalize os acordos entre as partes."},

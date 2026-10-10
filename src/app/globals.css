@@ -163,3 +163,6 @@ body {
 /* Texto branco em botão e selo coloridos continua branco: a regra geral troca text-white por azul-marinho
    porque, no resto da área de trabalho, os fundos escuros viraram brancos. */
 .negocialar-interior .text-white:is([class*="bg-emerald-7"], [class*="bg-red-6"], [class*="bg-sky-8"], [class*="bg-blue-6"], [class*="bg-purple-6"], [class*="bg-amber-7"]) { color: #ffffff; }
+
+/* O campo de senha tem o próprio olho (PasswordInput); o do Edge apareceria duplicado ao lado. */
+input::-ms-reveal { display: none; }

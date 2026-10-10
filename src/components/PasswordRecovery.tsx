@@ -4,6 +4,7 @@ import { useState, useEffect, type FormEvent } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { requestPasswordResetForm, resetPasswordForm } from "@/lib/actions/password-recovery";
+import { PasswordInput } from "./PasswordInput";
 
 export function RequestPasswordRecovery({ onBack }: { onBack: () => void }) {
   const [email, setEmail] = useState("");
@@ -68,12 +69,14 @@ export default function PasswordRecovery() {
       </> : token ? <form onSubmit={submit} className="space-y-4">
         <h1 className="text-xl font-bold text-slate-900">Crie sua nova senha</h1>
         <p className="text-sm text-slate-600">Use entre 12 e 200 caracteres.</p>
-        <label className="block text-sm font-semibold text-slate-700">Nova senha
-          <input required type="password" autoComplete="new-password" minLength={12} maxLength={200} value={password} onChange={event => setPassword(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 p-3" />
-        </label>
-        <label className="block text-sm font-semibold text-slate-700">Confirme a nova senha
-          <input required type="password" autoComplete="new-password" minLength={12} maxLength={200} value={confirmation} onChange={event => setConfirmation(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 p-3" />
-        </label>
+        <div>
+          <label htmlFor="new-password" className="block text-sm font-semibold text-slate-700">Nova senha</label>
+          <PasswordInput id="new-password" required autoComplete="new-password" minLength={12} maxLength={200} value={password} onChange={event => setPassword(event.target.value)} className="w-full rounded-xl border border-slate-300 p-3" wrapperClassName="mt-1" />
+        </div>
+        <div>
+          <label htmlFor="new-password-confirmation" className="block text-sm font-semibold text-slate-700">Confirme a nova senha</label>
+          <PasswordInput id="new-password-confirmation" required autoComplete="new-password" minLength={12} maxLength={200} value={confirmation} onChange={event => setConfirmation(event.target.value)} className="w-full rounded-xl border border-slate-300 p-3" wrapperClassName="mt-1" />
+        </div>
         {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
         <button disabled={busy} className="w-full rounded-xl bg-slate-900 p-3 font-bold text-white disabled:opacity-60">{busy ? "Salvando…" : "Salvar nova senha"}</button>
         <button type="button" disabled={busy} onClick={() => { setToken(null); setError(""); setPassword(""); setConfirmation(""); }} className="w-full text-sm font-semibold text-amber-700">Solicitar outro link</button>

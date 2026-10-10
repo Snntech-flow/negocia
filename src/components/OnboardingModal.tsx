@@ -11,6 +11,7 @@ import { loadStateCities } from "@/lib/cities";
 import { isPlanId, PLAN_IDS, PLANS, planCharge, planMonthlyEquivalent, type BillingCycle, type PlanId } from "@/lib/plans";
 
 import { RequestPasswordRecovery } from "./PasswordRecovery";
+import { PasswordInput } from "./PasswordInput";
 
 type AuthUser = ActionData<Awaited<ReturnType<typeof loginUser>>>["user"];
 
@@ -138,15 +139,16 @@ export default function OnboardingModal({ isOpen, onClose, onComplete, initialPl
         {step === 1 && mode === "login" && (
           <form onSubmit={handleLogin} className="p-6 space-y-4">
             <div>
-              <h3 className="text-lg font-extrabold text-slate-900">Entrar no Negocia Lar</h3>
+              <h3 className="text-lg font-extrabold text-slate-900">Entrar no Negocia <span className="text-amber-600">Lar</span></h3>
               <p className="text-xs text-slate-500">Use o e-mail e a senha do seu cadastro.</p>
             </div>
             <label className="block text-xs font-bold text-slate-700">E-mail
               <input required type="email" autoComplete="email" value={formData.email} onChange={(e) => setFormData({ ...formData, email: e.target.value })} className={`mt-1 ${inputClass}`} />
             </label>
-            <label className="block text-xs font-bold text-slate-700">Senha
-              <input required type="password" autoComplete="current-password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} className={`mt-1 ${inputClass}`} />
-            </label>
+            <div>
+              <label htmlFor="login-password" className="block text-xs font-bold text-slate-700">Senha</label>
+              <PasswordInput id="login-password" required autoComplete="current-password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} className={inputClass} wrapperClassName="mt-1" />
+            </div>
             {actionError && <p role="alert" className="text-xs text-red-700">{actionError}</p>}
             <button disabled={busyLogin} className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl disabled:opacity-60">{busyLogin ? "Entrando…" : "Entrar"}</button>
             <button type="button" onClick={() => { setMode("recovery"); setActionError(null); }} className="w-full text-xs text-amber-700 font-semibold">Esqueci minha senha</button>
@@ -197,7 +199,7 @@ export default function OnboardingModal({ isOpen, onClose, onComplete, initialPl
 
             <div>
               <label htmlFor="onboarding-password" className="block text-xs font-bold text-slate-700 mb-1">Senha (mínimo 12 caracteres)</label>
-              <input id="onboarding-password" required minLength={12} maxLength={200} type="password" autoComplete="new-password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} className={inputClass} />
+              <PasswordInput id="onboarding-password" required minLength={12} maxLength={200} autoComplete="new-password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} className={inputClass} />
             </div>
             {actionError && <p role="alert" className="text-xs text-red-700">{actionError}</p>}
 
@@ -302,7 +304,7 @@ export default function OnboardingModal({ isOpen, onClose, onComplete, initialPl
           <div className="p-8 text-center space-y-6">
             <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-inner"><CheckCircle2 className="w-10 h-10" /></div>
             <div className="space-y-1">
-              <h3 className="text-2xl font-black text-slate-900">Bem-vindo ao Negocia Lar!</h3>
+              <h3 className="text-2xl font-black text-slate-900">Bem-vindo ao Negocia <span className="text-amber-600">Lar</span>!</h3>
               <p className="text-xs text-slate-500 max-w-sm mx-auto">Seu cadastro no plano <strong>{selectedPlan.name}</strong> foi criado e os 30 dias grátis já começaram. A equipe confere o CRECI para liberar o uso da rede.</p>
             </div>
             <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl text-xs text-slate-600 text-left flex items-center gap-2.5">
