@@ -174,6 +174,10 @@ body {
 /* O campo de senha tem o próprio olho (PasswordInput); o do Edge apareceria duplicado ao lado. */
 input::-ms-reveal { display: none; }
 
+/* Fundo atrás das janelas (Ajuda, cobrança…) translúcido também no claro: a regra que deixa bg-slate-950 branco
+   o tornava opaco e escondia a tela. */
+.negocialar-interior .fixed.inset-0:is([class*="bg-slate-950/"], [class*="bg-black/"]) { background-color: rgb(8 56 88 / 55%); }
+
 /* Gráficos do Financeiro: cores por papel. Azul = receitas, laranja = despesas (par validado para daltonismo
    e contraste sobre o cartão branco); grade e textos recessivos. O modo escuro troca só estas variáveis. */
 .finance-viz {
@@ -219,6 +223,9 @@ input::-ms-reveal { display: none; }
 /* Cabeçalho um tom acima do fundo; logotipo e selo do nome continuam brancos. */
 [data-tema="escuro"] .negocialar-interior > header[class] { background-color: #082236; border-color: #163a55; box-shadow: 0 3px 16px rgb(0 0 0 / 35%); }
 [data-tema="escuro"] .negocialar-interior > header [class*="rounded-2xl"][class*="bg-slate-900"] { background-color: #0c2a3f; }
+
+/* Aba do menu aberto continua laranja no escuro, também com o mouse (ou o toque, no celular) em cima. */
+[data-tema="escuro"] .negocialar-interior > header .workspace-navigation details[open] > summary { background-color: #f59e0b; color: #0c2333; }
 
 /* Fundo de cor forte (âmbar, verde, azul-claro) leva texto escuro, como no claro. */
 [data-tema="escuro"] .negocialar-interior :is([class~="bg-amber-400"], [class~="bg-amber-500"], [class~="bg-emerald-400"], [class~="bg-emerald-500"], [class~="bg-sky-400"], [class~="bg-yellow-400"]) { color: #0c2333; }

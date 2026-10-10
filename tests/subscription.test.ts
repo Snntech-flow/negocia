@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { addFreeDays, billingNotice, extendPaidPeriod, hasSubscriptionAccess } from "../src/lib/subscription";
+import { addFreeDays, billingNotice, billingPopupSlot, extendPaidPeriod, hasSubscriptionAccess } from "../src/lib/subscription";
 test("30 dias gratuitos expiram exatamente no limite e não concedem acesso após a data", () => {
   const start = new Date("2026-10-01T12:00:00Z");
   const end = addFreeDays(start);
@@ -53,4 +53,18 @@ test("primeira cobrança oferece mensal ou anual; depois cobra só o ciclo escol
   assert.equal(annual.title, "Sua anuidade vence em 3 dias");
   assert.match(annual.message, /anuidade R\$\s1\.650,00\.$/);
   assert.equal(billingNotice(account({ pendingPix: true }), now)?.title, "Pix aguardando confirmação");
+});
+
+test("pop-up da cobrança: aviso 1× por dia, vencido de manhã e à tarde (Brasília), nada com Pix aguardando ou sem aviso", () => {
+  const aviso = { tone: "aviso" as const, title: "t", message: "m" };
+  const vencido = { tone: "vencido" as const, title: "t", message: "m" };
+  assert.equal(billingPopupSlot(aviso, false, new Date("2026-10-10T13:00:00Z")), "2026-10-10");
+  assert.equal(billingPopupSlot(aviso, false, new Date("2026-10-10T22:00:00Z")), "2026-10-10", "aviso não reabre à tarde");
+  // 11h59 e 12h00 em Brasília (UTC−3).
+  assert.equal(billingPopupSlot(vencido, false, new Date("2026-10-10T14:59:00Z")), "2026-10-10-manha");
+  assert.equal(billingPopupSlot(vencido, false, new Date("2026-10-10T15:00:00Z")), "2026-10-10-tarde");
+  // 23h de 09/10 em Brasília já é 10/10 em UTC.
+  assert.equal(billingPopupSlot(vencido, false, new Date("2026-10-10T02:00:00Z")), "2026-10-09-tarde");
+  assert.equal(billingPopupSlot(vencido, true, new Date("2026-10-10T15:00:00Z")), null);
+  assert.equal(billingPopupSlot(null, false), null);
 });

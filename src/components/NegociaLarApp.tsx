@@ -16,6 +16,7 @@ import Avatar from "./Avatar";
 import BuyerProfileForm from "./BuyerProfileForm";
 import PropertyCreateForm from "./PropertyCreateForm";
 const SubscriptionPanel = dynamic(() => import("./SubscriptionPanel"));
+const BillingPopup = dynamic(() => import("./BillingPopup"));
 const AdminPanel = dynamic(() => import("./AdminPanel"));
 import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
@@ -275,6 +276,14 @@ export default function NegociaLarApp({
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [isSubscriptionOpen, setIsSubscriptionOpen] = useState(false);
   const [defaultVisitDate, setDefaultVisitDate] = useState("");
+  // Celular: a aba ativa rola para dentro da faixa de abas.
+  const navRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const nav = navRef.current;
+    const active = nav?.querySelector<HTMLElement>("[data-ativa]");
+    if (!nav || !active || nav.scrollWidth <= nav.clientWidth) return;
+    nav.scrollTo({ left: Math.max(0, active.offsetLeft - 16), behavior: "smooth" });
+  }, [activeTab]);
   // Tema automático acompanha o aparelho com a página aberta.
   useEffect(() => watchSystemTheme(), []);
   // Hora lida no navegador depois de montar (o servidor não sabe o "agora" de quem usa); refaz a cada minuto.
@@ -738,8 +747,10 @@ export default function NegociaLarApp({
         </div>
 
         {/* Navigation Tabs */}
-        <div className="workspace-navigation max-w-7xl mx-auto flex flex-wrap items-center gap-2 border-t border-slate-800/60 px-4 py-1.5 sm:px-6 lg:px-8">
-          <button type="button" onClick={() => setActiveTab("vitrine")} className={`inline-flex h-9 items-center shrink-0 rounded-md px-2.5 py-1.5 text-xs font-semibold transition ${activeTab === "vitrine" ? "bg-amber-500 text-slate-950" : "text-slate-400 hover:bg-slate-800 hover:text-white"}`}>
+        {/* No celular, uma faixa só que rola para o lado (antes eram 3 linhas de abas acima do conteúdo); os menus
+            abertos são fixed no cabeçalho e não são cortados pela rolagem. */}
+        <div ref={navRef} className="workspace-navigation max-w-7xl mx-auto flex items-center gap-2 border-t border-slate-800/60 px-4 py-1.5 sm:flex-wrap sm:px-6 lg:px-8 max-sm:overflow-x-auto max-sm:[scrollbar-width:none]">
+          <button type="button" data-ativa={activeTab === "vitrine" ? "" : undefined} onClick={() => setActiveTab("vitrine")} className={`inline-flex h-9 items-center shrink-0 rounded-md px-2.5 py-1.5 text-xs font-semibold transition ${activeTab === "vitrine" ? "bg-amber-500 text-slate-950" : "text-slate-400 hover:bg-slate-800 hover:text-white"}`}>
             <Building2 className="mr-1.5 inline h-3.5 w-3.5" />Vitrine ({propertyTotal})
           </button>
           {[
@@ -750,7 +761,7 @@ export default function NegociaLarApp({
             { title: "Financeiro", active: ["financeiro"], items: [{ id: "financeiro", label: "Receitas e despesas", icon: Wallet }] },
             ...(currentUser?.role === "admin" ? [{ title: "Administração", active: ["admin"], items: [{ id: "admin", label: "Corretores e pagamentos", icon: UserCheck }] }] : []),
           ].map((menu, index) => (
-            <details key={menu.title} name="workspace-navigation-menu" className="group relative shrink-0">
+            <details key={menu.title} name="workspace-navigation-menu" data-ativa={menu.active.includes(activeTab) ? "" : undefined} className="group relative shrink-0">
               <summary className={`flex h-9 cursor-pointer list-none items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition [&::-webkit-details-marker]:hidden ${menu.active.includes(activeTab) ? "bg-amber-500 text-slate-950" : "text-slate-400 hover:bg-slate-800 hover:text-white"}`}>
                 {menu.title}<ChevronDown className="h-3.5 w-3.5 transition group-open:rotate-180" />
               </summary>
@@ -1287,6 +1298,9 @@ export default function NegociaLarApp({
 
       {/* Modal de Onboarding Direto */}
       {isSubscriptionOpen && <SubscriptionPanel onClose={() => setIsSubscriptionOpen(false)} />}
+      {currentUser && billingAlert && clock !== null && !isSubscriptionOpen && <BillingPopup userId={currentUser.id} notice={billingAlert} pendingPix={!!currentUser.pendingPix} now={new Date(clock)}
+        plan={currentUser.plan} hasPaid={!!currentUser.hasPaid} billingCycle={currentUser.billingCycle}
+        onRegistered={() => setCurrentUser((user) => user && { ...user, pendingPix: true })} onOpenSubscription={() => setIsSubscriptionOpen(true)} onMessage={(text) => showToast(text)} />}
       {isFeedbackOpen && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 p-4" role="dialog" aria-modal="true" aria-labelledby="pilot-feedback-title"><form onSubmit={(event) => void handlePilotFeedbackSubmit(event)} className="w-full max-w-lg space-y-4 rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl"><div className="flex items-start justify-between gap-4"><div><h2 id="pilot-feedback-title" className="text-lg font-bold text-white">Ajuda e fale conosco</h2><p className="mt-1 text-xs text-slate-400">Envie uma dúvida, relate um problema ou sugira uma melhoria. Sua mensagem e a tela atual ficam disponíveis para a equipe no painel administrativo.</p></div><button type="button" aria-label="Fechar" onClick={() => setIsFeedbackOpen(false)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white">✕</button></div><label className="block text-xs font-semibold text-slate-300">Tipo<select name="category" required className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white"><option value="duvida">Dúvida</option><option value="erro">Encontrei um erro</option><option value="ideia">Sugestão de melhoria</option></select></label><label className="block text-xs font-semibold text-slate-300">O que aconteceu ou o que você sugere?<textarea name="message" required minLength={10} maxLength={2000} rows={5} placeholder="Descreva o que tentou fazer e o que ficou confuso…" className="mt-1 w-full resize-y rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white placeholder:text-slate-500" /></label><div className="flex justify-end gap-2"><button type="button" onClick={() => setIsFeedbackOpen(false)} className="rounded-lg px-3 py-2 text-xs text-slate-300 hover:bg-slate-800">Cancelar</button><button disabled={feedbackBusy} className="rounded-lg bg-amber-500 px-4 py-2 text-xs font-bold text-slate-950 disabled:opacity-50">{feedbackBusy ? "Enviando…" : "Enviar feedback"}</button></div></form></div>}
       {isOnboardingModalOpen && <OnboardingModal
         isOpen={isOnboardingModalOpen}

@@ -63,3 +63,14 @@ export function billingNotice(account: BillingAccount, now = new Date()): Billin
   const what = trial ? "Seu período grátis termina" : account.billingCycle === "annual" && account.hasPaid ? "Sua anuidade vence" : "Sua mensalidade vence";
   return { tone: "aviso", title: `${what} ${when}`, message: `Acesso até ${date}. ${pay}` };
 }
+
+// Pop-up da cobrança (como no ModernaDental: o sino sozinho não é visto). Aviso amarelo 1× por dia; vencido
+// vermelho 2× por dia, manhã e tarde no horário de Brasília. Com Pix aguardando conferência, não insiste.
+// Devolve a "vez" atual; a tela guarda a última vez fechada e só reabre quando a vez muda.
+export function billingPopupSlot(notice: BillingNotice | null, pendingPix: boolean, now = new Date()) {
+  if (!notice || pendingPix) return null;
+  const day = new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE }).format(now);
+  if (notice.tone === "aviso") return day;
+  const hour = Number(new Intl.DateTimeFormat("en-GB", { timeZone: TIME_ZONE, hour: "2-digit", hourCycle: "h23" }).format(now));
+  return `${day}-${hour < 12 ? "manha" : "tarde"}`;
+}
