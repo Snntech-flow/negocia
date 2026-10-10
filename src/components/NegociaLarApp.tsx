@@ -102,12 +102,41 @@ interface PartnershipItem {
   externalReferrerCreci: string | null;
   externalReferrerWhatsapp: string | null;
   visitScheduledDate: Date | null;
+  commissionTotal: string | null;
+  commissionExpectedDate: string | null;
   notes: string | null;
   createdAt: Date;
   updatedAt: Date;
 }
 
 type PilotFeedbackItem = WorkspaceFeedback;
+
+// Fechar a parceria: valor total da comissão, data prevista e a parte de cada um calculada na hora.
+type ClosingState = { id: string; total: string; date: string; note: string; busy: boolean };
+function PartnershipClosingForm({ partnership, value, onChange, onSubmit, onCancel }: {
+  partnership: PartnershipItem; value: ClosingState; onChange: (next: ClosingState) => void;
+  onSubmit: (event: React.FormEvent) => void; onCancel: () => void;
+}) {
+  const totalCents = Math.round(Number((value.total || "0").replace(",", ".")) * 100) || 0;
+  const share = (percent: string) => ((totalCents * Number(percent)) / 10000).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+  const field = "mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-2 text-xs text-white";
+  return <form onSubmit={onSubmit} className="mt-3 grid gap-2 rounded-lg border border-emerald-500/30 bg-emerald-950/10 p-3 sm:grid-cols-2">
+    <p className="text-xs font-bold text-white sm:col-span-2">Fechar parceria e lançar a previsão</p>
+    <p className="text-[11px] leading-relaxed text-slate-400 sm:col-span-2">Cada corretor recebe no Financeiro a sua parte como “a receber”, pelo percentual combinado. Dá para ajustar depois no Financeiro.</p>
+    <label className="text-[10px] text-slate-300">Valor total da comissão (R$) *<input required type="number" inputMode="decimal" min="0.01" step="0.01" value={value.total} onChange={(event) => onChange({ ...value, total: event.target.value })} className={field} /></label>
+    <label className="text-[10px] text-slate-300">Data prevista para receber *<input required type="date" value={value.date} onChange={(event) => onChange({ ...value, date: event.target.value })} className={field} /></label>
+    <div className="rounded-md bg-slate-950/70 p-2 text-[11px] text-slate-300 sm:col-span-2" aria-live="polite">
+      Captador ({partnership.captorName}): {Number(partnership.captorCommissionPercent)}% = <strong>{share(partnership.captorCommissionPercent)}</strong> · Parceiro ({partnership.partnerName}): {Number(partnership.partnerCommissionPercent)}% = <strong>{share(partnership.partnerCommissionPercent)}</strong>
+      {Number(partnership.referrerCommissionPercent) > 0 && <> · Indicador externo: {Number(partnership.referrerCommissionPercent)}% = {share(partnership.referrerCommissionPercent)} (fora do Financeiro)</>}
+    </div>
+    <label className="text-[10px] text-slate-300 sm:col-span-2">Observação para a linha do tempo (opcional)<textarea maxLength={500} rows={2} value={value.note} onChange={(event) => onChange({ ...value, note: event.target.value })} className={field} /></label>
+    <div className="flex flex-wrap gap-2 sm:col-span-2">
+      <button disabled={value.busy} className="rounded-lg bg-emerald-600 px-3 py-2 text-[11px] font-bold text-white disabled:opacity-50">{value.busy ? "Fechando…" : "Confirmar fechamento"}</button>
+      <button type="button" onClick={onCancel} className="rounded-lg px-3 py-2 text-[11px] text-slate-300 hover:bg-slate-800">Cancelar</button>
+    </div>
+  </form>;
+}
+
 
 interface PartnershipActivityItem {
   id: string;
@@ -424,6 +453,31 @@ export default function NegociaLarApp({
       showToast("Etapa atualizada na linha do tempo. Esta mudança é operacional, sem aceite contratual.");
     } catch (error) {
       showToast(error instanceof Error ? error.message : "Não foi possível atualizar a parceria.");
+    }
+  };
+
+  // Fechar a parceria: valor total da comissão e data prevista; o servidor lança a parte de cada corretor no Financeiro.
+  const [closing, setClosing] = useState<ClosingState | null>(null);
+  const openClosing = (partnership: PartnershipItem) => {
+    const now = new Date();
+    const today = new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 10);
+    setClosing({ id: partnership.id, total: "", date: today, note: "", busy: false });
+  };
+  const handleClosePartnership = async (partnership: PartnershipItem, event: React.FormEvent) => {
+    event.preventDefault();
+    if (!closing || closing.busy) return;
+    setClosing({ ...closing, busy: true });
+    try {
+      const result = unwrap(await updatePartnershipStatus(partnership.id, "fechado", closing.note, { commissionTotal: closing.total, expectedDate: closing.date }));
+      setPartnershipList((items) => items.map((item) => item.id === partnership.id ? { ...item, ...result.partnership } : item));
+      setPartnershipActivityList((items) => [{ ...result.activity, partnershipId: partnership.id, actorUserId: currentUser?.id || "", actorName: currentUser?.name || "Você" }, ...items]);
+      setClosing(null);
+      showToast(result.forecastCents
+        ? `Parceria fechada. Sua parte, ${(result.forecastCents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}, entrou no Financeiro como a receber em ${closing.date.split("-").reverse().join("/")}.`
+        : "Parceria fechada.");
+    } catch (error) {
+      setClosing((current) => current && { ...current, busy: false });
+      showToast(error instanceof Error ? error.message : "Não foi possível fechar a parceria.");
     }
   };
 
@@ -1156,7 +1210,9 @@ export default function NegociaLarApp({
                           <button className="sm:col-span-2 rounded-lg border border-amber-500/40 px-3 py-2 text-[11px] font-bold text-amber-200 hover:bg-amber-500/10">Salvar nova versão e pedir confirmação dos dois</button>
                         </form></details>}
                       </div>
-                      {nextStatuses.length > 0 && (currentUser?.id === partnership.captorBrokerId || currentUser?.id === partnership.partnerBrokerId) && <div className="mt-3 flex flex-wrap gap-2">{nextStatuses.map((nextStatus) => <button key={nextStatus} type="button" onClick={() => { if (["fechado", "recusado"].includes(nextStatus) && !window.confirm(`Confirmar etapa “${labels[nextStatus]}”?`)) return; void handlePartnershipStatus(partnership, nextStatus); }} className={`rounded-lg border px-3 py-2 text-[11px] font-bold ${nextStatus === "recusado" ? "border-rose-500/25 text-rose-300 hover:bg-rose-500/10" : "border-emerald-500/25 text-emerald-300 hover:bg-emerald-500/10"}`}>{nextStatus === "recusado" ? "Recusar" : `Marcar: ${labels[nextStatus]}`}</button>)}</div>}
+                      {nextStatuses.length > 0 && (currentUser?.id === partnership.captorBrokerId || currentUser?.id === partnership.partnerBrokerId) && <div className="mt-3 flex flex-wrap gap-2">{nextStatuses.map((nextStatus) => <button key={nextStatus} type="button" onClick={() => { if (nextStatus === "fechado") { openClosing(partnership); return; } if (nextStatus === "recusado" && !window.confirm(`Confirmar etapa “${labels[nextStatus]}”?`)) return; void handlePartnershipStatus(partnership, nextStatus); }} className={`rounded-lg border px-3 py-2 text-[11px] font-bold ${nextStatus === "recusado" ? "border-rose-500/25 text-rose-300 hover:bg-rose-500/10" : "border-emerald-500/25 text-emerald-300 hover:bg-emerald-500/10"}`}>{nextStatus === "recusado" ? "Recusar" : `Marcar: ${labels[nextStatus]}`}</button>)}</div>}
+                      {closing?.id === partnership.id && <PartnershipClosingForm partnership={partnership} value={closing} onChange={setClosing} onSubmit={(event) => void handleClosePartnership(partnership, event)} onCancel={() => setClosing(null)} />}
+                      {partnership.status === "fechado" && partnership.commissionTotal && <p className="mt-3 rounded-md border border-emerald-500/25 bg-emerald-950/10 p-2 text-[11px] text-slate-300">Comissão total {Number(partnership.commissionTotal).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}{partnership.commissionExpectedDate ? `, prevista para ${partnership.commissionExpectedDate.split("-").reverse().join("/")}` : ""}. A parte de cada corretor está no Financeiro dele.</p>}
                       <details className="mt-3 border-t border-slate-800 pt-3"><summary className="cursor-pointer text-[11px] font-semibold text-slate-300">Linha do tempo ({history.length})</summary><div className="mt-3 space-y-2">{history.length ? history.map((activity) => <div key={activity.id} className="border-l border-slate-700 pl-3 text-[11px]"><div className="flex flex-wrap items-center justify-between gap-2 text-slate-300"><span>{activity.actorName}: {labels[activity.newStatus] || activity.newStatus}</span><time className="text-slate-500">{new Date(activity.createdAt).toLocaleString("pt-BR")}</time></div>{activity.note && <p className="mt-1 whitespace-pre-wrap text-slate-500">{activity.note}</p>}</div>) : <p className="text-[11px] text-slate-500">Nenhum evento registrado.</p>}</div></details>
                     </article>;
                   })}

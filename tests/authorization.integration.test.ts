@@ -752,6 +752,56 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
     assert.equal((await db.select().from(brokerFinanceEntries).where(eq(brokerFinanceEntries.id, target.id))).length, 0);
   });
 
+  await t.test("fechar parceria exige o valor da comissão e lança a parte de cada corretor no Financeiro, uma vez só", async () => {
+    const broker = (n: number) => ({
+      name: `Teste Fechamento ${n}`, email: `close${n}-${suffix}@example.test`, creci: `${7 + n}${suffix.slice(0, 6)}F`, whatsapp: `1199999002${n}`,
+      city: "São Paulo", state: "SP", role: "corretor", verificationStatus: "aprovado", subscriptionStatus: "ativo", nextBillingDate: null, plan: "10",
+    });
+    const [captor] = await db.insert(users).values(broker(1)).returning();
+    const [partner] = await db.insert(users).values(broker(2)).returning();
+    const [outsider] = await db.insert(users).values(broker(3)).returning();
+    registeredIds.push(captor.id, partner.id, outsider.id);
+    const [property] = await db.insert(properties).values({ brokerId: captor.id, title: "Casa da parceria", propertyType: "Casa Solta", salePrice: "500000",
+      city: "São Paulo", neighborhood: "Centro", bedrooms: 3, parkingSpots: 2, areaM2: "150", description: "Teste", confidentialAddress: "Endereço fictício",
+      ownerName: "Pessoa fictícia", ownerPhone: "11900002233", acceptsPartnership: true, status: "disponivel", purpose: "venda" }).returning();
+    try {
+      const [partnership] = await db.insert(partnerships).values({ propertyId: property.id, captorBrokerId: captor.id, partnerBrokerId: partner.id,
+        status: "em_negociacao", commissionStatus: "confirmada", commissionModel: "three_party_referral_40_40_20",
+        captorCommissionPercent: "40.00", partnerCommissionPercent: "40.00", referrerCommissionPercent: "20.00",
+        externalReferrerName: "Indicador Teste", externalReferrerCreci: "TESTE-01" }).returning();
+      const closing = { commissionTotal: "30000", expectedDate: "2026-11-20" };
+      await assert.rejects(asUser(outsider.id, () => actions.updatePartnershipStatus(partnership.id, "fechado", "", closing)), /não encontrada/);
+      await assert.rejects(asUser(partner.id, () => actions.updatePartnershipStatus(partnership.id, "fechado", "")), /valor total da comissão/);
+      await assert.rejects(asUser(partner.id, () => actions.updatePartnershipStatus(partnership.id, "fechado", "", { commissionTotal: "0", expectedDate: "2026-11-20" })), /valor total da comissão/);
+      await assert.rejects(asUser(partner.id, () => actions.updatePartnershipStatus(partnership.id, "fechado", "", { commissionTotal: "30000", expectedDate: "20/11/2026" })), /data prevista/);
+      assert.equal((await db.select().from(partnerships).where(eq(partnerships.id, partnership.id)))[0].status, "em_negociacao");
+
+      const closed = await asUser(partner.id, () => actions.updatePartnershipStatus(partnership.id, "fechado", "Escritura marcada", closing));
+      assert.equal(closed.forecastCents, 1_200_000);
+      const [saved] = await db.select().from(partnerships).where(eq(partnerships.id, partnership.id));
+      assert.deepEqual([saved.status, saved.commissionTotal, saved.commissionExpectedDate], ["fechado", "30000.00", "2026-11-20"]);
+      const forecasts = await db.select().from(brokerFinanceEntries).where(eq(brokerFinanceEntries.partnershipId, partnership.id));
+      assert.deepEqual(forecasts.map((row) => [row.ownerUserId, row.kind, row.category, row.amount, row.dueDate, row.paidAt]).sort(), [
+        [captor.id, "receita", "comissao_parceria", "12000.00", "2026-11-20", null],
+        [partner.id, "receita", "comissao_parceria", "12000.00", "2026-11-20", null],
+      ].sort());
+      const captorView = await asUser(captor.id, () => finance.getFinancePeriod({ from: "2026-11", to: "2026-11" }));
+      assert.deepEqual(captorView.entries.map((entry) => [entry.amount, entry.description]), [["12000.00", "Comissão da parceria — Casa da parceria"]]);
+      assert.equal((await asUser(outsider.id, () => finance.getFinancePeriod({ from: "2026-11", to: "2026-11" }))).entries.length, 0);
+      const [notice] = await db.select().from(notifications).where(and(eq(notifications.userId, captor.id), eq(notifications.title, "Parceria fechada")));
+      assert.match(notice.message, /R\$\s12\.000,00.*20\/11\/2026/);
+
+      await assert.rejects(asUser(captor.id, () => actions.updatePartnershipStatus(partnership.id, "fechado", "", closing)), /não é permitida/);
+      await assert.rejects(db.insert(brokerFinanceEntries).values({ ownerUserId: captor.id, kind: "receita", description: "Duplicada", category: "comissao_parceria",
+        amount: "1", dueDate: "2026-11-20", partnershipId: partnership.id }), (error: { cause?: { code?: string } }) => error.cause?.code === "23505", "uma previsão por corretor e parceria");
+      assert.equal((await db.select().from(brokerFinanceEntries).where(eq(brokerFinanceEntries.partnershipId, partnership.id))).length, 2);
+    } finally {
+      await db.delete(brokerFinanceEntries).where(inArray(brokerFinanceEntries.ownerUserId, [captor.id, partner.id]));
+      await db.delete(partnerships).where(eq(partnerships.propertyId, property.id));
+      await db.delete(properties).where(eq(properties.id, property.id));
+    }
+  });
+
   await t.test("sessões adulteradas, expiradas e copiadas após logout são rejeitadas", async () => {
     assert.equal(await asUser(owner.id, () => actions.getCurrentUserId(), {signature:"f".repeat(64)}), null);
     assert.equal(await asUser(owner.id, () => actions.getCurrentUserId(), {signature:"a".repeat(64)+"zz"}), null);

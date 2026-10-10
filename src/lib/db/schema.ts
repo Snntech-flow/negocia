@@ -1,3 +1,4 @@
+import { sql } from "drizzle-orm";
 import { pgTable, uuid, text, numeric, integer, boolean, timestamp, date, jsonb, index, uniqueIndex, type AnyPgColumn } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
@@ -207,6 +208,9 @@ export const partnerships = pgTable("partnerships", {
   externalReferrerCreci: text("external_referrer_creci"),
   externalReferrerWhatsapp: text("external_referrer_whatsapp"),
   visitScheduledDate: timestamp("visit_scheduled_date"),
+  // Informados ao fechar: valor total da comissão e data prevista; geram a previsão no Financeiro de cada corretor.
+  commissionTotal: numeric("commission_total", { precision: 12, scale: 2 }),
+  commissionExpectedDate: date("commission_expected_date", { mode: "string" }),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
@@ -246,10 +250,15 @@ export const brokerFinanceEntries = pgTable("broker_finance_entries", {
   dueDate: date("due_date", { mode: "string" }).notNull(),
   paidAt: date("paid_at", { mode: "string" }),
   leadId: uuid("lead_id").references(() => leads.id, { onDelete: "set null" }),
+  // Previsão gerada pelo fechamento de uma parceria (uma por corretor e parceria).
+  partnershipId: uuid("partnership_id").references(() => partnerships.id, { onDelete: "set null" }),
   notes: text("notes"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
   updatedAt: timestamp("updated_at").defaultNow().notNull(),
-}, (table) => ({ ownerDueIdx: index("broker_finance_entries_owner_due_idx").on(table.ownerUserId, table.dueDate) }));
+}, (table) => ({
+  ownerDueIdx: index("broker_finance_entries_owner_due_idx").on(table.ownerUserId, table.dueDate),
+  ownerPartnershipUnique: uniqueIndex("broker_finance_entries_owner_partnership_unique").on(table.ownerUserId, table.partnershipId).where(sql`partnership_id is not null`),
+}));
 
 export const transactions = pgTable("transactions", {
   id: uuid("id").defaultRandom().primaryKey(),

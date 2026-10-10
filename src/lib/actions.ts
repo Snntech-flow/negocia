@@ -18,6 +18,7 @@ import {
   notifications,
   dvpCertificates,
   authLoginAttempts,
+  brokerFinanceEntries,
 } from "./db";
 import { eq, ne, desc, and, lt, lte, gte, or, sql, inArray, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -35,6 +36,7 @@ import { isBrazilianState } from "./brazil-states";
 import { reserveListingSlot } from "./listing-limit";
 import { isPlanId, planCharge, planMonthlyEquivalent, planName, type BillingCycle } from "./plans";
 import { normalizedSql, normalizeText } from "./text-match";
+import { commissionShare, toCents, validatePartnershipClosing } from "./finance";
 
 import { getMarketplaceData as readMarketplaceData } from "./queries/marketplace";
 import type { MarketplaceQuery } from "./marketplace-query";
@@ -575,12 +577,14 @@ const PARTNERSHIP_TRANSITIONS: Record<string, string[]> = {
   recusado: [],
 };
 
-async function updatePartnershipStatusImpl(partnershipId: string, newStatus: string, note?: string) {
+async function updatePartnershipStatusImpl(partnershipId: string, newStatus: string, note?: string, closing?: { commissionTotal: string; expectedDate: string }) {
   const actor = await requireCurrentUser();
   requireActiveBroker(actor);
   const cleanNote = note?.trim() || null;
   if (cleanNote && cleanNote.length > 500) throw new ActionError("A observação deve ter até 500 caracteres.");
   if (!Object.values(PARTNERSHIP_TRANSITIONS).some((statuses) => statuses.includes(newStatus))) throw new ActionError("Etapa de parceria inválida.");
+  // Fechar exige o valor total da comissão e a data prevista: geram a previsão "a receber" de cada corretor.
+  const close = newStatus === "fechado" ? validatePartnershipClosing(closing) : null;
 
   const result = await db.transaction(async (tx) => {
     const [partnership] = await tx.select({
@@ -590,6 +594,8 @@ async function updatePartnershipStatusImpl(partnershipId: string, newStatus: str
       partnerBrokerId: partnerships.partnerBrokerId,
       status: partnerships.status,
       commissionStatus: partnerships.commissionStatus,
+      captorCommissionPercent: partnerships.captorCommissionPercent,
+      partnerCommissionPercent: partnerships.partnerCommissionPercent,
     }).from(partnerships).where(and(
       eq(partnerships.id, partnershipId),
       or(eq(partnerships.captorBrokerId, actor.id), eq(partnerships.partnerBrokerId, actor.id)),
@@ -603,8 +609,30 @@ async function updatePartnershipStatusImpl(partnershipId: string, newStatus: str
       throw new ActionError("A divisão foi recusada. Revise a proposta e obtenha as duas confirmações antes de avançar.");
     }
 
-    const [updated] = await tx.update(partnerships).set({ status: newStatus, updatedAt: new Date() })
-      .where(and(eq(partnerships.id, partnership.id), eq(partnerships.status, partnership.status))).returning();
+    const [updated] = await tx.update(partnerships).set({
+      status: newStatus, updatedAt: new Date(),
+      ...(close ? { commissionTotal: close.commissionTotal, commissionExpectedDate: close.expectedDate } : {}),
+    }).where(and(eq(partnerships.id, partnership.id), eq(partnerships.status, partnership.status))).returning();
+    if (!updated) throw new ActionError("A parceria foi atualizada por outra pessoa. Recarregue a tela.");
+    // Previsão no Financeiro de cada corretor: a parte dele pelo percentual combinado (indicador externo não tem conta).
+    const forecast = new Map<string, number>();
+    if (close) {
+      const [property] = await tx.select({ title: properties.title }).from(properties).where(eq(properties.id, partnership.propertyId)).limit(1);
+      const totalCents = toCents(close.commissionTotal);
+      const shares = [
+        { userId: partnership.captorBrokerId, percent: partnership.captorCommissionPercent },
+        { userId: partnership.partnerBrokerId, percent: partnership.partnerCommissionPercent },
+      ].map((share) => ({ ...share, cents: commissionShare(totalCents, share.percent) })).filter((share) => share.cents > 0);
+      const day = close.expectedDate.split("-").reverse().join("/");
+      const rows = shares.map((share) => ({
+        ownerUserId: share.userId, kind: "receita", category: "comissao_parceria", amount: (share.cents / 100).toFixed(2),
+        description: `Comissão da parceria — ${property?.title ?? "imóvel"}`.slice(0, 160),
+        dueDate: close.expectedDate, partnershipId: partnership.id,
+        notes: `Sua parte: ${Number(share.percent)}% de ${(totalCents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}, prevista para ${day}. Gerada ao fechar a parceria; ajuste se mudar.`,
+      }));
+      if (rows.length) await tx.insert(brokerFinanceEntries).values(rows).onConflictDoNothing();
+      for (const share of shares) forecast.set(share.userId, share.cents);
+    }
     const [activity] = await tx.insert(partnershipActivities).values({
       partnershipId: partnership.id,
       actorUserId: actor.id,
@@ -612,15 +640,17 @@ async function updatePartnershipStatusImpl(partnershipId: string, newStatus: str
       newStatus,
       note: cleanNote,
     }).returning();
+    const otherBroker = actor.id === partnership.captorBrokerId ? partnership.partnerBrokerId : partnership.captorBrokerId;
+    const otherShare = forecast.get(otherBroker);
     await tx.insert(notifications).values({
-      userId: actor.id === partnership.captorBrokerId ? partnership.partnerBrokerId : partnership.captorBrokerId,
-      title: "Parceria atualizada",
-      message: `A etapa da parceria foi alterada para ${newStatus.replaceAll("_", " ")}.${cleanNote ? ` Observação: ${cleanNote}` : ""} Esta atualização é operacional e não representa aceite contratual.`,
+      userId: otherBroker,
+      title: close ? "Parceria fechada" : "Parceria atualizada",
+      message: `A etapa da parceria foi alterada para ${newStatus.replaceAll("_", " ")}.${otherShare ? ` A sua parte, ${(otherShare / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}, entrou no seu Financeiro como a receber em ${close!.expectedDate.split("-").reverse().join("/")}.` : ""}${cleanNote ? ` Observação: ${cleanNote}` : ""} Esta atualização é operacional e não representa aceite contratual.`,
       type: "parceria",
       propertyId: partnership.propertyId,
       read: false,
     });
-    return { partnership: updated, activity };
+    return { partnership: updated, activity, forecastCents: forecast.get(actor.id) ?? null };
   });
   revalidatePath("/");
   return { success: true, ...result };

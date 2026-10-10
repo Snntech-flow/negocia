@@ -278,6 +278,8 @@ export async function getMarketplaceData(input: MarketplaceQuery = {}) {
         externalReferrerCreci: partnerships.externalReferrerCreci,
         externalReferrerWhatsapp: partnerships.externalReferrerWhatsapp,
         visitScheduledDate: partnerships.visitScheduledDate,
+        commissionTotal: partnerships.commissionTotal,
+        commissionExpectedDate: partnerships.commissionExpectedDate,
         notes: partnerships.notes,
         createdAt: partnerships.createdAt,
         updatedAt: partnerships.updatedAt,

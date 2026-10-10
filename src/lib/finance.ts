@@ -180,3 +180,16 @@ export function categoryTotals(entries: { kind: string; category: string; amount
   for (const entry of entries) if (entry.kind === kind) totals.set(entry.category, (totals.get(entry.category) ?? 0) + toCents(entry.amount));
   return [...totals].map(([category, cents]) => ({ category, label: financeCategoryLabel(kind, category), cents })).sort((a, b) => b.cents - a.cents);
 }
+
+// Fechamento de parceria: valor total da comissão e data prevista para receber.
+export function validatePartnershipClosing(input: { commissionTotal?: unknown; expectedDate?: unknown } | undefined) {
+  const amount = typeof input?.commissionTotal === "string" ? input.commissionTotal.trim().replace(",", ".") : "";
+  if (!/^\d{1,10}(\.\d{1,2})?$/.test(amount) || Number(amount) <= 0) throw new ActionError("Informe o valor total da comissão para fechar a parceria.");
+  if (!isIsoDate(input?.expectedDate)) throw new ActionError("Informe a data prevista para receber a comissão.");
+  return { commissionTotal: Number(amount).toFixed(2), expectedDate: input.expectedDate as string };
+}
+
+// Parte de cada corretor pelo percentual combinado, em centavos (arredonda no centavo mais próximo).
+export function commissionShare(totalCents: number, percent: string | number) {
+  return Math.round((totalCents * Number(percent)) / 100);
+}
