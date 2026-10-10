@@ -53,6 +53,13 @@ body {
   border-color: #326480;
 }
 .negocialar-interior > header [class*="hover:bg-slate-"]:hover { background-color: #205779; }
+/* A regra geral de hover põe texto azul-marinho (fundo claro); no cabeçalho azul o texto continua branco. */
+.negocialar-interior > header [class*="hover:text-white"]:hover { color: #ffffff; }
+/* Menus do cabeçalho (sino, Minha conta) seguem azul-escuros como o cabeçalho: a regra dos cartões brancos
+   deixava o texto branco sobre fundo branco. */
+.negocialar-interior > header [class*="rounded-2xl"][class*="bg-slate-900"] { background-color: #083858; }
+/* Aba do menu aberto: laranja como a seção atual, também com o mouse em cima. */
+.negocialar-interior > header .workspace-navigation details[open] > summary { background-color: #f59e0b; color: #083858; }
 .negocialar-interior > header [class*="bg-amber-500"],
 .negocialar-interior > header [class*="bg-amber-400"] { color: #083858; }
 .negocialar-interior > header [class*="bg-slate-"] input,
