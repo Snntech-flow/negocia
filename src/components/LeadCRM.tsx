@@ -297,7 +297,7 @@ export default function LeadCRM({
         const typeMatches = !type || propertyType.includes(type) || type.includes(propertyType);
         if (type) { weight += 30; if (typeMatches) { score += 30; reasons.push(`Tipo compatível: ${property.propertyType}`); } }
         if (budget) { weight += 30; score += 30; reasons.push(`Dentro do orçamento: ${money(property.salePrice)} de até ${money(selectedLead.maxBudget)}`); }
-        if (selectedLead.minBedrooms) { weight += 20; score += 20; reasons.push(`${property.bedrooms} quartos (mínimo ${selectedLead.minBedrooms})`); }
+        if (selectedLead.minBedrooms) { weight += 20; score += 20; reasons.push(`${property.bedrooms} ${property.bedrooms === 1 ? "quarto" : "quartos"} (mínimo ${selectedLead.minBedrooms})`); }
         if (city) { weight += 10; score += 10; reasons.push(`Cidade: ${property.city}`); }
         const neighborhoodMatches = neighborhoods.some((area) => normalizeMatchText(property.neighborhood).includes(area) || area.includes(normalizeMatchText(property.neighborhood)));
         if (neighborhoods.length) {
@@ -873,7 +873,7 @@ export default function LeadCRM({
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-xs font-bold text-white">{property.title}</div>
                         <div className="mt-1 flex items-center gap-1 text-[11px] text-slate-400"><MapPin className="h-3 w-3" />{property.neighborhood} · {property.city}</div>
-                        <div className="mt-1 text-[11px] font-semibold text-emerald-300">{money(property.salePrice)} · {property.bedrooms} quartos · critérios atendidos {score}%</div>
+                        <div className="mt-1 text-[11px] font-semibold text-emerald-300">{money(property.salePrice)} · {property.bedrooms} {property.bedrooms === 1 ? "quarto" : "quartos"} · critérios atendidos {score}%</div>
                         <details className="mt-1.5 text-[10px] text-slate-400"><summary className="cursor-pointer font-semibold text-sky-300">Ver como calculamos</summary><ul className="mt-1 list-inside list-disc space-y-0.5">{reasons.map((reason) => <li key={reason}>{reason}</li>)}{selectedLead.propertyType && !typeMatches && <li>Tipo diferente do informado ({property.propertyType})</li>}{selectedLead.neighborhoods.length && !neighborhoodMatches ? <li>Fora dos bairros preferidos; cidade e demais critérios coincidem</li> : null}</ul><p className="mt-1">Compatibilidade é uma comparação simples das preferências preenchidas; confirme detalhes com o captador.</p></details>
                       </div>
                       <div className="flex shrink-0 flex-col gap-1.5 self-center">

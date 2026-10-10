@@ -33,7 +33,7 @@ export default function WhiteLabelSheet({ property, broker, onClose }: { propert
         <div className="space-y-4 rounded-2xl border border-slate-800 bg-slate-950 p-4"><header className="flex items-center gap-3 border-b border-slate-800 pb-3"><Avatar name={broker.name} url={broker.avatar} size={40} /><div><p className="text-sm font-bold text-white">{broker.name}</p><p className="text-xs text-slate-400">CRECI {broker.creci}</p></div></header>
           {photo && <img src={photo} alt={property.title} className="h-48 w-full rounded-xl object-cover" />}
           <p className="text-xs text-slate-400">{property.neighborhood}, {property.city}</p><h4 className="font-bold text-white">{property.title}</h4><p className="text-xl font-extrabold text-amber-400">{Number(property.salePrice).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</p>
-          <p className="text-xs text-slate-300">{property.bedrooms} quartos · {property.bathrooms} banheiros · {property.parkingSpots} vagas · {formatArea(property.areaM2)} m²</p>
+          <p className="text-xs text-slate-300">{property.bedrooms} {property.bedrooms === 1 ? "quarto" : "quartos"} · {property.bathrooms} {property.bathrooms === 1 ? "banheiro" : "banheiros"} · {property.parkingSpots} {property.parkingSpots === 1 ? "vaga" : "vagas"} · {formatArea(property.areaM2)} m²</p>
           {contact ? <a href={contact} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-xs font-bold text-slate-950"><Phone className="h-4 w-4" />{broker.whatsapp}</a> : <p className="text-xs text-slate-400">WhatsApp indisponível.</p>}
         </div>
         {error && <p role="alert" className="text-sm text-rose-300">{error}</p>}

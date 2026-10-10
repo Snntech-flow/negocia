@@ -649,7 +649,7 @@ export default function NegociaLarApp({
             ...(currentUser?.role === "admin" ? [{ title: "Administração", active: ["admin"], items: [{ id: "admin", label: "Corretores e pagamentos", icon: UserCheck }] }] : []),
           ].map((menu, index) => (
             <details key={menu.title} name="workspace-navigation-menu" className="group relative shrink-0">
-              <summary className={`flex h-9 cursor-pointer list-none items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition [&::-webkit-details-marker]:hidden ${menu.active.includes(activeTab) ? "bg-slate-800 text-white" : "text-slate-400 hover:bg-slate-800 hover:text-white"}`}>
+              <summary className={`flex h-9 cursor-pointer list-none items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition [&::-webkit-details-marker]:hidden ${menu.active.includes(activeTab) ? "bg-amber-500 text-slate-950" : "text-slate-400 hover:bg-slate-800 hover:text-white"}`}>
                 {menu.title}<ChevronDown className="h-3.5 w-3.5 transition group-open:rotate-180" />
               </summary>
               <div className={`absolute top-full z-50 mt-1 w-56 rounded-xl max-sm:fixed max-sm:left-4 max-sm:right-4 max-sm:w-auto ${index >= 2 ? "sm:left-0" : "left-0"}`} data-menu=""><div className="rounded-xl border border-slate-700 bg-slate-900 p-1.5 shadow-xl">
@@ -778,7 +778,7 @@ export default function NegociaLarApp({
                         <span className="text-amber-400 font-mono font-bold">{formatBRL(bp.maxBudget)}</span>
                       </div>
                       <div>
-                        <strong className="text-slate-300">Mínimo:</strong> {bp.minBedrooms} quartos, {bp.minParkingSpots} vagas
+                        <strong className="text-slate-300">Mínimo:</strong> {bp.minBedrooms} {bp.minBedrooms === 1 ? "quarto" : "quartos"}, {bp.minParkingSpots} {bp.minParkingSpots === 1 ? "vaga" : "vagas"}
                       </div>
                       {bp.notes && <div className="text-[11px] text-slate-400 italic bg-slate-900/60 p-2 rounded-lg border border-slate-800/60">&ldquo;{bp.notes}&rdquo;</div>}
                     </div>

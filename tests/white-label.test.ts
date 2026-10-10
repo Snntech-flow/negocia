@@ -19,3 +19,8 @@ test("ficha imprimível escapa HTML e rejeita imagem executável e telefone inv�
   assert.ok(!html.includes("<script>")); assert.ok(html.includes("&lt;script&gt;")); assert.ok(!html.includes("javascript:"));
   assert.equal(whiteLabelContact(property, { ...broker, whatsapp: "123" }), null);
 });
+test("ficha escreve singular e plural certos para quartos, banheiros e vagas", () => {
+  for (const output of [whiteLabelText(property, broker), whiteLabelHtml(property, broker)]) assert.ok(output.includes("2 quartos · 1 banheiro · 1 vaga · 80 m²"));
+  const roomy = { ...property, bedrooms: 1, bathrooms: 2, parkingSpots: 0 };
+  for (const output of [whiteLabelText(roomy, broker), whiteLabelHtml(roomy, broker)]) assert.ok(output.includes("1 quarto · 2 banheiros · 0 vagas · 80 m²"));
+});
