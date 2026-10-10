@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import "./globals.css";
+import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 
 export const metadata: Metadata = {
   metadataBase: new URL("https://negocialar.com.br"),
@@ -45,7 +46,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }) {
   return (
-    <html lang="pt-BR">
+    // data-tema vem do script abaixo (antes da página aparecer); o servidor não sabe o tema escolhido.
+    <html lang="pt-BR" suppressHydrationWarning>
+      <head><script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} /></head>
       <body className="min-h-screen bg-slate-50 text-slate-900 antialiased">
         {children}
       </body>

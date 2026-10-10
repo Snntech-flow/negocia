@@ -183,3 +183,75 @@ input::-ms-reveal { display: none; }
   --fin-muted: #52606d;
   --fin-hover: rgb(8 56 88 / 6%);
 }
+
+/* ===== Modo escuro da área logada =====
+   Ativado por data-tema="escuro" no <html> (Minha conta › Tema). As telas usam o vocabulário escuro (slate-900,
+   text-white…) e as regras acima as clareiam; aqui cada regra clara ganha uma equivalente escura, um degrau mais
+   específica, e as classes claras escritas direto nas telas (bg-white, text-slate-900, bg-emerald-50…) escurecem.
+   Paleta: azul-marinho profundo da marca. Texto #e8f0f7 e secundário #a9bdd0 passam 4,5:1 nos cartões #0c2a3f. */
+[data-tema="escuro"] .negocialar-interior { background-color: #061a2a; color: #e8f0f7; color-scheme: dark; }
+[data-tema="escuro"] .negocialar-interior [class*="bg-slate-950"] { background-color: #08223a; }
+[data-tema="escuro"] .negocialar-interior [class*="bg-slate-900"] { background-color: #0c2a3f; }
+[data-tema="escuro"] .negocialar-interior [class*="bg-slate-800"] { background-color: #133550; }
+[data-tema="escuro"] .negocialar-interior [class*="bg-slate-700"] { background-color: #1a4262; }
+[data-tema="escuro"] .negocialar-interior [class*="text-slate-"],
+[data-tema="escuro"] .negocialar-interior [class*="hover:text-white"]:hover { color: #e8f0f7; }
+[data-tema="escuro"] .negocialar-interior .text-white { color: #ffffff; }
+[data-tema="escuro"] .negocialar-interior .text-slate-400,
+[data-tema="escuro"] .negocialar-interior .text-slate-500,
+[data-tema="escuro"] .negocialar-interior .text-slate-600 { color: #a9bdd0; }
+[data-tema="escuro"] .negocialar-interior [class*="border-slate-"] { border-color: #24506f; }
+[data-tema="escuro"] .negocialar-interior [class*="placeholder-slate-"]::placeholder { color: #7f97ad; }
+[data-tema="escuro"] .negocialar-interior [class*="hover:bg-slate-"]:hover { background-color: #1a4262; }
+[data-tema="escuro"] .negocialar-interior [class*="rounded-"][class*="bg-slate-900"],
+[data-tema="escuro"] .negocialar-interior [class*="rounded-2xl"][class*="bg-slate-900"],
+[data-tema="escuro"] .negocialar-interior [class*="rounded-3xl"][class*="bg-slate-900"] { background-color: #0c2a3f; box-shadow: 0 2px 10px rgb(0 0 0 / 25%); }
+[data-tema="escuro"] .negocialar-interior input,
+[data-tema="escuro"] .negocialar-interior select,
+[data-tema="escuro"] .negocialar-interior textarea { color-scheme: dark; }
+[data-tema="escuro"] .negocialar-interior input:not([type="checkbox"]):not([type="radio"]),
+[data-tema="escuro"] .negocialar-interior select,
+[data-tema="escuro"] .negocialar-interior textarea { background-color: #08223a; color: #e8f0f7; }
+
+/* Fundo atrás das janelas (Ajuda, assinatura…) translúcido: a regra de cor acima o deixaria opaco. */
+[data-tema="escuro"] .negocialar-interior .fixed.inset-0:is([class*="bg-slate-950/"], [class*="bg-black/"]) { background-color: rgb(2 12 22 / 78%); }
+
+/* Cabeçalho um tom acima do fundo; logotipo e selo do nome continuam brancos. */
+[data-tema="escuro"] .negocialar-interior > header[class] { background-color: #082236; border-color: #163a55; box-shadow: 0 3px 16px rgb(0 0 0 / 35%); }
+[data-tema="escuro"] .negocialar-interior > header [class*="rounded-2xl"][class*="bg-slate-900"] { background-color: #0c2a3f; }
+
+/* Fundo de cor forte (âmbar, verde, azul-claro) leva texto escuro, como no claro. */
+[data-tema="escuro"] .negocialar-interior :is([class~="bg-amber-400"], [class~="bg-amber-500"], [class~="bg-emerald-400"], [class~="bg-emerald-500"], [class~="bg-sky-400"], [class~="bg-yellow-400"]) { color: #0c2333; }
+
+/* Tons claros de destaque voltam a ser claros (as regras do modo claro os escurecem para o fundo branco). */
+[data-tema="escuro"] .negocialar-interior :is([class~="text-amber-200"], [class~="text-amber-300"], [class~="text-amber-400"], [class~="text-orange-300"], [class~="text-orange-400"]) { color: #fcd34d; }
+[data-tema="escuro"] .negocialar-interior :is([class~="text-sky-200"], [class~="text-sky-300"], [class~="text-sky-400"], [class~="text-blue-200"], [class~="text-blue-300"], [class~="text-blue-400"]) { color: #7dd3fc; }
+[data-tema="escuro"] .negocialar-interior :is([class~="text-emerald-200"], [class~="text-emerald-300"], [class~="text-emerald-400"], [class~="text-green-200"], [class~="text-green-300"], [class~="text-green-400"]) { color: #6ee7b7; }
+[data-tema="escuro"] .negocialar-interior :is([class~="text-rose-200"], [class~="text-rose-300"], [class~="text-rose-400"], [class~="text-red-200"], [class~="text-red-300"], [class~="text-red-400"]) { color: #fda4af; }
+
+/* Classes claras escritas direto nas telas (fora do cabeçalho, que mantém o logotipo branco). Fundos pastel pela
+   classe exata: "bg-amber-50" por trecho de texto também pegaria bg-amber-500 (botão laranja virava transparente). */
+[data-tema="escuro"] .negocialar-interior > :not(header) [class*="bg-white"],
+[data-tema="escuro"] .negocialar-interior > :not(header)[class*="bg-white"] { background-color: #0c2a3f; }
+[data-tema="escuro"] .negocialar-interior :is([class~="bg-slate-50"], [class*="bg-slate-50/"], [class~="bg-slate-100"], [class*="bg-slate-100/"], [class~="bg-slate-200"], [class*="bg-slate-200/"]) { background-color: #133550; }
+[data-tema="escuro"] .negocialar-interior :is([class*="text-amber-7"], [class*="text-amber-8"], [class*="text-amber-9"], [class*="text-orange-7"], [class*="text-orange-8"]) { color: #fcd34d; }
+[data-tema="escuro"] .negocialar-interior :is([class*="text-emerald-6"], [class*="text-emerald-7"], [class*="text-emerald-8"], [class*="text-emerald-9"], [class*="text-green-7"], [class*="text-green-8"]) { color: #6ee7b7; }
+[data-tema="escuro"] .negocialar-interior :is([class*="text-sky-7"], [class*="text-sky-8"], [class*="text-sky-9"], [class*="text-blue-7"], [class*="text-blue-8"]) { color: #7dd3fc; }
+[data-tema="escuro"] .negocialar-interior :is([class*="text-red-6"], [class*="text-red-7"], [class*="text-red-8"], [class*="text-red-9"], [class*="text-rose-7"], [class*="text-rose-8"]) { color: #fda4af; }
+[data-tema="escuro"] .negocialar-interior :is([class~="bg-emerald-50"], [class*="bg-emerald-50/"], [class~="bg-emerald-100"], [class*="bg-emerald-100/"], [class~="bg-green-50"], [class*="bg-green-50/"]) { background-color: rgb(16 185 129 / 14%); }
+[data-tema="escuro"] .negocialar-interior :is([class~="bg-sky-50"], [class*="bg-sky-50/"], [class~="bg-sky-100"], [class*="bg-sky-100/"], [class~="bg-blue-50"], [class*="bg-blue-50/"]) { background-color: rgb(56 189 248 / 14%); }
+[data-tema="escuro"] .negocialar-interior :is([class~="bg-amber-50"], [class*="bg-amber-50/"], [class~="bg-amber-100"], [class*="bg-amber-100/"], [class~="bg-orange-50"], [class*="bg-orange-50/"], [class~="bg-yellow-50"], [class*="bg-yellow-50/"]) { background-color: rgb(245 158 11 / 14%); }
+[data-tema="escuro"] .negocialar-interior :is([class~="bg-red-50"], [class*="bg-red-50/"], [class~="bg-red-100"], [class*="bg-red-100/"], [class~="bg-rose-50"], [class*="bg-rose-50/"]) { background-color: rgb(244 63 94 / 14%); }
+[data-tema="escuro"] .negocialar-interior :is([class*="border-emerald-2"], [class*="border-green-2"]) { border-color: rgb(110 231 183 / 35%); }
+[data-tema="escuro"] .negocialar-interior :is([class*="border-sky-2"], [class*="border-blue-2"]) { border-color: rgb(125 211 252 / 35%); }
+[data-tema="escuro"] .negocialar-interior :is([class*="border-amber-2"], [class*="border-orange-2"]) { border-color: rgb(252 211 77 / 35%); }
+[data-tema="escuro"] .negocialar-interior :is([class*="border-red-2"], [class*="border-rose-2"]) { border-color: rgb(253 164 175 / 35%); }
+
+/* Gráficos do Financeiro no escuro: mesmos papéis, tons da paleta escura validados no cartão #0c2a3f. */
+[data-tema="escuro"] .negocialar-interior .finance-viz {
+  --fin-receita: #3987e5;
+  --fin-despesa: #d95926;
+  --fin-grid: #1f4560;
+  --fin-muted: #a9bdd0;
+  --fin-hover: rgb(255 255 255 / 6%);
+}

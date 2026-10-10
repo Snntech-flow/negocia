@@ -10,6 +10,7 @@ import { PROPERTY_TYPES } from "@/lib/property-options";
 import { unwrap } from "@/lib/action-result";
 import { billingNotice, hasSubscriptionAccess } from "@/lib/subscription";
 import { planName } from "@/lib/plans";
+import { readThemeChoice, saveThemeChoice, THEME_CHOICES, watchSystemTheme, type ThemeChoice } from "@/lib/theme";
 import type { WorkspaceSessionUser, WorkspaceFeedback, WorkspaceNotification, WorkspaceTransaction, WorkspaceUser } from "@/lib/workspace-types";
 import Avatar from "./Avatar";
 import BuyerProfileForm from "./BuyerProfileForm";
@@ -110,6 +111,23 @@ interface PartnershipItem {
 }
 
 type PilotFeedbackItem = WorkspaceFeedback;
+
+// Tema da área logada (Minha conta): claro, escuro ou automático pelo aparelho.
+function ThemeSwitch() {
+  const [choice, setChoice] = useState<ThemeChoice | null>(null);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => setChoice(readThemeChoice()));
+    return () => cancelAnimationFrame(frame);
+  }, []);
+  return <div className="px-3 py-2">
+    <p className="mb-1.5 text-[11px] font-semibold text-slate-400">Tema</p>
+    <div role="radiogroup" aria-label="Tema" className="grid grid-cols-3 gap-1 rounded-xl bg-slate-950 p-1">
+      {THEME_CHOICES.map((option) => <button key={option.id} type="button" role="radio" aria-checked={choice === option.id}
+        onClick={() => { saveThemeChoice(option.id); setChoice(option.id); }}
+        className={`rounded-lg px-2 py-1.5 text-[11px] font-semibold ${choice === option.id ? "bg-amber-500 text-slate-950" : "text-slate-300 hover:bg-slate-800"}`}>{option.label}</button>)}
+    </div>
+  </div>;
+}
 
 // Fechar a parceria: valor total da comissão, data prevista e a parte de cada um calculada na hora.
 type ClosingState = { id: string; total: string; date: string; note: string; busy: boolean };
@@ -257,6 +275,8 @@ export default function NegociaLarApp({
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const [isSubscriptionOpen, setIsSubscriptionOpen] = useState(false);
   const [defaultVisitDate, setDefaultVisitDate] = useState("");
+  // Tema automático acompanha o aparelho com a página aberta.
+  useEffect(() => watchSystemTheme(), []);
   // Hora lida no navegador depois de montar (o servidor não sabe o "agora" de quem usa); refaz a cada minuto.
   const [clock, setClock] = useState<number | null>(null);
   useEffect(() => {
@@ -707,6 +727,7 @@ export default function NegociaLarApp({
                   </div>
                   <div className="p-2 space-y-1">
                     <button type="button" role="menuitem" onClick={() => { setIsUserSwitcherOpen(false); setIsSubscriptionOpen(true); }} className="w-full py-2 px-3 text-left text-xs font-semibold text-slate-300 hover:bg-slate-800 rounded-xl">Minha assinatura</button>
+                    <ThemeSwitch />
                     <button type="button" role="menuitem" onClick={() => { setIsUserSwitcherOpen(false); setCurrentView("landing"); }} className="w-full py-2 px-3 text-left text-xs font-semibold text-slate-300 hover:bg-slate-800 rounded-xl">Ver o site do Negocia Lar</button>
                     <button type="button" role="menuitem" onClick={() => void handleLogout()} className="w-full py-2 px-3 text-left text-xs font-semibold text-slate-300 hover:bg-slate-800 rounded-xl">Sair <span className="font-normal text-slate-500">(encerra em todos os aparelhos)</span></button>
                   </div>
