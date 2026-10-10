@@ -49,14 +49,16 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
   process.env.NEGOCIAR_LAR_SESSION_SECRET = "test-only-session-secret-at-least-32-bytes";
   (globalThis as typeof globalThis & { AsyncLocalStorage: typeof NodeAsyncLocalStorage }).AsyncLocalStorage = NodeAsyncLocalStorage;
 
-  const [{ db, users, leads, buyerProfiles, transactions, notifications, properties, partnerships, authLoginAttempts }, { and, eq, inArray, ne }, { workAsyncStorage }, { workUnitAsyncStorage }, rawActions] = await Promise.all([
+  const [{ db, users, leads, buyerProfiles, transactions, notifications, properties, partnerships, authLoginAttempts, brokerFinanceEntries }, { and, eq, inArray, ne }, { workAsyncStorage }, { workUnitAsyncStorage }, rawActions, rawFinance] = await Promise.all([
     import("../src/lib/db"),
     import("drizzle-orm"),
     import("next/dist/server/app-render/work-async-storage.external"),
     import("next/dist/server/app-render/work-unit-async-storage.external"),
     import("../src/lib/actions"),
+    import("../src/lib/actions/finance"),
   ]);
   const actions = strict(rawActions);
+  const finance = strict(rawFinance);
 
   const suffix = cryptoRandomSuffix();
   const registeredIds: string[] = [];
@@ -680,6 +682,64 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
     const renewal = await asUser(trial.id, () => actions.requestSubscriptionRenewal());
     [charge] = await db.select().from(transactions).where(eq(transactions.id, renewal.payment.id));
     assert.equal(charge.amount, "1650.00");
+  });
+
+  await t.test("financeiro é privado por corretor: outra conta não lê, não altera, não exclui nem vincula cliente alheio", async () => {
+    const broker = (n: number, extra: Record<string, unknown> = {}) => ({
+      name: `Teste Financeiro ${n}`, email: `fin${n}-${suffix}@example.test`, creci: `${5 + n}${suffix.slice(0, 6)}F`, whatsapp: `1199999001${n}`,
+      city: "São Paulo", state: "SP", role: "corretor", verificationStatus: "aprovado", subscriptionStatus: "ativo", nextBillingDate: null, plan: "10", ...extra,
+    });
+    const [alice] = await db.insert(users).values(broker(1)).returning();
+    const [bruno] = await db.insert(users).values(broker(2)).returning();
+    const [expired] = await db.insert(users).values(broker(3, { nextBillingDate: new Date(Date.now() - 86_400_000) })).returning();
+    registeredIds.push(alice.id, bruno.id, expired.id);
+    const [aliceClient] = await db.insert(leads).values({ ownerUserId: alice.id, fullName: "Cliente da Alice", phone: "11 98888-0001", normalizedPhone: "11988880001" }).returning();
+
+    await finance.createFinanceEntry({ kind: "receita", description: "Comissão parcelada", category: "comissao_venda", amount: "1000", dueDate: "2026-01-31", paidAt: "2026-01-31", leadId: aliceClient.id, repeatMonths: 3 })
+      .then(() => assert.fail("sem sessão não pode lançar"), (error: Error) => assert.match(error.message, /.+/));
+    await asUser(alice.id, () => finance.createFinanceEntry({ kind: "receita", description: "Comissão parcelada", category: "comissao_venda", amount: "1000", dueDate: "2026-01-31", paidAt: "2026-01-31", leadId: aliceClient.id, repeatMonths: 3 }));
+    const created = await db.select().from(brokerFinanceEntries).where(eq(brokerFinanceEntries.ownerUserId, alice.id)).orderBy(brokerFinanceEntries.dueDate);
+    assert.deepEqual(created.map((row) => [row.dueDate, row.paidAt, row.description]), [
+      ["2026-01-31", "2026-01-31", "Comissão parcelada (1/3)"],
+      ["2026-02-28", null, "Comissão parcelada (2/3)"],
+      ["2026-03-31", null, "Comissão parcelada (3/3)"],
+    ]);
+
+    const february = await asUser(alice.id, () => finance.getFinanceMonth({ month: "2026-02" }));
+    assert.equal(february.entries.length, 1);
+    assert.equal(february.entries[0].leadName, "Cliente da Alice");
+    assert.ok(february.clients.some((client) => client.id === aliceClient.id));
+    assert.equal(february.overdue.find((row) => row.kind === "receita")?.count, 2, "fevereiro e março estão em aberto com data passada");
+    const brunoView = await asUser(bruno.id, () => finance.getFinanceMonth({ month: "2026-02" }));
+    assert.equal(brunoView.entries.length, 0);
+    assert.equal(brunoView.clients.length, 0);
+    await assert.rejects(asUser(bruno.id, () => finance.getFinanceMonth({ month: "2026-13" })), /Mês inválido/);
+
+    const target = created[1];
+    await assert.rejects(asUser(bruno.id, () => finance.updateFinanceEntry(target.id, { kind: "despesa", description: "Alterado", category: "impostos", amount: "1", dueDate: "2026-02-28" })), /não encontrado/);
+    await assert.rejects(asUser(bruno.id, () => finance.setFinanceEntryPaid(target.id, "2026-02-28")), /não encontrado/);
+    await assert.rejects(asUser(bruno.id, () => finance.deleteFinanceEntry(target.id)), /não encontrado/);
+    await assert.rejects(asUser(bruno.id, () => finance.createFinanceEntry({ kind: "receita", description: "Vínculo alheio", category: "comissao_venda", amount: "10", dueDate: "2026-02-01", leadId: aliceClient.id })), /Cliente não encontrado na sua carteira/);
+    const [untouched] = await db.select().from(brokerFinanceEntries).where(eq(brokerFinanceEntries.id, target.id));
+    assert.equal(untouched.paidAt, null);
+    assert.equal(untouched.description, "Comissão parcelada (2/3)");
+
+    await asUser(alice.id, () => finance.setFinanceEntryPaid(target.id, "2026-03-02"));
+    let [paid] = await db.select().from(brokerFinanceEntries).where(eq(brokerFinanceEntries.id, target.id));
+    assert.equal(paid.paidAt, "2026-03-02");
+    await asUser(alice.id, () => finance.setFinanceEntryPaid(target.id, null));
+    [paid] = await db.select().from(brokerFinanceEntries).where(eq(brokerFinanceEntries.id, target.id));
+    assert.equal(paid.paidAt, null);
+    await asUser(alice.id, () => finance.updateFinanceEntry(target.id, { kind: "despesa", description: "Virou despesa", category: "impostos", amount: "12.5", dueDate: "2026-02-10" }));
+    [paid] = await db.select().from(brokerFinanceEntries).where(eq(brokerFinanceEntries.id, target.id));
+    assert.deepEqual([paid.kind, paid.amount, paid.dueDate, paid.leadId], ["despesa", "12.50", "2026-02-10", null]);
+
+    // Conta vencida continua vendo os lançamentos, mas não lança.
+    await assert.rejects(asUser(expired.id, () => finance.createFinanceEntry({ kind: "despesa", description: "Combustível", category: "deslocamento", amount: "50", dueDate: "2026-10-01" })), /Ative sua assinatura/);
+    assert.equal((await asUser(expired.id, () => finance.getFinanceMonth({}))).entries.length, 0);
+
+    await asUser(alice.id, () => finance.deleteFinanceEntry(target.id));
+    assert.equal((await db.select().from(brokerFinanceEntries).where(eq(brokerFinanceEntries.id, target.id))).length, 0);
   });
 
   await t.test("sessões adulteradas, expiradas e copiadas após logout são rejeitadas", async () => {

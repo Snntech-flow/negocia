@@ -1,6 +1,6 @@
 import { ActionError } from "./action-result";
 export const PROPERTY_PAGE_SIZE = 24;
-export const WORKSPACE_SECTIONS = ["full", "vitrine", "radar", "crm", "atendimento", "cadastrar", "dvp", "termo", "admin"] as const;
+export const WORKSPACE_SECTIONS = ["full", "vitrine", "radar", "crm", "atendimento", "cadastrar", "dvp", "termo", "financeiro", "admin"] as const;
 export type WorkspaceSection = typeof WORKSPACE_SECTIONS[number];
 export type MarketplaceQuery = { section?: WorkspaceSection; page?: number; search?: string; purpose?: string; propertyType?: string };
 

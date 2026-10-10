@@ -1,4 +1,4 @@
-import { pgTable, uuid, text, numeric, integer, boolean, timestamp, jsonb, index, uniqueIndex, type AnyPgColumn } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, numeric, integer, boolean, timestamp, date, jsonb, index, uniqueIndex, type AnyPgColumn } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -233,6 +233,23 @@ export const pilotFeedback = pgTable("pilot_feedback", {
   reviewedBy: uuid("reviewed_by").references(() => users.id),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 }, (table) => ({ statusCreatedIdx: index("pilot_feedback_status_created_idx").on(table.status, table.createdAt) }));
+
+// Financeiro do corretor: receitas e despesas privadas de cada conta.
+// Datas em texto (aaaa-mm-dd): o driver converteria "date" em meia-noite local e o dia poderia voltar um.
+export const brokerFinanceEntries = pgTable("broker_finance_entries", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  ownerUserId: uuid("owner_user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  kind: text("kind").notNull(), // 'receita', 'despesa'
+  description: text("description").notNull(),
+  category: text("category").notNull(),
+  amount: numeric("amount", { precision: 12, scale: 2 }).notNull(),
+  dueDate: date("due_date", { mode: "string" }).notNull(),
+  paidAt: date("paid_at", { mode: "string" }),
+  leadId: uuid("lead_id").references(() => leads.id, { onDelete: "set null" }),
+  notes: text("notes"),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+  updatedAt: timestamp("updated_at").defaultNow().notNull(),
+}, (table) => ({ ownerDueIdx: index("broker_finance_entries_owner_due_idx").on(table.ownerUserId, table.dueDate) }));
 
 export const transactions = pgTable("transactions", {
   id: uuid("id").defaultRandom().primaryKey(),

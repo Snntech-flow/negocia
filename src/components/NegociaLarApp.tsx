@@ -23,6 +23,7 @@ import {
   Radar,
   Building2,
   UserCheck,
+  Wallet,
   PlusCircle,
   ArrowRight,
   Scale,
@@ -53,6 +54,7 @@ import {
 } from "@/lib/actions";
 
 const PropertyInventory = dynamic(() => import("./PropertyInventory"), { loading: () => <p className="p-4 text-sm">Carregando carteira…</p> });
+const BrokerFinance = dynamic(() => import("./BrokerFinance"), { loading: () => <p className="p-4 text-sm">Carregando financeiro…</p> });
 
 type NotificationItem = WorkspaceNotification;
 
@@ -183,7 +185,7 @@ export default function NegociaLarApp({
   initialFeedback?: PilotFeedbackItem[];
 }) {
   const [currentView, setCurrentView] = useState<"app" | "landing">(initialCurrentUser ? "app" : "landing");
-  type WorkspaceTab = "vitrine" | "crm" | "radar" | "atendimento" | "cadastrar" | "termo" | "dvp" | "admin";
+  type WorkspaceTab = "vitrine" | "crm" | "radar" | "atendimento" | "cadastrar" | "termo" | "dvp" | "financeiro" | "admin";
   const [activeTab, setActiveTabState] = useState<WorkspaceTab>("vitrine");
   const setActiveTab = (tab: WorkspaceTab) => {
     document.querySelectorAll<HTMLDetailsElement>(".workspace-navigation details[open]").forEach(menu => { menu.open = false; });
@@ -196,7 +198,7 @@ export default function NegociaLarApp({
     if (!initialCurrentUser) return;
     let saved: string | null = null;
     try { saved = sessionStorage.getItem(`negocialar-tab:${initialCurrentUser.id}`); } catch {}
-    const allowed = ["vitrine", "crm", "radar", "atendimento", "cadastrar", "termo", "dvp", ...(initialCurrentUser.role === "admin" ? ["admin"] : [])];
+    const allowed = ["vitrine", "crm", "radar", "atendimento", "cadastrar", "termo", "dvp", "financeiro", ...(initialCurrentUser.role === "admin" ? ["admin"] : [])];
     if (!saved || !allowed.includes(saved)) return;
     const tab = saved as WorkspaceTab;
     const frame = requestAnimationFrame(() => setActiveTabState(tab));
@@ -670,6 +672,7 @@ export default function NegociaLarApp({
             { title: "Atendimento", active: ["atendimento"], items: [{ id: "atendimento", label: "Funil de atendimento", icon: Users }] },
             { title: "Documentos", active: ["termo", "dvp"], items: [{ id: "termo", label: "Prévia do Termo de Parceria", icon: FileText }, { id: "dvp", label: "Registro de Visita", icon: Stamp }] },
             { title: "Imóveis", active: ["cadastrar"], items: [{ id: "cadastrar", label: "Meus imóveis", icon: PlusCircle }] },
+            { title: "Financeiro", active: ["financeiro"], items: [{ id: "financeiro", label: "Receitas e despesas", icon: Wallet }] },
             ...(currentUser?.role === "admin" ? [{ title: "Administração", active: ["admin"], items: [{ id: "admin", label: "Corretores e pagamentos", icon: UserCheck }] }] : []),
           ].map((menu, index) => (
             <details key={menu.title} name="workspace-navigation-menu" className="group relative shrink-0">
@@ -1164,6 +1167,10 @@ export default function NegociaLarApp({
         )}
 
         {/* Meus imóveis: carteira e cadastro */}
+        {workspaceReady && activeTab === "financeiro" && currentUser && (
+          <div className="max-w-5xl mx-auto"><BrokerFinance blockedReason={blockedReason} onMessage={(text) => showToast(text)} /></div>
+        )}
+
         {activeTab === "cadastrar" && (
           <div className="max-w-3xl mx-auto space-y-6">
             {currentUser ? <>

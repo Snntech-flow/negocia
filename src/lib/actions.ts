@@ -800,7 +800,7 @@ async function submitPilotFeedbackImpl(input: { screen: string; category: string
   const screen = input.screen.trim();
   const category = input.category.trim();
   const message = input.message.trim();
-  if (!["vitrine", "crm", "radar", "atendimento", "cadastrar", "termo", "dvp", "admin"].includes(screen)) throw new ActionError("Selecione uma tela válida.");
+  if (!["vitrine", "crm", "radar", "atendimento", "cadastrar", "termo", "dvp", "financeiro", "admin"].includes(screen)) throw new ActionError("Selecione uma tela válida.");
   if (!["duvida", "erro", "ideia"].includes(category)) throw new ActionError("Selecione um tipo de feedback válido.");
   if (message.length < 10 || message.length > 2000) throw new ActionError("Escreva de 10 a 2.000 caracteres.");
   const [feedback] = await db.insert(pilotFeedback).values({ userId: actor.id, screen, category, message }).returning({ id: pilotFeedback.id, createdAt: pilotFeedback.createdAt });
