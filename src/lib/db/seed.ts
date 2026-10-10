@@ -13,6 +13,11 @@ async function runSeed() {
   if (process.env.NODE_ENV === "production" || process.env.ALLOW_DESTRUCTIVE_NEGOCIAR_LAR_SEED !== "yes") {
     throw new Error("Seed destrutivo bloqueado. Em desenvolvimento, configure ALLOW_DESTRUCTIVE_NEGOCIAR_LAR_SEED=yes após confirmar o banco alvo.");
   }
+  // O seed APAGA todas as tabelas: só em banco local, nunca no Supabase (o .env.local costuma apontar para produção).
+  const target = new URL(process.env.DATABASE_URL || "postgresql://localhost/negocialar_db");
+  if (!["localhost", "127.0.0.1", "[::1]"].includes(target.hostname)) {
+    throw new Error(`Seed bloqueado: ${target.hostname} não é um banco local.`);
+  }
   console.log("🌱 Populando banco de dados com estrutura real, planos oficiais e blindagem...");
 
   // Limpeza de tabelas para um seed limpo

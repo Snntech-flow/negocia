@@ -2,6 +2,8 @@
 const nextConfig = {
   poweredByHeader: false,
   productionBrowserSourceMaps: false,
+  // Fotos de imóveis chegam por ação do servidor (até 3 MB cada, já reduzidas na tela).
+  experimental: { serverActions: { bodySizeLimit: "4mb" } },
   async headers() {
     return [
       {

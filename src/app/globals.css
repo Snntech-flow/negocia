@@ -34,7 +34,7 @@ body {
 
 .negocialar-interior .text-slate-400,
 .negocialar-interior .text-slate-500,
-.negocialar-interior .text-slate-600 { color: #64748b; }
+.negocialar-interior .text-slate-600 { color: #475569; }
 .negocialar-interior [class*="rounded-"][class*="bg-slate-900"] {
   box-shadow: 0 2px 8px rgb(8 56 88 / 6%);
 }
@@ -64,13 +64,6 @@ body {
 /* Finishing details for the broker workspace. */
 .negocialar-interior > header[class] {
   box-shadow: 0 3px 16px rgb(8 56 88 / 12%);
-}
-.negocialar-interior > header > .h-16 {
-  height: auto;
-  min-height: 80px;
-  padding-top: 12px;
-  padding-bottom: 12px;
-  gap: 16px;
 }
 .negocialar-interior > header .bg-white.text-slate-900 {
   display: inline-block;
@@ -107,10 +100,6 @@ body {
 .negocialar-interior > header input,
 .negocialar-interior > header select,
 .negocialar-interior > header textarea { background-color: #16486b; color: #ffffff; }
-@media (max-width: 767px) {
-  .negocialar-interior > header > .h-16 { flex-wrap: wrap; gap: 12px; }
-  .negocialar-interior > header > .h-16 > div:last-child { flex-wrap: wrap; }
-}
 
 .negocialar-interior .workspace-navigation > button,
 .negocialar-interior .workspace-navigation > details > summary {
@@ -156,3 +145,21 @@ body {
 .negocialar-interior [class~="text-red-200"],
 .negocialar-interior [class~="text-red-300"],
 .negocialar-interior [class~="text-red-400"] { color: #9f1239; }
+
+/* No cabeçalho azul-marinho os tons claros continuam claros: as regras acima escurecem para o fundo branco.
+   Sem isto, "Minha assinatura" ficava laranja-escuro sobre azul-marinho (contraste 1,67:1). */
+.negocialar-interior > header [class~="text-amber-200"],
+.negocialar-interior > header [class~="text-amber-300"],
+.negocialar-interior > header [class~="text-amber-400"],
+.negocialar-interior > header [class~="text-orange-300"],
+.negocialar-interior > header [class~="text-orange-400"] { color: #fcd34d; }
+.negocialar-interior > header [class~="text-emerald-300"],
+.negocialar-interior > header [class~="text-emerald-400"] { color: #6ee7b7; }
+.negocialar-interior > header [class~="text-sky-300"],
+.negocialar-interior > header [class~="text-sky-400"] { color: #7dd3fc; }
+.negocialar-interior > header [class~="text-rose-300"],
+.negocialar-interior > header [class~="text-red-400"] { color: #fda4af; }
+
+/* Texto branco em botão e selo coloridos continua branco: a regra geral troca text-white por azul-marinho
+   porque, no resto da área de trabalho, os fundos escuros viraram brancos. */
+.negocialar-interior .text-white:is([class*="bg-emerald-7"], [class*="bg-red-6"], [class*="bg-sky-8"], [class*="bg-blue-6"], [class*="bg-purple-6"], [class*="bg-amber-7"]) { color: #ffffff; }

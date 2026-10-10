@@ -1,6 +1,7 @@
+import { ActionError } from "./action-result";
 import { validatePropertyInput } from "./input-validation";
 
-export class PropertyInventoryError extends Error {}
+export class PropertyInventoryError extends ActionError {}
 
 export interface PropertyInput {
   title: string;
@@ -62,14 +63,17 @@ export function propertyChanges(input: PropertyInput) {
   const result = Object.fromEntries(keys.map(key => [key, input[key] === "" ? null : input[key] ?? null]));
   return { ...result, purpose: input.purpose || "venda", condition: input.condition || "usado",
     acceptsTrade: input.acceptsTrade ?? false, acceptsFinancing: input.acceptsFinancing ?? true,
-    hideStreet: input.hideStreet ?? false, condoFee: input.condoFee || "0", iptu: input.iptu || "0",
-    iptuPeriod: input.iptuPeriod || "anual", state: input.state || "SP", garageType: input.garageType || "coberta",
+    hideStreet: input.hideStreet ?? true, condoFee: input.condoFee || "0", iptu: input.iptu || "0",
+    iptuPeriod: input.iptuPeriod || "anual", state: input.state ? input.state.toUpperCase() : null, garageType: input.garageType || null,
     photos: input.photos || [], floorPlanPhotos: input.floorPlanPhotos || [],
     privateAmenities: input.privateAmenities || [], condoAmenities: input.condoAmenities || [],
   } as PropertyInput;
 }
-export const PROPERTY_STATUSES = ["disponivel", "em_negociacao", "vendido", "arquivado"] as const;
+export const PROPERTY_STATUSES = ["disponivel", "em_negociacao", "vendido", "alugado", "arquivado"] as const;
 export type PropertyStatus = typeof PROPERTY_STATUSES[number];
+export const PROPERTY_STATUS_LABELS: Record<PropertyStatus, string> = {
+  disponivel: "Disponível", em_negociacao: "Em negociação", vendido: "Vendido", alugado: "Alugado", arquivado: "Arquivado",
+};
 export function validatePropertyRevision(id: string, revision: string) {
   if (typeof id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id) ||
     typeof revision !== "string" || !Number.isFinite(Date.parse(revision))) throw new PropertyInventoryError("Imóvel ou versão inválida.");

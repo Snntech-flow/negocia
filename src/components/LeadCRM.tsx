@@ -11,6 +11,8 @@ import BrokerCrmClients from "./BrokerCrmClients";
 import React, { FormEvent, useEffect, useMemo, useState } from "react";
 import { Calculator, Bot, LayoutDashboard, List, KanbanSquare, Building2, CalendarClock, CheckCircle2, Clock3, Download, FileUp, MapPin, Pencil, Phone, Plus, Search, UserRound, X } from "lucide-react";
 import { addLeadActivity, completeLeadFollowUp, createDvpCertificate, createLead, importLeadsCsv, updateLead, updateLeadStage } from "@/lib/actions";
+import { loadStateCities, uniqueCities } from "@/lib/cities";
+import { unwrap } from "@/lib/action-result";
 
 export interface LeadItem {
   documentation?: NegotiationDocuments | null;
@@ -215,6 +217,8 @@ export default function LeadCRM({
   properties,
   onOpenProperty,
   currentUserId,
+  currentUserState = null,
+  blockedReason = null,
   onCreateProperty,
 }: {
   initialView?: "overview" | "pipeline";
@@ -223,8 +227,18 @@ export default function LeadCRM({
   properties: LeadMatchProperty[];
   onOpenProperty: (propertyId: string) => void;
   currentUserId: string | null;
+  currentUserState?: string | null;
+  // Quando o corretor ainda não pode cadastrar (CRECI pendente ou acesso vencido), o motivo aparece e os botões de criar ficam desativados.
+  blockedReason?: string | null;
   onCreateProperty?: () => void;
 }) {
+  const [stateCities, setStateCities] = useState<string[]>([]);
+  useEffect(() => {
+    if (!currentUserState) return;
+    let cancelled = false;
+    void loadStateCities(currentUserState).then((cities) => { if (!cancelled) setStateCities(cities); });
+    return () => { cancelled = true; };
+  }, [currentUserState]);
   const [crmView, setCrmView] = useState<"overview" | "clients" | "pipeline" | "agenda" | "properties" | "simulation" | "assistant">(initialView);
   const [monthFilter, setMonthFilter] = useState("");
   const [pagination, setPagination] = useState({ key: "", page: 1 });
@@ -322,7 +336,7 @@ export default function LeadCRM({
   const clientPage = pagination.key === filterKey ? Math.min(pagination.page, Math.max(1, Math.ceil(visibleLeads.length / 15))) : 1;
   const ownProperties = properties.filter(property => currentUserId && property.brokerId === currentUserId && `${property.title} ${property.city} ${property.neighborhood}`.toLocaleLowerCase("pt-BR").includes(propertySearch.toLocaleLowerCase("pt-BR")));
   const openClient = (id: string) => { setSelectedLeadId(id); setError(null); };
-  const availableCities = Array.from(new Set(leads.map((lead) => lead.city?.trim()).filter((city): city is string => Boolean(city)))).sort((a, b) => a.localeCompare(b, "pt-BR"));
+  const availableCities = uniqueCities(leads.map((lead) => lead.city));
 
   const overdueCount = leads.filter((lead) =>
     lead.nextActionAt && new Date(lead.nextActionAt).getTime() < now
@@ -345,7 +359,7 @@ export default function LeadCRM({
     }
     setBusy(true);
     try {
-      const result = await updateLeadStage(lead.id, stage, lostReason);
+      const result = unwrap(await updateLeadStage(lead.id, stage, lostReason));
       setLeads((current) => current.map((item) => item.id === lead.id ? { ...item, stage: result.lead.stage, lostReason: result.lead.lostReason, updatedAt: result.lead.updatedAt } : item));
       setActivities((current) => [{
         id: result.activity.id,
@@ -387,8 +401,8 @@ export default function LeadCRM({
         nextActionAt: nextActionAtValue ? new Date(nextActionAtValue).toISOString() : "",
       };
       const result = editingLead
-        ? await updateLead(editingLead.id, leadData)
-        : await createLead(leadData);
+        ? unwrap(await updateLead(editingLead.id, leadData))
+        : unwrap(await createLead(leadData));
       const lead: LeadItem = { ...result.lead, neighborhoods: (result.lead.neighborhoods as string[]) || [] };
       setLeads((current) => editingLead
         ? current.map((item) => item.id === lead.id ? lead : item)
@@ -425,7 +439,7 @@ export default function LeadCRM({
     const nextActionAtValue = String(form.get("nextActionAt") || "");
     const nextActionAt = nextActionAtValue ? new Date(nextActionAtValue).toISOString() : "";
     try {
-      const result = await addLeadActivity({ leadId: selectedLead.id, activityType, description, nextAction, nextActionAt });
+      const result = unwrap(await addLeadActivity({ leadId: selectedLead.id, activityType, description, nextAction, nextActionAt }));
       const activity: LeadActivityItem = { ...result.activity, leadId: selectedLead.id };
       setActivities((current) => [activity, ...current]);
       setLeads((current) => current.map((lead) => lead.id === selectedLead.id ? {
@@ -451,7 +465,7 @@ export default function LeadCRM({
     setBusy(true);
     setError(null);
     try {
-      const result = await createDvpCertificate({
+      const result = unwrap(await createDvpCertificate({
         propertyId: visitProperty.id,
         captorBrokerId: visitProperty.brokerId,
         partnerBrokerId: currentUserId,
@@ -461,7 +475,7 @@ export default function LeadCRM({
         clientCpfPartial: String(form.get("clientCpfPartial") || ""),
         visitDate: visitDateValue ? new Date(visitDateValue).toISOString() : "",
         commissionSplit: visitProperty.splitPercentage || "50.00",
-      });
+      }));
       if (result.activity) {
         const activity: LeadActivityItem = { ...result.activity, leadId: selectedLead.id };
         setActivities((current) => [activity, ...current]);
@@ -486,7 +500,7 @@ export default function LeadCRM({
     setBusy(true);
     setError(null);
     try {
-      const result = await completeLeadFollowUp(lead.id);
+      const result = unwrap(await completeLeadFollowUp(lead.id));
       setLeads((current) => current.map((item) => item.id === lead.id ? { ...result.lead, neighborhoods: (result.lead.neighborhoods as string[]) || [] } : item));
       setActivities((current) => [{ ...result.activity, leadId: lead.id }, ...current]);
       setNotice(`Retorno de ${lead.fullName} concluído e salvo no histórico.`);
@@ -578,7 +592,7 @@ export default function LeadCRM({
     try {
       if (file.size > 1_000_000) throw new Error("O arquivo deve ter até 1 MB.");
       const rows = parseCsv(await file.text());
-      const result = await importLeadsCsv(rows);
+      const result = unwrap(await importLeadsCsv(rows));
       setLeads((current) => [...result.leads.map((lead) => ({ ...lead, neighborhoods: (lead.neighborhoods as string[]) || [] })), ...current]);
       setActivities((current) => [...result.activities, ...current]);
       setNotice(`${result.imported} leads importados${result.duplicates ? `; ${result.duplicates} telefones duplicados foram ignorados` : ""}.`);
@@ -600,10 +614,11 @@ export default function LeadCRM({
           <p className="mt-1 text-sm text-slate-400">Seus contatos e histórico ficam privados na sua carteira.</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button onClick={() => { setError(null); setCsvImportOpen(true); }} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 px-4 py-2.5 text-sm font-bold text-slate-200 hover:border-slate-500 hover:bg-slate-800"><FileUp className="h-4 w-4" /> Importar contatos de uma planilha</button>
-          <button onClick={() => { setError(null); setEditingLead(null); setIsCreateOpen(true); }} className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-bold text-slate-950 hover:bg-amber-400"><Plus className="w-4 h-4" /> Novo cliente</button>
+          <button type="button" disabled={!!blockedReason} title={blockedReason || undefined} onClick={() => { setError(null); setCsvImportOpen(true); }} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 px-4 py-2.5 text-sm font-bold text-slate-200 hover:border-slate-500 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"><FileUp className="h-4 w-4" /> Importar contatos de uma planilha</button>
+          <button type="button" disabled={!!blockedReason} title={blockedReason || undefined} onClick={() => { setError(null); setEditingLead(null); setIsCreateOpen(true); }} className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-bold text-slate-950 hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"><Plus className="w-4 h-4" /> Novo cliente</button>
         </div>
       </div>
+      {blockedReason && <p role="note" className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs text-sky-900">{blockedReason}</p>}
 
       <div className="grid gap-5 lg:grid-cols-[180px_minmax(0,1fr)]">
         <aside className="self-start rounded-2xl border border-slate-800 bg-slate-900 p-3 lg:sticky lg:top-36"><p className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">Minha área de trabalho</p><nav aria-label="Áreas do CRM" className="flex flex-wrap gap-1 lg:flex-col">{([
@@ -660,6 +675,7 @@ export default function LeadCRM({
           <select value={cityFilter} onChange={(event) => setCityFilter(event.target.value)} className={selectClass} aria-label="Filtrar cidade">
             <option value="todas">Todas as cidades</option>
             {availableCities.map((city) => <option key={city} value={city}>{city}</option>)}
+            {!availableCities.length && <option value="" disabled>Nenhum cliente com cidade cadastrada ainda</option>}
           </select>
           <select value={followUpFilter} onChange={(event) => setFollowUpFilter(event.target.value)} className={selectClass} aria-label="Filtrar retornos">
             <option value="todos">Qualquer retorno</option>
@@ -700,7 +716,7 @@ export default function LeadCRM({
           <UserRound className="mx-auto h-10 w-10 text-slate-900" />
           <h3 className="mt-4 text-lg font-bold text-white">Sua carteira começa aqui</h3>
           <p className="mx-auto mt-2 max-w-md text-sm text-slate-900">Cadastre um contato, defina a próxima ação e acompanhe cada etapa até a conclusão.</p>
-          <button onClick={() => setIsCreateOpen(true)} className="mt-5 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-bold text-slate-950 hover:bg-amber-400"><Plus className="mr-1 inline h-4 w-4" /> Cadastrar primeiro lead</button>
+          <button type="button" disabled={!!blockedReason} title={blockedReason || undefined} onClick={() => setIsCreateOpen(true)} className="mt-5 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-bold text-slate-950 hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"><Plus className="mr-1 inline h-4 w-4" /> Cadastrar primeiro lead</button>
         </div>
       ) : (
         <>
@@ -788,7 +804,7 @@ export default function LeadCRM({
               <label className="text-xs font-semibold text-slate-300">Tipo de lead<select name="leadType" defaultValue={editingLead?.leadType || "comprador"} className={`${inputClass} mt-1`}>{leadTypes.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
               <label className="text-xs font-semibold text-slate-300">Como chegou<select name="source" defaultValue={editingLead?.source || "outro"} className={`${inputClass} mt-1`}>{sources.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
               <label className="text-xs font-semibold text-slate-300">Tipo de imóvel<input name="propertyType" defaultValue={editingLead?.propertyType || ""} className={`${inputClass} mt-1`} placeholder="Apartamento, casa..." /></label>
-              <label className="text-xs font-semibold text-slate-300">Cidade<input name="city" defaultValue={editingLead?.city || ""} className={`${inputClass} mt-1`} placeholder="São Paulo" /></label>
+              <label className="text-xs font-semibold text-slate-300">Cidade<input name="city" list="lead-city-options" autoComplete="off" defaultValue={editingLead?.city || ""} className={`${inputClass} mt-1`} placeholder={stateCities.length ? `Digite para ver as cidades de ${currentUserState}` : "São Paulo"} /><datalist id="lead-city-options">{stateCities.map((city) => <option key={city} value={city} />)}</datalist></label>
               <label className="text-xs font-semibold text-slate-300">Bairros de interesse<input name="neighborhoods" defaultValue={editingLead?.neighborhoods?.join(", ") || ""} className={`${inputClass} mt-1`} placeholder="Moema, Pinheiros" /></label>
               <label className="text-xs font-semibold text-slate-300">Orçamento máximo (R$)<input name="maxBudget" type="number" min="1" step="0.01" defaultValue={editingLead?.maxBudget || ""} className={`${inputClass} mt-1`} placeholder="Ex.: 850000" /></label>
               <label className="text-xs font-semibold text-slate-300">Quartos mínimos<input name="minBedrooms" type="number" min="1" max="20" defaultValue={editingLead?.minBedrooms || ""} className={`${inputClass} mt-1`} placeholder="2" /></label>
@@ -814,11 +830,11 @@ export default function LeadCRM({
             </div>
             <label className="block text-xs font-semibold text-slate-300">Data e horário da visita<input name="visitDate" type="datetime-local" required defaultValue={localDateTimeNow()} className={`${inputClass} mt-1`} /></label>
             <label className="block text-xs font-semibold text-slate-300">CPF parcial do cliente<input name="clientCpfPartial" type="text" required pattern="\*{3}\.\d{3}\.\d{3}-\*{2}" maxLength={14} placeholder="***.123.456-**" className={`${inputClass} mt-1 font-mono`} /></label>
-            <p className="rounded-lg border border-amber-500/20 bg-amber-950/20 p-3 text-[11px] leading-relaxed text-amber-100/80">O registro fica como rascunho até ser validado e aceito pelas partes. Ele não equivale a assinatura eletrônica nem substitui orientação jurídica.</p>
+            <p className="rounded-lg border border-amber-500/20 bg-amber-950/20 p-3 text-[11px] leading-relaxed text-slate-300">O registro fica como rascunho até ser validado e aceito pelas partes. Ele não equivale a assinatura eletrônica nem substitui orientação jurídica.</p>
             {error && <p role="alert" className="text-xs text-rose-300">{error}</p>}
             <div className="flex justify-end gap-2 border-t border-slate-800 pt-3">
               <button type="button" onClick={() => setVisitProperty(null)} className="rounded-lg px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800">Cancelar</button>
-              <button disabled={busy} className="rounded-lg bg-emerald-500 px-3 py-2 text-xs font-bold text-slate-950 hover:bg-emerald-400 disabled:opacity-50">{busy ? "Registrando..." : "Criar DVP em rascunho"}</button>
+              <button disabled={busy || !!blockedReason} title={blockedReason || undefined} className="rounded-lg bg-emerald-500 px-3 py-2 text-xs font-bold text-slate-950 hover:bg-emerald-400 disabled:opacity-50">{busy ? "Registrando..." : "Criar registro de visita"}</button>
             </div>
           </form>
         </div>

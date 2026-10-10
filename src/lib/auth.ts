@@ -1,3 +1,4 @@
+import { ActionError } from "./action-result";
 import { db, users, authLoginAttempts } from "./db";
 import { eq, sql } from "drizzle-orm";
 import { cookies, headers } from "next/headers";
@@ -30,7 +31,7 @@ export async function limitRegistrationAttempts() {
     })
     .returning({ blockedUntil: authLoginAttempts.blockedUntil });
   if (state.blockedUntil && state.blockedUntil.getTime() > Date.now()) {
-    throw new Error("Muitos cadastros nesta conexão. Aguarde uma hora e tente novamente.");
+    throw new ActionError("Muitos cadastros nesta conexão. Aguarde uma hora e tente novamente.");
   }
 }
 
@@ -57,7 +58,7 @@ function signUserId(userId: string, expiresAt: number, sessionVersion?: number) 
 export async function setBrokerSession(userId: string) {
   const cookieStore = await cookies();
   const [user] = await db.select({ sessionVersion: users.sessionVersion }).from(users).where(eq(users.id, userId)).limit(1);
-  if (!user) throw new Error("Conta não encontrada.");
+  if (!user) throw new ActionError("Conta não encontrada.");
   const expiresAt = Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS;
   cookieStore.set(SESSION_COOKIE, `${userId}.${user.sessionVersion}.${expiresAt}.${signUserId(userId, expiresAt, user.sessionVersion)}`, {
     path: "/",
@@ -70,7 +71,7 @@ export async function setBrokerSession(userId: string) {
 
 export async function hashPassword(password: string) {
   if (password.length < 12 || password.length > 200) {
-    throw new Error("A senha precisa ter entre 12 e 200 caracteres.");
+    throw new ActionError("A senha precisa ter entre 12 e 200 caracteres.");
   }
   const salt = crypto.randomBytes(16).toString("hex");
   const derived = (await new Promise<Buffer>((resolve, reject) => {
@@ -93,15 +94,15 @@ export async function verifyPassword(password: string, stored: string | null) {
 
 export async function requireCurrentUser() {
   const id = await getCurrentUserId();
-  if (!id) throw new Error("Faça login para continuar.");
-  const [user] = await db.select({ id: users.id, role: users.role, verificationStatus: users.verificationStatus, subscriptionStatus: users.subscriptionStatus, nextBillingDate: users.nextBillingDate }).from(users).where(eq(users.id, id)).limit(1);
-  if (!user || user.verificationStatus === "suspenso") throw new Error("A conta não está autorizada.");
+  if (!id) throw new ActionError("Faça login para continuar.");
+  const [user] = await db.select({ id: users.id, role: users.role, plan: users.plan, verificationStatus: users.verificationStatus, subscriptionStatus: users.subscriptionStatus, nextBillingDate: users.nextBillingDate }).from(users).where(eq(users.id, id)).limit(1);
+  if (!user || user.verificationStatus === "suspenso") throw new ActionError("A conta não está autorizada.");
   return user;
 }
 
 export function requireActiveBroker(actor: Awaited<ReturnType<typeof requireCurrentUser>>) {
-  if (actor.verificationStatus !== "aprovado") throw new Error("Seu cadastro ainda aguarda verificação.");
-  if (!hasSubscriptionAccess(actor.subscriptionStatus, actor.nextBillingDate)) throw new Error("Ative sua assinatura para usar esta função.");
+  if (actor.verificationStatus !== "aprovado") throw new ActionError("Seu cadastro ainda aguarda verificação.");
+  if (!hasSubscriptionAccess(actor.subscriptionStatus, actor.nextBillingDate)) throw new ActionError("Ative sua assinatura para usar esta função.");
 }
 
 export async function getCurrentUserId(): Promise<string | null> {

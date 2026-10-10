@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import Image from "next/image";
 import { ExternalLink, Send, Trash2 } from "lucide-react";
 import { askBrokerAssistant, getBrokerAssistantStatus } from "@/lib/actions";
+import { unwrap } from "@/lib/action-result";
 import type { BrokerAnswer } from "@/lib/broker-assistant";
 
 type Message={role:"user"|"assistant";text:string;sources?:BrokerAnswer["sources"];searchSuggestions?:string|null};
@@ -13,12 +14,12 @@ export default function BrokerAssistant() {
   const [busy,setBusy]=useState(false);
   const [enabled,setEnabled]=useState<boolean|null>(null);
   const [error,setError]=useState("");
-  useEffect(()=>{let active=true;getBrokerAssistantStatus().then(status=>{if(active)setEnabled(status.enabled);}).catch(()=>{if(active){setEnabled(false);setError("Não foi possível consultar a disponibilidade da IA.");}});return()=>{active=false;};},[]);
+  useEffect(()=>{let active=true;getBrokerAssistantStatus().then(result=>{if(active)setEnabled(unwrap(result).enabled);}).catch(()=>{if(active){setEnabled(false);setError("Não foi possível consultar a disponibilidade da IA.");}});return()=>{active=false;};},[]);
   async function send(event:React.FormEvent) {
     event.preventDefault();const text=question.trim();if(text.length<3 || busy || !enabled)return;
     setBusy(true);setError("");const history=messages.slice(1).slice(-10).map(item=>({role:item.role,text:item.text.slice(0,6000)}));
     setMessages(current=>[...current,{role:"user",text}]);setQuestion("");
-    try {const answer=await askBrokerAssistant({question:text,history});setMessages(current=>[...current,{role:"assistant",...answer}]);}
+    try {const answer=unwrap(await askBrokerAssistant({question:text,history}));setMessages(current=>[...current,{role:"assistant",...answer}]);}
     catch(error){setMessages(current=>current.slice(0,-1));setQuestion(text);setError(error instanceof Error?error.message:"Não foi possível consultar o Bartolomeu.");}
     finally{setBusy(false);}
   }

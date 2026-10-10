@@ -2,12 +2,15 @@
 
 import { db, properties, users, buyerProfiles, leads, leadActivities, partnerships, partnershipActivities,
   pilotFeedback, transactions, notifications, dvpCertificates } from "../db";
-import { eq, ne, desc, and, or, sql, ilike, count } from "drizzle-orm";
+import { eq, ne, desc, and, or, sql, ilike, count, inArray } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { getCurrentUserId } from "../auth";
 import { hasSubscriptionAccess } from "../subscription";
 import { networkPropertyScope, networkProfileScope } from "../property-access";
 import { validateMarketplaceQuery, PROPERTY_PAGE_SIZE, type MarketplaceQuery, type WorkspaceSection } from "../marketplace-query";
+
+// CRM, Radar e Visitas cruzam com o estoque recente; a vitrine pagina e enxerga tudo.
+const NETWORK_PROPERTY_CAP = 500;
 
 const partnershipCaptor = alias(users, "partnership_captor");
 const partnershipPartner = alias(users, "partnership_partner");
@@ -30,6 +33,7 @@ export async function getMarketplaceData(input: MarketplaceQuery = {}) {
           nextBillingDate: users.nextBillingDate, billingCycle: users.billingCycle,
           role: users.role, trustScore: users.trustScore,
           successfulDeals: users.successfulDeals, bypassReports: users.bypassReports,
+          verificationReviewedAt: users.verificationReviewedAt, verificationReviewedBy: users.verificationReviewedBy,
           createdAt: users.createdAt,
         }).from(users).where(eq(users.id, currentUserId)).limit(1)
       : [];
@@ -124,7 +128,7 @@ export async function getMarketplaceData(input: MarketplaceQuery = {}) {
       .innerJoin(users, eq(properties.brokerId, users.id))
       .where(filteredPropertyScope)
       .orderBy(desc(properties.createdAt), desc(properties.id))
-      .limit(paginated ? PROPERTY_PAGE_SIZE : 2147483647)
+      .limit(paginated ? PROPERTY_PAGE_SIZE : NETWORK_PROPERTY_CAP)
       .offset(paginated ? (page - 1) * PROPERTY_PAGE_SIZE : 0) : [];
     const propertyCountQuery = includePropertyCount ? db.select({ total: count() }).from(properties)
       .innerJoin(users, eq(properties.brokerId, users.id)).where(filteredPropertyScope) : [];
@@ -169,6 +173,7 @@ export async function getMarketplaceData(input: MarketplaceQuery = {}) {
         subscriptionStatus: users.subscriptionStatus, monthlyFee: users.monthlyFee,
           nextBillingDate: users.nextBillingDate, billingCycle: users.billingCycle,
         role: users.role, trustScore: users.trustScore,
+        verificationReviewedAt: users.verificationReviewedAt, verificationReviewedBy: users.verificationReviewedBy,
         successfulDeals: users.successfulDeals, bypassReports: users.bypassReports,
         createdAt: users.createdAt,
       })
@@ -184,6 +189,11 @@ export async function getMarketplaceData(input: MarketplaceQuery = {}) {
         type: transactions.type,
         paymentMethod: transactions.paymentMethod,
         status: transactions.status,
+        confirmedAt: transactions.confirmedAt,
+        confirmedBy: transactions.confirmedBy,
+        refundedAt: transactions.refundedAt,
+        refundReason: transactions.refundReason,
+        periodEnd: transactions.periodEnd,
         description: transactions.description,
         createdAt: transactions.createdAt,
         userName: users.name,
@@ -354,7 +364,7 @@ export async function getMarketplaceData(input: MarketplaceQuery = {}) {
       })
       .from(partnershipActivities)
       .innerJoin(users, eq(partnershipActivities.actorUserId, users.id))
-      .where(or(...partnershipList.map((partnership) => eq(partnershipActivities.partnershipId, partnership.id))))
+      .where(inArray(partnershipActivities.partnershipId, partnershipList.map((partnership) => partnership.id)))
       .orderBy(desc(partnershipActivities.createdAt))
       .limit(500)
       : [];

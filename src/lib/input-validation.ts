@@ -1,8 +1,12 @@
+import { ActionError } from "./action-result";
+import { isBrazilianState } from "./brazil-states";
+import { CONDITIONS, DOCUMENTATION_STATUSES, GARAGE_TYPES, IPTU_PERIODS, PURPOSES, SOLAR_POSITIONS, VIEW_TYPES } from "./property-options";
+
 type Input = Record<string, unknown>;
 
 function fields(value: unknown): Input {
   if (!value || typeof value !== "object" || Array.isArray(value)) {
-    throw new Error("Dados inválidos.");
+    throw new ActionError("Dados inválidos.");
   }
   return value as Input;
 }
@@ -10,34 +14,34 @@ function fields(value: unknown): Input {
 function text(input: Input, field: string, label: string, max: number, required = false) {
   const value = input[field];
   if (value == null || value === "") {
-    if (required) throw new Error(`Informe ${label}.`);
+    if (required) throw new ActionError(`Informe ${label}.`);
     return;
   }
   if (typeof value !== "string" || value.trim().length < (required ? 1 : 0) || value.length > max) {
-    throw new Error(`${label} inválido; máximo de ${max} caracteres.`);
+    throw new ActionError(`${label} inválido; máximo de ${max} caracteres.`);
   }
 }
 
 function decimal(input: Input, field: string, label: string, max: number, required = false, allowZero = true) {
   const value = input[field];
   if (value == null || value === "") {
-    if (required) throw new Error(`Informe ${label}.`);
+    if (required) throw new ActionError(`Informe ${label}.`);
     return;
   }
   if (typeof value !== "string" || !/^\d+(?:\.\d{1,2})?$/.test(value) ||
       !Number.isFinite(Number(value)) || Number(value) > max || (!allowZero && Number(value) === 0)) {
-    throw new Error(`${label} inválido.`);
+    throw new ActionError(`${label} inválido.`);
   }
 }
 
 function count(input: Input, field: string, label: string, max: number, required = false) {
   const value = input[field];
   if (value == null) {
-    if (required) throw new Error(`Informe ${label}.`);
+    if (required) throw new ActionError(`Informe ${label}.`);
     return;
   }
   if (typeof value !== "number" || !Number.isInteger(value) || value < 0 || value > max) {
-    throw new Error(`${label} inválido.`);
+    throw new ActionError(`${label} inválido.`);
   }
 }
 
@@ -46,7 +50,7 @@ function list(input: Input, field: string, label: string, maxItems: number, maxT
   if (value == null) return;
   if (!Array.isArray(value) || value.length > maxItems ||
       value.some((item) => typeof item !== "string" || item.length > maxText || (urls && !safeHttpsUrl(item)))) {
-    throw new Error(`${label} inválido.`);
+    throw new ActionError(`${label} inválido.`);
   }
 }
 
@@ -59,11 +63,17 @@ function safeHttpsUrl(value: string) {
   }
 }
 
+function oneOf(input: Input, field: string, message: string, options: readonly { id: string }[]) {
+  const value = input[field];
+  if (value == null || value === "") return;
+  if (!options.some((option) => option.id === value)) throw new ActionError(message);
+}
+
 function optionalUrl(input: Input, field: string, label: string) {
   const value = input[field];
   if (value == null || value === "") return;
   if (typeof value !== "string" || value.length > 2048 || !safeHttpsUrl(value)) {
-    throw new Error(`${label} deve ser uma URL HTTPS válida.`);
+    throw new ActionError(`${label} deve ser uma URL HTTPS válida.`);
   }
 }
 
@@ -84,6 +94,14 @@ export function validatePropertyInput(value: unknown) {
     ["garageType", "o tipo de garagem", 40], ["solarPosition", "a posição solar", 50],
     ["viewType", "a vista", 50], ["documentationStatus", "a documentação", 80],
   ] as const) text(input, field, label, max);
+  oneOf(input, "solarPosition", "Escolha uma posição solar da lista.", SOLAR_POSITIONS);
+  oneOf(input, "viewType", "Escolha um tipo de vista da lista.", VIEW_TYPES);
+  oneOf(input, "purpose", "Escolha venda, aluguel ou temporada.", PURPOSES);
+  oneOf(input, "condition", "Escolha a condição do imóvel da lista.", CONDITIONS);
+  oneOf(input, "garageType", "Escolha vaga coberta ou descoberta.", GARAGE_TYPES);
+  oneOf(input, "documentationStatus", "Escolha a situação da documentação da lista.", DOCUMENTATION_STATUSES);
+  oneOf(input, "iptuPeriod", "Escolha IPTU anual ou mensal.", IPTU_PERIODS);
+  if (typeof input.state === "string" && input.state && !isBrazilianState(input.state.toUpperCase())) throw new ActionError("Informe uma UF válida.");
   for (const [field, label, max, required] of [
     ["salePrice", "o preço", 9999999999.99, true],
     ["areaM2", "a área", 999999.99, true],
@@ -102,7 +120,7 @@ export function validatePropertyInput(value: unknown) {
     ["propertyAge", "a idade do imóvel", 1000, false],
   ] as const) count(input, field, label, max, required);
   for (const field of ["acceptsTrade", "hideStreet", "acceptsFinancing", "acceptsPartnership"]) {
-    if (input[field] != null && typeof input[field] !== "boolean") throw new Error(`${field} inválido.`);
+    if (input[field] != null && typeof input[field] !== "boolean") throw new ActionError(`${field} inválido.`);
   }
   list(input, "privateAmenities", "Itens privativos", 50, 120);
   list(input, "condoAmenities", "Itens do condomínio", 50, 120);
@@ -132,13 +150,13 @@ export function validateLeadInput(value: unknown) {
   text(input, "fullName", "o nome do lead", 120, true);
   const phone = input.phone;
   if (typeof phone !== "string" || phone.length > 30 || phone.replace(/\D/g, "").length < 8 || phone.replace(/\D/g, "").length > 15) {
-    throw new Error("Informe um telefone válido com DDD.");
+    throw new ActionError("Informe um telefone válido com DDD.");
   }
-  if (typeof input.leadType !== "string" || !leadTypes.has(input.leadType)) throw new Error("Tipo de lead inválido.");
-  if (typeof input.source !== "string" || !leadSources.has(input.source)) throw new Error("Origem do lead inválida.");
+  if (typeof input.leadType !== "string" || !leadTypes.has(input.leadType)) throw new ActionError("Tipo de lead inválido.");
+  if (typeof input.source !== "string" || !leadSources.has(input.source)) throw new ActionError("Origem do lead inválida.");
   text(input, "email", "o e-mail", 254);
   const email = typeof input.email === "string" ? input.email.trim() : "";
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Informe um e-mail válido.");
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new ActionError("Informe um e-mail válido.");
   text(input, "propertyType", "o tipo do imóvel", 80);
   text(input, "city", "a cidade", 120);
   text(input, "notes", "as observações", 3000);
@@ -148,12 +166,12 @@ export function validateLeadInput(value: unknown) {
   if (budget != null && budget !== "" && (
     typeof budget !== "string" || !/^\d+(?:\.\d{1,2})?$/.test(budget) ||
     !Number.isFinite(Number(budget)) || Number(budget) <= 0 || Number(budget) > 9999999999.99
-  )) throw new Error("O orçamento deve ser um valor positivo válido.");
+  )) throw new ActionError("O orçamento deve ser um valor positivo válido.");
   count(input, "minBedrooms", "o mínimo de quartos", 100);
-  if (input.minBedrooms === 0) throw new Error("O mínimo de quartos deve ser maior que zero.");
+  if (input.minBedrooms === 0) throw new ActionError("O mínimo de quartos deve ser maior que zero.");
   if (input.neighborhoods != null) list(input, "neighborhoods", "Bairros", 20, 120);
   const date = input.nextActionAt;
   if (date != null && date !== "" && (typeof date !== "string" || date.length > 100 || !Number.isFinite(new Date(date).getTime()))) {
-    throw new Error("Informe uma data válida para o próximo retorno.");
+    throw new ActionError("Informe uma data válida para o próximo retorno.");
   }
 }

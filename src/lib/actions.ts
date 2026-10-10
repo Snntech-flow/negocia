@@ -1,5 +1,7 @@
 "use server";
 
+import { ActionError, isUniqueViolation, runAction } from "./action-result";
+
 import { validateNegotiationDocuments, type NegotiationDocuments } from "./negotiation-documents";
 
 import {
@@ -17,7 +19,7 @@ import {
   dvpCertificates,
   authLoginAttempts,
 } from "./db";
-import { eq, desc, and, lte, gte, or, sql, inArray } from "drizzle-orm";
+import { eq, ne, desc, and, lt, lte, gte, or, sql, inArray, isNull } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import crypto from "crypto";
@@ -29,42 +31,52 @@ export async function getCurrentUserId() { return readCurrentUserId(); }
 import { networkPropertyScope, networkProfileScope, canUseProperty } from "./property-access";
 import type { PropertyInput } from "./property-input";
 import { validateBuyerProfileInput, validatePropertyInput } from "./input-validation";
+import { isBrazilianState } from "./brazil-states";
+import { reserveListingSlot } from "./listing-limit";
+import { isPlanId, planCharge, planMonthlyEquivalent, planName } from "./plans";
+import { normalizedSql, normalizeText } from "./text-match";
 
 import { getMarketplaceData as readMarketplaceData } from "./queries/marketplace";
 import type { MarketplaceQuery } from "./marketplace-query";
-export async function getMarketplaceData(input: MarketplaceQuery = {}) { return readMarketplaceData(input); }
+async function getMarketplaceDataImpl(input: MarketplaceQuery = {}) { return readMarketplaceData(input); }
 
 import * as crmActions from "./actions/crm";
-export async function createLead(...args: Parameters<typeof crmActions.createLead>) { return crmActions.createLead(...args); }
-export async function importLeadsCsv(...args: Parameters<typeof crmActions.importLeadsCsv>) { return crmActions.importLeadsCsv(...args); }
-export async function updateLead(...args: Parameters<typeof crmActions.updateLead>) { return crmActions.updateLead(...args); }
-export async function updateLeadStage(...args: Parameters<typeof crmActions.updateLeadStage>) { return crmActions.updateLeadStage(...args); }
-export async function addLeadActivity(...args: Parameters<typeof crmActions.addLeadActivity>) { return crmActions.addLeadActivity(...args); }
-export async function completeLeadFollowUp(...args: Parameters<typeof crmActions.completeLeadFollowUp>) { return crmActions.completeLeadFollowUp(...args); }
+async function createLeadImpl(...args: Parameters<typeof crmActions.createLead>) { return crmActions.createLead(...args); }
+async function importLeadsCsvImpl(...args: Parameters<typeof crmActions.importLeadsCsv>) { return crmActions.importLeadsCsv(...args); }
+async function updateLeadImpl(...args: Parameters<typeof crmActions.updateLead>) { return crmActions.updateLead(...args); }
+async function updateLeadStageImpl(...args: Parameters<typeof crmActions.updateLeadStage>) { return crmActions.updateLeadStage(...args); }
+async function addLeadActivityImpl(...args: Parameters<typeof crmActions.addLeadActivity>) { return crmActions.addLeadActivity(...args); }
+async function completeLeadFollowUpImpl(...args: Parameters<typeof crmActions.completeLeadFollowUp>) { return crmActions.completeLeadFollowUp(...args); }
 
-export async function updateUserStatus(userId: string, newStatus: string) {
+async function updateUserStatusImpl(userId: string, newStatus: string) {
   const actor = await requireCurrentUser();
-  if (actor.role !== "admin") throw new Error("Ação restrita à administração.");
-  if (!["pendente", "aprovado", "suspenso"].includes(newStatus)) throw new Error("Status inválido.");
-  await db
+  if (actor.role !== "admin") throw new ActionError("Ação restrita à administração.");
+  if (!["pendente", "aprovado", "suspenso"].includes(newStatus)) throw new ActionError("Status inválido.");
+  if (userId === actor.id) throw new ActionError("Você não pode mudar a situação da sua própria conta.");
+  const reviewedAt = new Date();
+  const [updated] = await db
     .update(users)
     .set({
       verificationStatus: newStatus,
       isVerified: newStatus === "aprovado",
+      verificationReviewedBy: actor.id,
+      verificationReviewedAt: reviewedAt,
       ...(newStatus === "suspenso" ? { sessionVersion: sql`${users.sessionVersion} + 1` } : {}),
-      updatedAt: new Date(),
+      updatedAt: reviewedAt,
     })
-    .where(eq(users.id, userId));
+    .where(eq(users.id, userId))
+    .returning({ id: users.id });
+  if (!updated) throw new ActionError("Corretor não encontrado.");
 
   revalidatePath("/");
-  return { success: true };
+  return { success: true, reviewedBy: actor.id, reviewedAt };
 }
 
-export async function confirmPixSubscriptionPayment(transactionId: string) {
+async function confirmPixSubscriptionPaymentImpl(transactionId: string) {
   const actor = await requireCurrentUser();
-  if (actor.role !== "admin") throw new Error("Ação restrita à administração.");
+  if (actor.role !== "admin") throw new ActionError("Ação restrita à administração.");
   if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(transactionId)) {
-    throw new Error("Transação inválida.");
+    throw new ActionError("Transação inválida.");
   }
 
   const payment = await db.transaction(async (tx) => {
@@ -75,34 +87,44 @@ export async function confirmPixSubscriptionPayment(transactionId: string) {
       paymentMethod: transactions.paymentMethod,
       status: transactions.status,
     }).from(transactions).where(eq(transactions.id, transactionId)).for("update").limit(1);
-    if (!pending) throw new Error("Transação não encontrada.");
+    if (!pending) throw new ActionError("Transação não encontrada.");
     if (!pending.type.startsWith("mensalidade_") || pending.paymentMethod !== "pix") {
-      throw new Error("Apenas mensalidades via Pix podem ser confirmadas nesta tela.");
+      throw new ActionError("Apenas mensalidades via Pix podem ser confirmadas nesta tela.");
     }
-    if (pending.status !== "pendente") throw new Error("Esta transação não está pendente.");
-
-    const [confirmed] = await tx.update(transactions)
-      .set({ status: "pago" })
-      .where(and(eq(transactions.id, pending.id), eq(transactions.status, "pendente")))
-      .returning({ id: transactions.id, userId: transactions.userId, amount: transactions.amount });
-    if (!confirmed) throw new Error("A transação já foi atualizada.");
+    if (pending.status !== "pendente") throw new ActionError("Esta transação não está pendente.");
 
     const [subscriber] = await tx.select().from(users).where(eq(users.id, pending.userId)).for("update").limit(1);
-    if (!subscriber) throw new Error("Assinante não encontrado.");
-    await tx.update(users).set({ subscriptionStatus: "ativo", nextBillingDate: extendPaidPeriod(subscriber.nextBillingDate, subscriber.billingCycle), updatedAt: new Date() }).where(eq(users.id, pending.userId));
+    if (!subscriber) throw new ActionError("Assinante não encontrado.");
+    const now = new Date();
+    const periodEnd = extendPaidPeriod(subscriber.nextBillingDate, subscriber.billingCycle, now);
+    let referral: { userId: string; previous: Date | null; end: Date } | null = null;
     if (subscriber.referredBy && !subscriber.referralRewardedAt) {
       const [referrer] = await tx.select().from(users).where(eq(users.id, subscriber.referredBy)).for("update").limit(1);
       if (referrer && referrer.verificationStatus !== "suspenso") {
-        const start = referrer.nextBillingDate && referrer.nextBillingDate > new Date() ? referrer.nextBillingDate : new Date();
-        await tx.update(users).set({ nextBillingDate: addFreeDays(start), subscriptionStatus: referrer.subscriptionStatus === "teste" ? "teste" : "ativo", updatedAt: new Date() }).where(eq(users.id, referrer.id));
-        await tx.update(users).set({ referralRewardedAt: new Date() }).where(eq(users.id, subscriber.id));
+        const start = referrer.nextBillingDate && referrer.nextBillingDate > now ? referrer.nextBillingDate : now;
+        referral = { userId: referrer.id, previous: referrer.nextBillingDate, end: addFreeDays(start) };
+        await tx.update(users).set({ nextBillingDate: referral.end, subscriptionStatus: referrer.subscriptionStatus === "teste" ? "teste" : "ativo", updatedAt: now }).where(eq(users.id, referrer.id));
+        await tx.update(users).set({ referralRewardedAt: now }).where(eq(users.id, subscriber.id));
         await tx.insert(notifications).values({ userId: referrer.id, title: "Você ganhou 30 dias grátis!", message: "O primeiro pagamento de um corretor indicado foi confirmado. Adicionamos 30 dias ao seu acesso.", type: "sistema", read: false });
       }
     }
+    // Guarda o estado anterior: o estorno desfaz exatamente esta confirmação.
+    const [confirmed] = await tx.update(transactions)
+      .set({
+        status: "pago", confirmedBy: actor.id, confirmedAt: now,
+        previousBillingDate: subscriber.nextBillingDate, previousSubscriptionStatus: subscriber.subscriptionStatus, periodEnd,
+        referralRewardedUserId: referral?.userId ?? null, referralPreviousBillingDate: referral?.previous ?? null, referralPeriodEnd: referral?.end ?? null,
+      })
+      .where(and(eq(transactions.id, pending.id), eq(transactions.status, "pendente")))
+      .returning({ id: transactions.id, userId: transactions.userId, amount: transactions.amount, confirmedAt: transactions.confirmedAt });
+    if (!confirmed) throw new ActionError("A transação já foi atualizada.");
+    await tx.update(users).set({ subscriptionStatus: "ativo", nextBillingDate: periodEnd, updatedAt: now }).where(eq(users.id, pending.userId));
     await tx.insert(notifications).values({
       userId: pending.userId,
       title: "Pagamento Pix confirmado",
-      message: "A equipe confirmou o recebimento do Pix. Seu acesso será liberado assim que o CRECI também for aprovado.",
+      message: subscriber.verificationStatus === "aprovado"
+        ? `A equipe confirmou o recebimento do Pix. Seu acesso vai até ${periodEnd.toLocaleDateString("pt-BR", { timeZone: "America/Sao_Paulo" })}.`
+        : "A equipe confirmou o recebimento do Pix. O uso da rede é liberado assim que o CRECI for aprovado.",
       type: "sistema",
       read: false,
     });
@@ -113,70 +135,123 @@ export async function confirmPixSubscriptionPayment(transactionId: string) {
   return { success: true, payment };
 }
 
-export async function createProperty(formData: PropertyInput) {
+async function refundPixSubscriptionPaymentImpl(transactionId: string, reason: string) {
+  const actor = await requireCurrentUser();
+  if (actor.role !== "admin") throw new ActionError("Ação restrita à administração.");
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(transactionId)) throw new ActionError("Transação inválida.");
+  const cleanReason = typeof reason === "string" ? reason.trim() : "";
+  if (cleanReason.length < 5 || cleanReason.length > 300) throw new ActionError("Informe o motivo do estorno (5 a 300 caracteres).");
+
+  const refunded = await db.transaction(async (tx) => {
+    const [payment] = await tx.select().from(transactions).where(eq(transactions.id, transactionId)).for("update").limit(1);
+    if (!payment) throw new ActionError("Transação não encontrada.");
+    if (payment.status !== "pago" || !payment.type.startsWith("mensalidade_") || payment.paymentMethod !== "pix") throw new ActionError("Só mensalidades Pix confirmadas podem ser estornadas.");
+    if (!payment.confirmedAt || !payment.periodEnd) throw new ActionError("Este Pix foi confirmado antes do registro de estorno. Ajuste o acesso do corretor manualmente.");
+    const [subscriber] = await tx.select().from(users).where(eq(users.id, payment.userId)).for("update").limit(1);
+    if (!subscriber) throw new ActionError("Assinante não encontrado.");
+    if (subscriber.nextBillingDate?.getTime() !== payment.periodEnd.getTime()) {
+      throw new ActionError("Houve outra renovação depois deste pagamento. Estorne primeiro o pagamento mais recente.");
+    }
+    const now = new Date();
+    await tx.update(users).set({
+      nextBillingDate: payment.previousBillingDate,
+      subscriptionStatus: payment.previousSubscriptionStatus || "pendente",
+      ...(payment.referralRewardedUserId ? { referralRewardedAt: null } : {}),
+      updatedAt: now,
+    }).where(eq(users.id, subscriber.id));
+    if (payment.referralRewardedUserId) {
+      const [referrer] = await tx.select().from(users).where(eq(users.id, payment.referralRewardedUserId)).for("update").limit(1);
+      if (referrer?.nextBillingDate) {
+        // Sem renovação do indicador depois do bônus, volta à data exata; senão, tira os 30 dias concedidos.
+        const restored = payment.referralPeriodEnd && referrer.nextBillingDate.getTime() === payment.referralPeriodEnd.getTime()
+          ? payment.referralPreviousBillingDate
+          : addFreeDays(referrer.nextBillingDate, -30);
+        await tx.update(users).set({ nextBillingDate: restored, updatedAt: now }).where(eq(users.id, referrer.id));
+        await tx.insert(notifications).values({ userId: referrer.id, title: "Bônus de indicação estornado", message: "O pagamento do corretor indicado foi estornado; os 30 dias de bônus foram retirados.", type: "sistema", read: false });
+      }
+    }
+    const [updated] = await tx.update(transactions)
+      .set({ status: "estornado", refundedBy: actor.id, refundedAt: now, refundReason: cleanReason })
+      .where(and(eq(transactions.id, payment.id), eq(transactions.status, "pago")))
+      .returning({ id: transactions.id, userId: transactions.userId, status: transactions.status });
+    if (!updated) throw new ActionError("A transação já foi atualizada.");
+    await tx.insert(notifications).values({ userId: subscriber.id, title: "Pagamento estornado", message: `O pagamento Pix foi estornado pela equipe. Motivo: ${cleanReason}`, type: "sistema", read: false });
+    return { ...updated, nextBillingDate: payment.previousBillingDate, subscriptionStatus: payment.previousSubscriptionStatus || "pendente" };
+  });
+  revalidatePath("/");
+  return { success: true, payment: refunded };
+}
+
+async function createPropertyImpl(formData: PropertyInput) {
   const actor = await requireCurrentUser();
   requireActiveBroker(actor);
   validatePropertyInput(formData);
+  // No cadastro novo estes dados aparecem na vitrine: o corretor precisa escolher, o sistema não presume.
+  if (!formData.condition) throw new ActionError("Informe a condição do imóvel (novo, usado, em construção ou na planta).");
+  if (typeof formData.acceptsFinancing !== "boolean") throw new ActionError("Informe se o imóvel aceita financiamento.");
+  if (!formData.state) throw new ActionError("Informe o estado (UF) do imóvel.");
+  const state = formData.state.toUpperCase();
+  const condition = formData.condition;
+  const acceptsFinancing = formData.acceptsFinancing;
   const targetBrokerId = actor.id;
 
-  const [newProperty] = await db
-    .insert(properties)
-    .values({
-      brokerId: targetBrokerId,
-      title: formData.title,
-      propertyType: formData.propertyType,
-      salePrice: formData.salePrice,
-      purpose: formData.purpose || "venda",
-      acceptsTrade: formData.acceptsTrade ?? false,
-      tradeDetails: formData.tradeDetails || null,
-      condition: formData.condition || "usado",
-      hotelRoomsCount: formData.hotelRoomsCount || null,
-      condoFee: formData.condoFee || "0",
-      iptu: formData.iptu || "0",
-      iptuPeriod: formData.iptuPeriod || "anual",
-      city: formData.city,
-      state: formData.state || "SP",
-      neighborhood: formData.neighborhood,
-      cep: formData.cep || null,
-      street: formData.street || null,
-      streetNumber: formData.streetNumber || null,
-      block: formData.block || null,
-      floor: formData.floor || null,
-      condoName: formData.condoName || null,
-      hideStreet: formData.hideStreet ?? false,
-      bedrooms: formData.bedrooms,
-      suites: formData.suites,
-      bathrooms: formData.bathrooms,
-      parkingSpots: formData.parkingSpots,
-      garageType: formData.garageType || "coberta",
-      areaM2: formData.areaM2,
-      usefulAreaM2: formData.usefulAreaM2 || null,
-      totalAreaM2: formData.totalAreaM2 || null,
-      solarPosition: formData.solarPosition || null,
-      viewType: formData.viewType || null,
-      propertyAge: formData.propertyAge || null,
-      documentationStatus: formData.documentationStatus || null,
-      acceptsFinancing: formData.acceptsFinancing ?? true,
-      privateAmenities: formData.privateAmenities || [],
-      condoAmenities: formData.condoAmenities || [],
-      description: formData.description,
-      videoUrl: formData.videoUrl || null,
-      coverPhoto: formData.coverPhoto || null,
-      photos:
-        formData.photos && formData.photos.length > 0
-          ? formData.photos
-          : [
-              "https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=1200&auto=format&fit=crop&q=80",
-            ],
-      floorPlanPhotos: formData.floorPlanPhotos || [],
-      confidentialAddress: formData.confidentialAddress,
-      ownerName: formData.ownerName,
-      ownerPhone: formData.ownerPhone,
-      acceptsPartnership: formData.acceptsPartnership,
-      splitPercentage: formData.splitPercentage,
-      status: "disponivel",
-    })
-    .returning();
+  const newProperty = await db.transaction(async (tx) => {
+    await reserveListingSlot(tx, actor);
+    const [created] = await tx
+      .insert(properties)
+      .values({
+        brokerId: targetBrokerId,
+        title: formData.title,
+        propertyType: formData.propertyType,
+        salePrice: formData.salePrice,
+        purpose: formData.purpose || "venda",
+        acceptsTrade: formData.acceptsTrade ?? false,
+        tradeDetails: formData.tradeDetails || null,
+        condition,
+        hotelRoomsCount: formData.hotelRoomsCount || null,
+        condoFee: formData.condoFee || "0",
+        iptu: formData.iptu || "0",
+        iptuPeriod: formData.iptuPeriod || "anual",
+        city: formData.city.trim(),
+        state,
+        neighborhood: formData.neighborhood.trim(),
+        cep: formData.cep || null,
+        street: formData.street || null,
+        streetNumber: formData.streetNumber || null,
+        block: formData.block || null,
+        floor: formData.floor || null,
+        condoName: formData.condoName || null,
+        hideStreet: formData.hideStreet ?? false,
+        bedrooms: formData.bedrooms,
+        suites: formData.suites,
+        bathrooms: formData.bathrooms,
+        parkingSpots: formData.parkingSpots,
+        garageType: formData.garageType || null,
+        areaM2: formData.areaM2,
+        usefulAreaM2: formData.usefulAreaM2 || null,
+        totalAreaM2: formData.totalAreaM2 || null,
+        solarPosition: formData.solarPosition || null,
+        viewType: formData.viewType || null,
+        propertyAge: formData.propertyAge ?? null,
+        documentationStatus: formData.documentationStatus || null,
+        acceptsFinancing,
+        privateAmenities: formData.privateAmenities || [],
+        condoAmenities: formData.condoAmenities || [],
+        description: formData.description,
+        videoUrl: formData.videoUrl || null,
+        coverPhoto: formData.coverPhoto || formData.photos?.[0] || null,
+        photos: formData.photos || [],
+        floorPlanPhotos: formData.floorPlanPhotos || [],
+        confidentialAddress: formData.confidentialAddress,
+        ownerName: formData.ownerName,
+        ownerPhone: formData.ownerPhone,
+        acceptsPartnership: formData.acceptsPartnership,
+        splitPercentage: formData.splitPercentage,
+        status: "disponivel",
+      })
+      .returning();
+    return created;
+  });
 
   // Cruzamento dos critérios cadastrados para imóveis de venda compartilhados.
   try {
@@ -193,14 +268,14 @@ export async function createProperty(formData: PropertyInput) {
       })
       .from(buyerProfiles)
       .innerJoin(users, eq(buyerProfiles.brokerId, users.id))
-      .where(and(networkProfileScope(), eq(buyerProfiles.city, formData.city)));
+      .where(and(networkProfileScope(), eq(normalizedSql(buyerProfiles.city), normalizeText(formData.city))));
 
     const actualMatches = matchingProfiles.filter((bp) => {
       const maxBudget = Number(bp.maxBudget);
       const price = Number(formData.salePrice);
-      const neighborhoods = Array.isArray(bp.neighborhoods) ? bp.neighborhoods as string[] : [];
-      return bp.propertyType === formData.propertyType
-        && (!neighborhoods.length || neighborhoods.includes(formData.neighborhood))
+      const neighborhoods = Array.isArray(bp.neighborhoods) ? (bp.neighborhoods as string[]).map(normalizeText) : [];
+      return normalizeText(bp.propertyType) === normalizeText(formData.propertyType)
+        && (!neighborhoods.length || neighborhoods.includes(normalizeText(formData.neighborhood)))
         && (!Number.isFinite(maxBudget) || maxBudget <= 0 || price <= maxBudget)
         && formData.bedrooms >= bp.minBedrooms
         && formData.parkingSpots >= bp.minParkingSpots;
@@ -209,7 +284,7 @@ export async function createProperty(formData: PropertyInput) {
       if (bp.brokerId !== targetBrokerId) {
         await db.insert(notifications).values({
           userId: bp.brokerId,
-          title: `🤖 Match no Radar: Imóvel em ${formData.neighborhood}`,
+          title: `Match no Radar: imóvel em ${formData.neighborhood}`,
           message: "Um imóvel compatível com os critérios do seu cliente foi cadastrado na rede.",
           type: "ai_match",
           propertyId: newProperty.id,
@@ -226,7 +301,7 @@ export async function createProperty(formData: PropertyInput) {
   return { success: true, property: newProperty };
 }
 
-export async function createBuyerProfile(profileData: {
+async function createBuyerProfileImpl(profileData: {
   clientInternalName: string;
   propertyType: string;
   city: string;
@@ -257,7 +332,7 @@ export async function createBuyerProfile(profileData: {
     })
     .returning();
 
-  // 🤖 MOTOR DE IA: Busca instantânea no estoque da rede
+  // Cruzamento imediato com os imóveis da rede (mesmos critérios do Radar).
   try {
     const matchingProps = await db
       .select({
@@ -270,10 +345,11 @@ export async function createBuyerProfile(profileData: {
       .where(
         and(
           networkPropertyScope(),
-          eq(properties.city, profileData.city),
+          ne(properties.brokerId, targetBrokerId),
+          eq(normalizedSql(properties.city), normalizeText(profileData.city)),
           eq(properties.purpose, "venda"),
-          eq(properties.propertyType, profileData.propertyType),
-          ...(profileData.neighborhoods.length ? [inArray(properties.neighborhood, profileData.neighborhoods)] : []),
+          eq(normalizedSql(properties.propertyType), normalizeText(profileData.propertyType)),
+          ...(profileData.neighborhoods.length ? [inArray(normalizedSql(properties.neighborhood), profileData.neighborhoods.map(normalizeText))] : []),
           lte(properties.salePrice, profileData.maxBudget),
           gte(properties.bedrooms, profileData.minBedrooms),
           gte(properties.parkingSpots, profileData.minParkingSpots),
@@ -284,8 +360,8 @@ export async function createBuyerProfile(profileData: {
     if (matchingProps.length > 0) {
       await db.insert(notifications).values({
         userId: targetBrokerId,
-        title: `🤖 ${matchingProps.length} Imóveis Encontrados para "${profileData.clientInternalName}"`,
-        message: "Localizamos imóveis que atendem a alguns critérios cadastrados. Confirme os detalhes e as condições de parceria com o captador.",
+        title: matchingProps.length === 1 ? `1 imóvel compatível com "${profileData.clientInternalName}"` : `${matchingProps.length} imóveis compatíveis com "${profileData.clientInternalName}"`,
+        message: "Encontramos imóveis da rede que atendem aos critérios cadastrados. Confirme os detalhes e as condições de parceria com o captador.",
         type: "ai_match",
         propertyId: matchingProps[0].id,
         read: false,
@@ -299,7 +375,7 @@ export async function createBuyerProfile(profileData: {
   return { success: true, profile: newProfile };
 }
 
-export async function createDvpCertificate(data: {
+async function createDvpCertificateImpl(data: {
   propertyId: string;
   captorBrokerId: string;
   partnerBrokerId: string;
@@ -316,24 +392,24 @@ export async function createDvpCertificate(data: {
 }) {
   const actor = await requireCurrentUser();
   requireActiveBroker(actor);
-  if (data.partnerBrokerId !== actor.id) throw new Error("O corretor parceiro deve ser o usuário conectado.");
+  if (data.partnerBrokerId !== actor.id) throw new ActionError("O corretor parceiro deve ser o usuário conectado.");
   const [property] = await db.select({ brokerId: properties.brokerId, acceptsPartnership: properties.acceptsPartnership, title: properties.title, status: properties.status, verificationStatus: users.verificationStatus })
     .from(properties).innerJoin(users, eq(properties.brokerId, users.id)).where(eq(properties.id, data.propertyId)).limit(1);
   if (!property || property.brokerId !== data.captorBrokerId || property.brokerId === actor.id || !canUseProperty(property, actor.id)) {
-    throw new Error("Imóvel ou parceria inválidos para este registro.");
+    throw new ActionError("Imóvel ou parceria inválidos para este registro.");
   }
   const [lead] = data.leadId
     ? await db.select({ id: leads.id, fullName: leads.fullName, phone: leads.phone, leadType: leads.leadType, stage: leads.stage }).from(leads).where(and(eq(leads.id, data.leadId), eq(leads.ownerUserId, actor.id))).limit(1)
     : [];
-  if (data.leadId && !lead) throw new Error("Lead não encontrado na sua carteira.");
-  if (lead && !["comprador", "locatario"].includes(lead.leadType)) throw new Error("Só é possível vincular uma visita a um lead comprador ou locatário.");
+  if (data.leadId && !lead) throw new ActionError("Lead não encontrado na sua carteira.");
+  if (lead && !["comprador", "locatario"].includes(lead.leadType)) throw new ActionError("Só é possível vincular uma visita a um lead comprador ou locatário.");
   const clientName = lead?.fullName || data.clientName.trim();
   const clientPhone = lead?.phone || data.clientPhone || null;
   if (clientName.length < 2 || !/^\*{3}\.\d{3}\.\d{3}-\*\*$/.test(data.clientCpfPartial.trim())) {
-    throw new Error("Informe o nome do cliente e apenas o CPF parcialmente mascarado.");
+    throw new ActionError("Informe o nome do cliente e apenas o CPF parcialmente mascarado.");
   }
   if (data.commissionModel && !["two_party_50_50", "three_party_referral_40_40_20"].includes(data.commissionModel)) {
-    throw new Error("Escolha uma divisão de comissão válida.");
+    throw new ActionError("Escolha uma divisão de comissão válida.");
   }
   const commissionModel = data.commissionModel === "three_party_referral_40_40_20" ? data.commissionModel : "two_party_50_50";
   const externalReferrerName = data.externalReferrerName?.trim() || null;
@@ -341,13 +417,13 @@ export async function createDvpCertificate(data: {
   const externalReferrerWhatsapp = data.externalReferrerWhatsapp?.trim() || null;
   if (commissionModel === "three_party_referral_40_40_20") {
     if (!externalReferrerName || externalReferrerName.length < 2 || externalReferrerName.length > 120) {
-      throw new Error("Informe o nome do corretor indicador externo.");
+      throw new ActionError("Informe o nome do corretor indicador externo.");
     }
     if (!externalReferrerCreci || externalReferrerCreci.length < 2 || externalReferrerCreci.length > 30) {
-      throw new Error("Informe o CRECI do corretor indicador externo.");
+      throw new ActionError("Informe o CRECI do corretor indicador externo.");
     }
     if (externalReferrerWhatsapp && externalReferrerWhatsapp.length > 30) {
-      throw new Error("O WhatsApp do corretor indicador está inválido.");
+      throw new ActionError("O WhatsApp do corretor indicador está inválido.");
     }
   }
   const captorCommissionPercent = commissionModel === "three_party_referral_40_40_20" ? "40.00" : "50.00";
@@ -361,11 +437,27 @@ export async function createDvpCertificate(data: {
     .slice(0, 16)
     .toUpperCase();
 
+  // A tela manda o instante com fuso (toISOString); "2026-10-12T14:00" sem fuso seria lido como UTC no servidor.
+  if (typeof data.visitDate !== "string" || !/(Z|[+-]\d{2}:\d{2})$/.test(data.visitDate)) throw new ActionError("Informe uma data de visita válida.");
   const visitDate = new Date(data.visitDate);
-  if (!Number.isFinite(visitDate.getTime())) throw new Error("Informe uma data de visita válida.");
-  const lockExpirationDate = new Date(visitDate.getTime() + 180 * 24 * 60 * 60 * 1000);
+  if (!Number.isFinite(visitDate.getTime())) throw new ActionError("Informe uma data de visita válida.");
+  const day = 24 * 60 * 60 * 1000;
+  if (visitDate.getTime() < Date.now() - 60 * day || visitDate.getTime() > Date.now() + 365 * day) {
+    throw new ActionError("A data da visita deve estar entre os últimos 60 dias e os próximos 12 meses.");
+  }
+  const lockExpirationDate = new Date(visitDate.getTime() + 180 * day);
+  const cpfPartial = data.clientCpfPartial.trim();
 
   const result = await db.transaction(async (tx) => {
+    // Trava o imóvel: dois registros simultâneos do mesmo cliente não passam juntos.
+    await tx.select({ id: properties.id }).from(properties).where(eq(properties.id, data.propertyId)).for("update");
+    const [duplicate] = await tx.select({ certificateHash: dvpCertificates.certificateHash }).from(dvpCertificates).where(and(
+      eq(dvpCertificates.propertyId, data.propertyId),
+      eq(dvpCertificates.partnerBrokerId, actor.id),
+      gte(dvpCertificates.createdAt, new Date(Date.now() - 180 * day)),
+      lead ? eq(dvpCertificates.leadId, lead.id) : and(eq(normalizedSql(dvpCertificates.clientName), normalizeText(clientName)), eq(dvpCertificates.clientCpfPartial, cpfPartial)),
+    )).limit(1);
+    if (duplicate) throw new ActionError(`Este cliente já tem um registro de visita para este imóvel (${duplicate.certificateHash}). Acompanhe-o em Registro de Visita.`);
     const [certificate] = await tx.insert(dvpCertificates).values({
       certificateHash: `DVP-${certificateHash}`,
       propertyId: data.propertyId,
@@ -374,7 +466,7 @@ export async function createDvpCertificate(data: {
       leadId: lead?.id || null,
       clientName,
       clientPhone,
-      clientCpfPartial: data.clientCpfPartial.trim(),
+      clientCpfPartial: cpfPartial,
       visitDate,
       lockExpirationDate,
       commissionModel,
@@ -412,7 +504,7 @@ export async function createDvpCertificate(data: {
       actorUserId: actor.id,
       previousStatus: null,
       newStatus: "visita_agendada",
-      note: `Visita registrada para ${visitDate.toLocaleString("pt-BR")}. DVP em rascunho, sem aceite eletrônico.`,
+      note: `Visita registrada para ${visitDate.toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" })} (horário de Brasília). DVP em rascunho, sem aceite eletrônico.`,
     }).returning();
 
     await tx.insert(notifications).values({
@@ -460,12 +552,12 @@ const PARTNERSHIP_TRANSITIONS: Record<string, string[]> = {
   recusado: [],
 };
 
-export async function updatePartnershipStatus(partnershipId: string, newStatus: string, note?: string) {
+async function updatePartnershipStatusImpl(partnershipId: string, newStatus: string, note?: string) {
   const actor = await requireCurrentUser();
   requireActiveBroker(actor);
   const cleanNote = note?.trim() || null;
-  if (cleanNote && cleanNote.length > 500) throw new Error("A observação deve ter até 500 caracteres.");
-  if (!Object.values(PARTNERSHIP_TRANSITIONS).some((statuses) => statuses.includes(newStatus))) throw new Error("Etapa de parceria inválida.");
+  if (cleanNote && cleanNote.length > 500) throw new ActionError("A observação deve ter até 500 caracteres.");
+  if (!Object.values(PARTNERSHIP_TRANSITIONS).some((statuses) => statuses.includes(newStatus))) throw new ActionError("Etapa de parceria inválida.");
 
   const result = await db.transaction(async (tx) => {
     const [partnership] = await tx.select({
@@ -479,13 +571,13 @@ export async function updatePartnershipStatus(partnershipId: string, newStatus: 
       eq(partnerships.id, partnershipId),
       or(eq(partnerships.captorBrokerId, actor.id), eq(partnerships.partnerBrokerId, actor.id)),
     )).for("update").limit(1);
-    if (!partnership) throw new Error("Parceria não encontrada na sua carteira.");
-    if (!PARTNERSHIP_TRANSITIONS[partnership.status]?.includes(newStatus)) throw new Error("Esta mudança de etapa não é permitida.");
+    if (!partnership) throw new ActionError("Parceria não encontrada na sua carteira.");
+    if (!PARTNERSHIP_TRANSITIONS[partnership.status]?.includes(newStatus)) throw new ActionError("Esta mudança de etapa não é permitida.");
     if (["em_negociacao", "fechado"].includes(newStatus) && partnership.commissionStatus === "aguardando_aceites") {
-      throw new Error("Os dois corretores precisam confirmar a divisão antes de avançar esta parceria.");
+      throw new ActionError("Os dois corretores precisam confirmar a divisão antes de avançar esta parceria.");
     }
     if (["em_negociacao", "fechado"].includes(newStatus) && partnership.commissionStatus === "recusada") {
-      throw new Error("A divisão foi recusada. Revise a proposta e obtenha as duas confirmações antes de avançar.");
+      throw new ActionError("A divisão foi recusada. Revise a proposta e obtenha as duas confirmações antes de avançar.");
     }
 
     const [updated] = await tx.update(partnerships).set({ status: newStatus, updatedAt: new Date() })
@@ -511,9 +603,10 @@ export async function updatePartnershipStatus(partnershipId: string, newStatus: 
   return { success: true, ...result };
 }
 
-export async function respondToPartnershipSplit(partnershipId: string, accepted: boolean) {
+async function respondToPartnershipSplitImpl(partnershipId: string, accepted: boolean, expectedRevision: number) {
   const actor = await requireCurrentUser();
   requireActiveBroker(actor);
+  if (!Number.isSafeInteger(expectedRevision) || expectedRevision < 1) throw new ActionError("Recarregue a tela para ver a versão atual da proposta.");
   const result = await db.transaction(async (tx) => {
     const [partnership] = await tx.select({
       id: partnerships.id,
@@ -523,19 +616,22 @@ export async function respondToPartnershipSplit(partnershipId: string, accepted:
       status: partnerships.status,
       commissionModel: partnerships.commissionModel,
       commissionStatus: partnerships.commissionStatus,
+      commissionRevision: partnerships.commissionRevision,
       captorAcceptedAt: partnerships.captorAcceptedAt,
       partnerAcceptedAt: partnerships.partnerAcceptedAt,
     }).from(partnerships).where(and(
       eq(partnerships.id, partnershipId),
       or(eq(partnerships.captorBrokerId, actor.id), eq(partnerships.partnerBrokerId, actor.id)),
     )).for("update").limit(1);
-    if (!partnership) throw new Error("Parceria não encontrada na sua carteira.");
-    if (partnership.commissionStatus === "nao_registrada") throw new Error("Esta parceria antiga ainda não tem proposta de divisão para confirmar.");
-    if (["recusado", "fechado"].includes(partnership.status)) throw new Error("Esta parceria já foi encerrada.");
-    if (partnership.commissionStatus === "recusada") throw new Error("Esta proposta foi recusada. Revise os termos para criar uma nova versão.");
+    if (!partnership) throw new ActionError("Parceria não encontrada na sua carteira.");
+    // A proposta pode ter sido revisada pelo outro corretor depois que esta tela carregou.
+    if (partnership.commissionRevision !== expectedRevision) throw new ActionError(`A proposta mudou para a versão ${partnership.commissionRevision} enquanto você olhava. Recarregue e confira antes de responder.`);
+    if (partnership.commissionStatus === "nao_registrada") throw new ActionError("Esta parceria antiga ainda não tem proposta de divisão para confirmar.");
+    if (["recusado", "fechado"].includes(partnership.status)) throw new ActionError("Esta parceria já foi encerrada.");
+    if (partnership.commissionStatus === "recusada") throw new ActionError("Esta proposta foi recusada. Revise os termos para criar uma nova versão.");
     const acceptedAt = actor.id === partnership.captorBrokerId ? partnership.captorAcceptedAt : partnership.partnerAcceptedAt;
     if (accepted && acceptedAt) return { partnership, activity: null, alreadyAccepted: true };
-    if (!accepted && acceptedAt) throw new Error("Sua confirmação já foi registrada e não pode ser retirada nesta tela.");
+    if (!accepted && acceptedAt) throw new ActionError("Sua confirmação já foi registrada e não pode ser retirada nesta tela.");
 
     const now = new Date();
     const otherAcceptedAt = actor.id === partnership.captorBrokerId ? partnership.partnerAcceptedAt : partnership.captorAcceptedAt;
@@ -573,7 +669,7 @@ export async function respondToPartnershipSplit(partnershipId: string, accepted:
   return { success: true, ...result };
 }
 
-export async function revisePartnershipCommission(partnershipId: string, input: {
+async function revisePartnershipCommissionImpl(partnershipId: string, input: {
   commissionModel: string;
   externalReferrerName?: string;
   externalReferrerCreci?: string;
@@ -581,15 +677,15 @@ export async function revisePartnershipCommission(partnershipId: string, input: 
 }) {
   const actor = await requireCurrentUser();
   requireActiveBroker(actor);
-  if (!["two_party_50_50", "three_party_referral_40_40_20"].includes(input.commissionModel)) throw new Error("Escolha uma divisão válida.");
+  if (!["two_party_50_50", "three_party_referral_40_40_20"].includes(input.commissionModel)) throw new ActionError("Escolha uma divisão válida.");
   const commissionModel = input.commissionModel;
   const externalReferrerName = input.externalReferrerName?.trim() || null;
   const externalReferrerCreci = input.externalReferrerCreci?.trim().toUpperCase() || null;
   const externalReferrerWhatsapp = input.externalReferrerWhatsapp?.trim() || null;
   if (commissionModel === "three_party_referral_40_40_20") {
-    if (!externalReferrerName || externalReferrerName.length < 2 || externalReferrerName.length > 120) throw new Error("Informe o nome do indicador externo.");
-    if (!externalReferrerCreci || externalReferrerCreci.length < 2 || externalReferrerCreci.length > 30) throw new Error("Informe o CRECI do indicador externo.");
-    if (externalReferrerWhatsapp && externalReferrerWhatsapp.length > 30) throw new Error("O WhatsApp do indicador está inválido.");
+    if (!externalReferrerName || externalReferrerName.length < 2 || externalReferrerName.length > 120) throw new ActionError("Informe o nome do indicador externo.");
+    if (!externalReferrerCreci || externalReferrerCreci.length < 2 || externalReferrerCreci.length > 30) throw new ActionError("Informe o CRECI do indicador externo.");
+    if (externalReferrerWhatsapp && externalReferrerWhatsapp.length > 30) throw new ActionError("O WhatsApp do indicador está inválido.");
   }
   const isReferral = commissionModel === "three_party_referral_40_40_20";
   const captorCommissionPercent = isReferral ? "40.00" : "50.00";
@@ -614,8 +710,8 @@ export async function revisePartnershipCommission(partnershipId: string, input: 
       eq(partnerships.id, partnershipId),
       or(eq(partnerships.captorBrokerId, actor.id), eq(partnerships.partnerBrokerId, actor.id)),
     )).for("update").limit(1);
-    if (!partnership) throw new Error("Parceria não encontrada na sua carteira.");
-    if (["fechado", "recusado"].includes(partnership.status)) throw new Error("Não é possível revisar uma parceria encerrada.");
+    if (!partnership) throw new ActionError("Parceria não encontrada na sua carteira.");
+    if (["fechado", "recusado"].includes(partnership.status)) throw new ActionError("Não é possível revisar uma parceria encerrada.");
     const describe = (model: string, captor: string, partner: string, referrer: string, name: string | null, creci: string | null) =>
       model === "three_party_referral_40_40_20" ? `40/40/20 (indicador: ${name || "sem nome"}, CRECI ${creci || "não informado"})` : `${captor}/${partner}`;
     const previousTerms = describe(partnership.commissionModel, partnership.captorCommissionPercent, partnership.partnerCommissionPercent, partnership.referrerCommissionPercent, partnership.externalReferrerName, partnership.externalReferrerCreci);
@@ -658,7 +754,7 @@ export async function revisePartnershipCommission(partnershipId: string, input: 
   return { success: true, ...result };
 }
 
-export async function markNotificationAsRead(notificationId: string) {
+async function markNotificationAsReadImpl(notificationId: string) {
   const actor = await requireCurrentUser();
   await db
     .update(notifications)
@@ -669,34 +765,42 @@ export async function markNotificationAsRead(notificationId: string) {
   return { success: true };
 }
 
-export async function submitPilotFeedback(input: { screen: string; category: string; message: string }) {
+async function markAllNotificationsAsReadImpl() {
+  const actor = await requireCurrentUser();
+  await db.update(notifications).set({ read: true }).where(and(eq(notifications.userId, actor.id), eq(notifications.read, false)));
+  revalidatePath("/");
+  return { success: true };
+}
+
+async function submitPilotFeedbackImpl(input: { screen: string; category: string; message: string }) {
   const actor = await requireCurrentUser();
   const screen = input.screen.trim();
   const category = input.category.trim();
   const message = input.message.trim();
-  if (!["vitrine", "crm", "radar", "cadastrar", "termo", "dvp", "admin"].includes(screen)) throw new Error("Selecione uma tela válida.");
-  if (!["duvida", "erro", "ideia"].includes(category)) throw new Error("Selecione um tipo de feedback válido.");
-  if (message.length < 10 || message.length > 2000) throw new Error("Escreva de 10 a 2.000 caracteres.");
+  if (!["vitrine", "crm", "radar", "atendimento", "cadastrar", "termo", "dvp", "admin"].includes(screen)) throw new ActionError("Selecione uma tela válida.");
+  if (!["duvida", "erro", "ideia"].includes(category)) throw new ActionError("Selecione um tipo de feedback válido.");
+  if (message.length < 10 || message.length > 2000) throw new ActionError("Escreva de 10 a 2.000 caracteres.");
   const [feedback] = await db.insert(pilotFeedback).values({ userId: actor.id, screen, category, message }).returning({ id: pilotFeedback.id, createdAt: pilotFeedback.createdAt });
   revalidatePath("/");
   return { success: true, feedback };
 }
 
-export async function updatePilotFeedbackStatus(feedbackId: string, status: string) {
+async function updatePilotFeedbackStatusImpl(feedbackId: string, status: string) {
   const actor = await requireCurrentUser();
-  if (actor.role !== "admin") throw new Error("Apenas administradores podem atualizar o feedback do piloto.");
-  if (!["novo", "em_analise", "concluido"].includes(status)) throw new Error("Status de feedback inválido.");
+  if (actor.role !== "admin") throw new ActionError("Apenas administradores podem atualizar o feedback do piloto.");
+  if (!["novo", "em_analise", "concluido"].includes(status)) throw new ActionError("Status de feedback inválido.");
   const [updated] = await db.update(pilotFeedback).set({
     status,
     reviewedAt: status === "novo" ? null : new Date(),
     reviewedBy: status === "novo" ? null : actor.id,
   }).where(eq(pilotFeedback.id, feedbackId)).returning({ id: pilotFeedback.id, status: pilotFeedback.status, reviewedAt: pilotFeedback.reviewedAt });
-  if (!updated) throw new Error("Feedback não encontrado.");
+  if (!updated) throw new ActionError("Feedback não encontrado.");
   revalidatePath("/");
   return { success: true, feedback: updated };
 }
 
-export async function validateCreciWithAI(creci: string, state: string, _name?: string) {
+// Confere só o formato do número; a situação no conselho é conferida pela equipe.
+async function validateCreciFormatImpl(creci: string, state: string) {
   const cleanCreci = creci.trim().toUpperCase();
   const creciRegex = /^[0-9]{3,7}-?[FJ]?$/i;
 
@@ -718,7 +822,7 @@ export async function validateCreciWithAI(creci: string, state: string, _name?: 
   };
 }
 
-export async function registerUserWithPix(userData: {
+async function registerUserWithPixImpl(userData: {
   name: string;
   email: string;
   whatsapp: string;
@@ -732,59 +836,58 @@ export async function registerUserWithPix(userData: {
 }) {
   const cleanEmail = userData.email.trim().toLowerCase();
   const cleanCreci = userData.creci.trim().toUpperCase();
-  const prices: Record<string, { monthly: string; annual: string; annualTotal: string }> = {
-    "10": { monthly: "59.90", annual: "54.91", annualTotal: "658.90" },
-    "20": { monthly: "89.90", annual: "82.41", annualTotal: "988.90" },
-    "40": { monthly: "150.00", annual: "137.50", annualTotal: "1650.00" },
-  };
-  const selectedPlan = prices[userData.plan];
-  if (!selectedPlan) throw new Error("Plano inválido.");
-  if (!['monthly', 'annual'].includes(userData.billingCycle)) throw new Error("Ciclo de cobrança inválido.");
-  if (cleanEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) throw new Error("E-mail inválido.");
-  if (userData.name.trim().length < 2 || userData.name.length > 120 || userData.city.trim().length < 2 || userData.city.length > 120 || !/^[A-Z]{2}$/.test(userData.state.toUpperCase())) throw new Error("Confira nome, cidade e estado.");
+  if (!isPlanId(userData.plan)) throw new ActionError("Plano inválido.");
+  if (!['monthly', 'annual'].includes(userData.billingCycle)) throw new ActionError("Ciclo de cobrança inválido.");
+  if (cleanEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) throw new ActionError("E-mail inválido.");
+  if (userData.name.trim().length < 2 || userData.name.length > 120 || userData.city.trim().length < 2 || userData.city.length > 120 || !isBrazilianState(userData.state.toUpperCase())) throw new ActionError("Confira nome, cidade e estado.");
   const phoneDigits = userData.whatsapp.replace(/\D/g, "");
-  if (phoneDigits.length < 10 || phoneDigits.length > 15 || userData.whatsapp.length > 30) throw new Error("WhatsApp inválido.");
-  if (!/^[0-9]{3,7}-?[FJ]?$/.test(cleanCreci)) throw new Error("Informe um CRECI no formato numérico aceito.");
-  const monthlyFee = selectedPlan[userData.billingCycle];
+  if (phoneDigits.length < 10 || phoneDigits.length > 15 || userData.whatsapp.length > 30) throw new ActionError("WhatsApp inválido.");
+  if (!/^[0-9]{3,7}-?[FJ]?$/.test(cleanCreci)) throw new ActionError("Informe um CRECI no formato numérico aceito.");
+  const monthlyFee = planMonthlyEquivalent(userData.plan, userData.billingCycle);
   const referralCode = userData.referralCode?.trim() || null;
-  if (referralCode && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(referralCode)) throw new Error("Código de indicação inválido.");
-  const [referrer] = referralCode ? await db.select({ id: users.id, email: users.email, verificationStatus: users.verificationStatus }).from(users).where(eq(users.id, referralCode)).limit(1) : [];
-  if (referralCode && (!referrer || referrer.verificationStatus === "suspenso" || referrer.email === cleanEmail)) throw new Error("Código de indicação indisponível.");
+  if (referralCode && !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(referralCode)) throw new ActionError("Código de indicação inválido.");
+  // O limite vem antes de qualquer consulta: tentativas em série não testam códigos de indicação à vontade.
   await limitRegistrationAttempts();
+  const [referrer] = referralCode ? await db.select({ id: users.id, email: users.email, verificationStatus: users.verificationStatus }).from(users).where(eq(users.id, referralCode)).limit(1) : [];
+  if (referralCode && (!referrer || referrer.verificationStatus === "suspenso" || referrer.email === cleanEmail)) throw new ActionError("Código de indicação indisponível.");
   const passwordHash = await hashPassword(userData.password);
 
-  const newUser = await db.transaction(async (tx) => {
-    const [created] = await tx.insert(users).values({
-      name: userData.name,
-      email: cleanEmail,
-      whatsapp: userData.whatsapp,
-      creci: cleanCreci,
-      state: userData.state.toUpperCase(),
-      city: userData.city,
-      passwordHash,
-      role: "corretor",
-      isVerified: false,
-      verificationStatus: "pendente",
-      plan: userData.plan,
-      subscriptionStatus: "teste",
-      nextBillingDate: addFreeDays(new Date()),
-      billingCycle: userData.billingCycle,
-      referredBy: referrer?.id || null,
-      monthlyFee,
-      trustScore: 0,
-      avatarUrl:
-        "https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=400&auto=format&fit=crop&q=80",
-    }).returning();
+  let newUser;
+  try {
+    newUser = await db.transaction(async (tx) => {
+      const [created] = await tx.insert(users).values({
+        name: userData.name.trim(),
+        email: cleanEmail,
+        whatsapp: userData.whatsapp,
+        creci: cleanCreci,
+        state: userData.state.toUpperCase(),
+        city: userData.city.trim(),
+        passwordHash,
+        role: "corretor",
+        isVerified: false,
+        verificationStatus: "pendente",
+        plan: userData.plan,
+        subscriptionStatus: "teste",
+        nextBillingDate: addFreeDays(new Date()),
+        billingCycle: userData.billingCycle,
+        referredBy: referrer?.id || null,
+        monthlyFee,
+        avatarUrl: null,
+      }).returning();
 
-    await tx.insert(notifications).values({
-      userId: created.id,
-      title: "🎉 Bem-vindo ao Negocia Lar!",
-      message: "Você tem 30 dias grátis a partir do cadastro, sem pagamento inicial. O uso da rede depende da aprovação do CRECI. Ao terminar, renove seu plano via Pix.",
-      type: "sistema",
-      read: false,
+      await tx.insert(notifications).values({
+        userId: created.id,
+        title: "Bem-vindo ao Negocia Lar!",
+        message: "Você tem 30 dias grátis a partir do cadastro, sem pagamento inicial. O uso da rede depende da aprovação do CRECI. Ao terminar, renove seu plano via Pix.",
+        type: "sistema",
+        read: false,
+      });
+      return created;
     });
-    return created;
-  });
+  } catch (error) {
+    if (isUniqueViolation(error)) throw new ActionError("Este e-mail já tem cadastro. Entre com sua senha ou use Esqueci minha senha.");
+    throw error;
+  }
 
   // Salva a sessão do corretor
   await setBrokerSession(newUser.id);
@@ -795,11 +898,18 @@ export async function registerUserWithPix(userData: {
 }
 
 async function reserveLoginAttempt(email: string, address: string) {
+  // Ordem importa: conexão e par conta+conexão travam antes de contar na conta. Assim uma única conexão
+  // não consegue bloquear o login de outra pessoa; para travar a conta são precisas várias conexões.
   const buckets = [
-    { key: `login-account:${email}`, limit: 8, clearOnSuccess: true },
-    { key: `login-pair:${email}:${address}`, limit: 5, clearOnSuccess: true },
     { key: `login-address:${address}`, limit: address === "unknown" ? 100 : 50, clearOnSuccess: false },
+    { key: `login-pair:${email}:${address}`, limit: 5, clearOnSuccess: true },
+    { key: `login-account:${email}`, limit: 30, clearOnSuccess: true },
   ];
+  // Contadores vencidos não servem para nada; limpeza ocasional para a tabela não crescer sem fim.
+  if (Math.random() < 0.02) {
+    await db.delete(authLoginAttempts).where(and(lt(authLoginAttempts.updatedAt, new Date(Date.now() - 2 * 86_400_000)),
+      or(isNull(authLoginAttempts.blockedUntil), lt(authLoginAttempts.blockedUntil, new Date()))));
+  }
   const successfulLoginKeys: string[] = [];
   for (const bucket of buckets) {
     const keyHash = crypto.createHash("sha256").update(bucket.key).digest("hex");
@@ -812,20 +922,20 @@ async function reserveLoginAttempt(email: string, address: string) {
         updatedAt: sql`case when ${authLoginAttempts.blockedUntil} > now() then ${authLoginAttempts.updatedAt} else now() end`,
       },
     }).returning({blockedUntil:authLoginAttempts.blockedUntil});
-    if (counter.blockedUntil && counter.blockedUntil.getTime() > Date.now()) throw new Error("Muitas tentativas de acesso. Aguarde 15 minutos e tente novamente.");
+    if (counter.blockedUntil && counter.blockedUntil.getTime() > Date.now()) throw new ActionError("Muitas tentativas de acesso. Aguarde 15 minutos e tente novamente.");
     if (bucket.clearOnSuccess) successfulLoginKeys.push(keyHash);
   }
   return successfulLoginKeys;
 }
 
-export async function loginUser(email: string, password: string) {
+async function loginUserImpl(email: string, password: string) {
   const cleanEmail = email.trim().toLowerCase();
-  if (cleanEmail.length > 254 || password.length > 200) throw new Error("E-mail ou senha incorretos.");
+  if (cleanEmail.length > 254 || password.length > 200) throw new ActionError("E-mail ou senha incorretos.");
   const loginKeys = await reserveLoginAttempt(cleanEmail, await requestAddress());
   const [user] = await db.select().from(users).where(eq(users.email, cleanEmail)).limit(1);
   const passwordMatches = await verifyPassword(password, user?.passwordHash ?? null);
-  if (!user || !passwordMatches) throw new Error("E-mail ou senha incorretos.");
-  if (user.verificationStatus === "suspenso") throw new Error("Esta conta está suspensa.");
+  if (!user || !passwordMatches) throw new ActionError("E-mail ou senha incorretos.");
+  if (user.verificationStatus === "suspenso") throw new ActionError("Esta conta está suspensa.");
   await db.delete(authLoginAttempts).where(inArray(authLoginAttempts.keyHash, loginKeys));
   await setBrokerSession(user.id);
   const { passwordHash: _passwordHash, ...safeUser } = user;
@@ -833,8 +943,9 @@ export async function loginUser(email: string, password: string) {
   return { success: true, user: safeUser };
 }
 
-export async function logoutUser() {
-  const userId = await getCurrentUserId();
+// Sair encerra a sessão em todos os aparelhos (a versão da sessão muda): um cookie copiado deixa de valer.
+async function logoutUserImpl() {
+  const userId = await readCurrentUserId();
   if (userId) await db.update(users).set({sessionVersion:sql`${users.sessionVersion} + 1`}).where(eq(users.id, userId));
   const cookieStore = await cookies();
   cookieStore.delete(SESSION_COOKIE);
@@ -843,22 +954,22 @@ export async function logoutUser() {
 }
 
 
-export async function getMySubscription() {
+async function getMySubscriptionImpl() {
   const actor = await requireCurrentUser();
   const [user] = await db.select({ id: users.id, plan: users.plan, status: users.subscriptionStatus, expiresAt: users.nextBillingDate, billingCycle: users.billingCycle }).from(users).where(eq(users.id, actor.id)).limit(1);
   const payments = await db.select({ id: transactions.id, amount: transactions.amount, status: transactions.status, type: transactions.type, paymentMethod: transactions.paymentMethod, description: transactions.description, createdAt: transactions.createdAt }).from(transactions).where(eq(transactions.userId, actor.id)).orderBy(desc(transactions.createdAt));
   return { user, payments };
 }
 
-export async function requestSubscriptionRenewal() {
+async function requestSubscriptionRenewalImpl() {
   const actor = await requireCurrentUser();
   const payment = await db.transaction(async (tx) => {
     const [user] = await tx.select().from(users).where(eq(users.id, actor.id)).for("update").limit(1);
-    const prices: Record<string, { monthly: string; annual: string }> = { "10": { monthly: "59.90", annual: "658.90" }, "20": { monthly: "89.90", annual: "988.90" }, "40": { monthly: "150.00", annual: "1650.00" } };
-    if (!user || !prices[user.plan]) throw new Error("Consulte a equipe para renovar este plano.");
+    if (!user || !isPlanId(user.plan)) throw new ActionError("Consulte a equipe para renovar este plano.");
     const [existing] = await tx.select({ id: transactions.id }).from(transactions).where(and(eq(transactions.userId, actor.id), eq(transactions.status, "pendente"), eq(transactions.paymentMethod, "pix"), eq(transactions.type, "mensalidade_pro"))).limit(1);
     if (existing) return existing;
-    const [created] = await tx.insert(transactions).values({ userId: actor.id, amount: prices[user.plan][user.billingCycle === "annual" ? "annual" : "monthly"], type: "mensalidade_pro", paymentMethod: "pix", status: "pendente", description: `Renovação do plano ${user.plan} (${user.billingCycle}) — confirmação manual` }).returning({ id: transactions.id });
+    const cycle = user.billingCycle === "annual" ? "annual" : "monthly";
+    const [created] = await tx.insert(transactions).values({ userId: actor.id, amount: planCharge(user.plan, cycle), type: "mensalidade_pro", paymentMethod: "pix", status: "pendente", description: `Renovação do plano ${planName(user.plan)} (${cycle === "annual" ? "anual" : "mensal"}) — confirmação manual` }).returning({ id: transactions.id });
     return created;
   });
   revalidatePath("/");
@@ -866,35 +977,35 @@ export async function requestSubscriptionRenewal() {
 }
 
 
-export async function getBrokerAssistantStatus() {
+async function getBrokerAssistantStatusImpl() {
   await requireCurrentUser();
   return { enabled: !!process.env.GEMINI_API_KEY };
 }
 
-export async function askBrokerAssistant(input: BrokerAssistantInput) {
+async function askBrokerAssistantImpl(input: BrokerAssistantInput) {
   const actor = await requireCurrentUser();
   requireActiveBroker(actor);
   const cleaned = validateBrokerAssistantInput(input);
-  if (!process.env.GEMINI_API_KEY) throw new Error("O Bartolomeu aguarda a configuração da IA pela equipe.");
+  if (!process.env.GEMINI_API_KEY) throw new ActionError("O Bartolomeu aguarda a configuração da IA pela equipe.");
   const day = new Intl.DateTimeFormat("en-CA", { timeZone: "America/Sao_Paulo" }).format(new Date());
   const keyHash = crypto.createHash("sha256").update(`broker-assistant:${actor.id}:${day}`).digest("hex");
   const [counter] = await db.insert(authLoginAttempts).values({ keyHash, attempts: 1, updatedAt: new Date() }).onConflictDoUpdate({ target: authLoginAttempts.keyHash, set: { attempts: sql`${authLoginAttempts.attempts} + 1`, updatedAt: new Date() } }).returning({ attempts: authLoginAttempts.attempts });
-  if (counter.attempts > 60) throw new Error("Você atingiu as 60 perguntas de hoje. Seu acesso ao CRM continua normal; novas perguntas serão liberadas amanhã.");
+  if (counter.attempts > 60) throw new ActionError("Você atingiu as 60 perguntas de hoje. Seu acesso ao CRM continua normal; novas perguntas serão liberadas amanhã.");
   const rows = await db.select({ stage: leads.stage, total: sql<number>`count(*)::int` }).from(leads).where(eq(leads.ownerUserId, actor.id)).groupBy(leads.stage);
   const summary = JSON.stringify(rows);
   return generateBrokerAnswer(cleaned, summary);
 }
 
-export async function saveNegotiationDocuments(leadId: string, input: NegotiationDocuments) {
+async function saveNegotiationDocumentsImpl(leadId: string, input: NegotiationDocuments) {
   const actor = await requireCurrentUser();
   requireActiveBroker(actor);
   const data = validateNegotiationDocuments(input);
   const [owned] = await db.select({id: leads.id}).from(leads).where(and(eq(leads.id, leadId), eq(leads.ownerUserId, actor.id))).limit(1);
-  if (!owned) throw new Error("Cliente não encontrado na sua carteira.");
+  if (!owned) throw new ActionError("Cliente não encontrado na sua carteira.");
   if (data.propertyId) {
     const [property] = await db.select({title: properties.title, city: properties.city, brokerId: properties.brokerId, acceptsPartnership: properties.acceptsPartnership, status: properties.status, verificationStatus: users.verificationStatus})
       .from(properties).innerJoin(users, eq(properties.brokerId, users.id)).where(eq(properties.id, data.propertyId)).limit(1);
-    if (!property || !canUseProperty(property, actor.id)) throw new Error("Imóvel não disponível para esta negociação.");
+    if (!property || !canUseProperty(property, actor.id)) throw new ActionError("Imóvel não disponível para esta negociação.");
     data.propertyTitle = property.title; data.city = data.city.trim();
   }
   const [saved] = await db.update(leads).set({documentation: data, updatedAt: new Date()}).where(and(eq(leads.id, leadId), eq(leads.ownerUserId, actor.id))).returning({documentation: leads.documentation});
@@ -902,15 +1013,48 @@ export async function saveNegotiationDocuments(leadId: string, input: Negotiatio
   return {documentation: saved.documentation!};
 }
 
-export async function saveMyDocumentationTemplate(input: NegotiationDocuments) {
+async function saveMyDocumentationTemplateImpl(input: NegotiationDocuments) {
   const actor = await requireCurrentUser(); requireActiveBroker(actor);
   const data = validateNegotiationDocuments(input);
   const template = {...data, propertyId: null, propertyTitle: "", statuses: {}};
   await db.update(users).set({documentationTemplate: template}).where(eq(users.id, actor.id));
   return {success:true};
 }
-export async function getMyDocumentationTemplate() {
+async function getMyDocumentationTemplateImpl() {
   const actor = await requireCurrentUser(); requireActiveBroker(actor);
   const [row] = await db.select({template: users.documentationTemplate}).from(users).where(eq(users.id, actor.id)).limit(1);
   return row?.template || null;
 }
+
+// Cada ação devolve { ok, data } ou { ok, error }: a mensagem esperada chega à tela também em produção.
+export async function getMarketplaceData(...args: Parameters<typeof getMarketplaceDataImpl>) { return runAction(() => getMarketplaceDataImpl(...args)); }
+export async function createLead(...args: Parameters<typeof createLeadImpl>) { return runAction(() => createLeadImpl(...args)); }
+export async function importLeadsCsv(...args: Parameters<typeof importLeadsCsvImpl>) { return runAction(() => importLeadsCsvImpl(...args)); }
+export async function updateLead(...args: Parameters<typeof updateLeadImpl>) { return runAction(() => updateLeadImpl(...args)); }
+export async function updateLeadStage(...args: Parameters<typeof updateLeadStageImpl>) { return runAction(() => updateLeadStageImpl(...args)); }
+export async function addLeadActivity(...args: Parameters<typeof addLeadActivityImpl>) { return runAction(() => addLeadActivityImpl(...args)); }
+export async function completeLeadFollowUp(...args: Parameters<typeof completeLeadFollowUpImpl>) { return runAction(() => completeLeadFollowUpImpl(...args)); }
+export async function updateUserStatus(...args: Parameters<typeof updateUserStatusImpl>) { return runAction(() => updateUserStatusImpl(...args)); }
+export async function confirmPixSubscriptionPayment(...args: Parameters<typeof confirmPixSubscriptionPaymentImpl>) { return runAction(() => confirmPixSubscriptionPaymentImpl(...args)); }
+export async function refundPixSubscriptionPayment(...args: Parameters<typeof refundPixSubscriptionPaymentImpl>) { return runAction(() => refundPixSubscriptionPaymentImpl(...args)); }
+export async function createProperty(...args: Parameters<typeof createPropertyImpl>) { return runAction(() => createPropertyImpl(...args)); }
+export async function createBuyerProfile(...args: Parameters<typeof createBuyerProfileImpl>) { return runAction(() => createBuyerProfileImpl(...args)); }
+export async function createDvpCertificate(...args: Parameters<typeof createDvpCertificateImpl>) { return runAction(() => createDvpCertificateImpl(...args)); }
+export async function updatePartnershipStatus(...args: Parameters<typeof updatePartnershipStatusImpl>) { return runAction(() => updatePartnershipStatusImpl(...args)); }
+export async function respondToPartnershipSplit(...args: Parameters<typeof respondToPartnershipSplitImpl>) { return runAction(() => respondToPartnershipSplitImpl(...args)); }
+export async function revisePartnershipCommission(...args: Parameters<typeof revisePartnershipCommissionImpl>) { return runAction(() => revisePartnershipCommissionImpl(...args)); }
+export async function markNotificationAsRead(...args: Parameters<typeof markNotificationAsReadImpl>) { return runAction(() => markNotificationAsReadImpl(...args)); }
+export async function markAllNotificationsAsRead(...args: Parameters<typeof markAllNotificationsAsReadImpl>) { return runAction(() => markAllNotificationsAsReadImpl(...args)); }
+export async function submitPilotFeedback(...args: Parameters<typeof submitPilotFeedbackImpl>) { return runAction(() => submitPilotFeedbackImpl(...args)); }
+export async function updatePilotFeedbackStatus(...args: Parameters<typeof updatePilotFeedbackStatusImpl>) { return runAction(() => updatePilotFeedbackStatusImpl(...args)); }
+export async function validateCreciFormat(...args: Parameters<typeof validateCreciFormatImpl>) { return runAction(() => validateCreciFormatImpl(...args)); }
+export async function registerUserWithPix(...args: Parameters<typeof registerUserWithPixImpl>) { return runAction(() => registerUserWithPixImpl(...args)); }
+export async function loginUser(...args: Parameters<typeof loginUserImpl>) { return runAction(() => loginUserImpl(...args)); }
+export async function logoutUser(...args: Parameters<typeof logoutUserImpl>) { return runAction(() => logoutUserImpl(...args)); }
+export async function getMySubscription(...args: Parameters<typeof getMySubscriptionImpl>) { return runAction(() => getMySubscriptionImpl(...args)); }
+export async function requestSubscriptionRenewal(...args: Parameters<typeof requestSubscriptionRenewalImpl>) { return runAction(() => requestSubscriptionRenewalImpl(...args)); }
+export async function getBrokerAssistantStatus(...args: Parameters<typeof getBrokerAssistantStatusImpl>) { return runAction(() => getBrokerAssistantStatusImpl(...args)); }
+export async function askBrokerAssistant(...args: Parameters<typeof askBrokerAssistantImpl>) { return runAction(() => askBrokerAssistantImpl(...args)); }
+export async function saveNegotiationDocuments(...args: Parameters<typeof saveNegotiationDocumentsImpl>) { return runAction(() => saveNegotiationDocumentsImpl(...args)); }
+export async function saveMyDocumentationTemplate(...args: Parameters<typeof saveMyDocumentationTemplateImpl>) { return runAction(() => saveMyDocumentationTemplateImpl(...args)); }
+export async function getMyDocumentationTemplate(...args: Parameters<typeof getMyDocumentationTemplateImpl>) { return runAction(() => getMyDocumentationTemplateImpl(...args)); }

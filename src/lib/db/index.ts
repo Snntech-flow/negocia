@@ -10,7 +10,8 @@ if (process.env.NODE_ENV === "production" && !process.env.DATABASE_URL) {
 const connectionString = process.env.DATABASE_URL || "postgresql://negocialar:negocialar_dev_password@localhost:5433/negocialar_db";
 
 const isSupabase = connectionString.includes("supabase.com") || connectionString.includes("supabase.co");
-const isRemote = isSupabase || process.env.NODE_ENV === "production";
+const isLocalhost = ["localhost", "127.0.0.1", "[::1]"].includes(new URL(connectionString).hostname);
+const isRemote = isSupabase || (process.env.NODE_ENV === "production" && !isLocalhost);
 
 const pool = new Pool({
   connectionString,
@@ -20,6 +21,10 @@ const pool = new Pool({
         rejectUnauthorized: true,
       }
     : undefined,
+  // Na Vercel cada instância abre o próprio pool: poucas conexões por instância para não esgotar o Supabase.
+  max: Number(process.env.DATABASE_POOL_MAX) || (process.env.VERCEL ? 3 : 10),
+  idleTimeoutMillis: 10_000,
+  connectionTimeoutMillis: 10_000,
 });
 
 export const db = drizzle(pool, { schema });

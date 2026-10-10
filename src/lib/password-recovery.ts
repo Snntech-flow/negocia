@@ -1,6 +1,7 @@
+import { ActionError } from "./action-result";
 import crypto from "node:crypto";
 
-export class RecoveryError extends Error {}
+export class RecoveryError extends ActionError {}
 export const RESET_MESSAGE = "Se houver uma conta elegível com esse e-mail, você receberá um link para criar uma nova senha. Confira também o spam.";
 export const RESET_ERROR = "Link inválido ou expirado. Solicite uma nova recuperação de senha.";
 export function resetTokenHash(token: string) {

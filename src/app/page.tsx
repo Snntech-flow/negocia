@@ -1,4 +1,5 @@
-import { getMarketplaceData } from "@/lib/actions";
+// Componente de servidor: lê direto a consulta (um erro aqui cai na tela de erro, não volta como valor).
+import { getMarketplaceData } from "@/lib/queries/marketplace";
 import NegociaLarApp from "@/components/NegociaLarApp";
 
 export const dynamic = "force-dynamic";

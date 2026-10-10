@@ -20,6 +20,27 @@ if (process.env.NEGOCIAR_LAR_REQUIRE_INTEGRATION === "1" && !approvedLocalDataba
   throw new Error("Os testes de autorização exigem NEGOCIAR_LAR_TEST_DATABASE_URL local e descartável.");
 }
 
+// As ações devolvem { ok, data } ou { ok, error }; aqui o erro volta a ser lançado para as asserções com rejects.
+type Unwrapped<R> = [R] extends [{ ok: boolean }] ? (Extract<R, { ok: true }> extends { data: infer D } ? D : never) : R;
+function strict<M extends object>(mod: M) {
+  return new Proxy(mod, {
+    get(target, key) {
+      const value = Reflect.get(target, key) as unknown;
+      if (typeof value !== "function") return value;
+      const call = value as (...args: unknown[]) => Promise<unknown>;
+      return async (...args: unknown[]) => {
+        const result = await call(...args);
+        if (result && typeof result === "object" && "ok" in result) {
+          const outcome = result as { ok: boolean; data?: unknown; error?: string };
+          if (!outcome.ok) throw new Error(outcome.error);
+          return outcome.data;
+        }
+        return result;
+      };
+    },
+  }) as { [K in keyof M]: M[K] extends (...args: infer A) => Promise<infer R> ? (...args: A) => Promise<Unwrapped<R>> : M[K] };
+}
+
 test("server actions enforce account ownership and admin-only Pix confirmation", {
   skip: !approvedLocalDatabase ? "Configure NEGOCIAR_LAR_TEST_DATABASE_URL with a disposable local test database." : false,
 }, async (t) => {
@@ -28,13 +49,14 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
   process.env.NEGOCIAR_LAR_SESSION_SECRET = "test-only-session-secret-at-least-32-bytes";
   (globalThis as typeof globalThis & { AsyncLocalStorage: typeof NodeAsyncLocalStorage }).AsyncLocalStorage = NodeAsyncLocalStorage;
 
-  const [{ db, users, leads, buyerProfiles, transactions, notifications, properties, partnerships, authLoginAttempts }, { eq, inArray }, { workAsyncStorage }, { workUnitAsyncStorage }, actions] = await Promise.all([
+  const [{ db, users, leads, buyerProfiles, transactions, notifications, properties, partnerships, authLoginAttempts }, { and, eq, inArray, ne }, { workAsyncStorage }, { workUnitAsyncStorage }, rawActions] = await Promise.all([
     import("../src/lib/db"),
     import("drizzle-orm"),
     import("next/dist/server/app-render/work-async-storage.external"),
     import("next/dist/server/app-render/work-unit-async-storage.external"),
     import("../src/lib/actions"),
   ]);
+  const actions = strict(rawActions);
 
   const suffix = cryptoRandomSuffix();
   const registeredIds: string[] = [];
@@ -140,8 +162,21 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
       workUnitAsyncStorage.run(requestStore, callback));
   }
 
+  await t.test("as migrations criam toda coluna que o código usa (coluna sem migration derruba a produção)", async () => {
+    const schema = await import("../src/lib/db/schema");
+    const { getTableConfig, PgTable } = await import("drizzle-orm/pg-core");
+    const { sql } = await import("drizzle-orm");
+    const rows = await db.execute(sql`select table_name, column_name from information_schema.columns where table_schema = 'public'`);
+    const existing = new Set(rows.rows.map((row) => `${row.table_name}.${row.column_name}`));
+    const tables = Object.values(schema as Record<string, unknown>).filter((value) => value instanceof PgTable) as InstanceType<typeof PgTable>[];
+    const missing = tables
+      .flatMap((table) => { const config = getTableConfig(table); return config.columns.map((column) => `${config.name}.${column.name}`); })
+      .filter((column) => !existing.has(column));
+    assert.deepEqual(missing, []);
+  });
+
   await t.test("carteira permite edição e arquivamento apenas pelo dono, com controle de versão", async () => {
-    const inventory = await import("../src/lib/actions/property-inventory");
+    const inventory = strict(await import("../src/lib/actions/property-inventory"));
     const form = { title: "Imóvel editável", propertyType: "Apartamento", salePrice: "550000", city: "São Paulo", neighborhood: "Centro",
       bedrooms: 2, suites: 1, bathrooms: 2, parkingSpots: 1, areaM2: "80", description: "Descrição original",
       confidentialAddress: "Rua protegida, 123", ownerName: "Proprietário privado", ownerPhone: "11933332222",
@@ -271,8 +306,21 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
     await assert.rejects(asUser(otherBroker.id, () => actions.completeLeadFollowUp(ownerLead.id)), /Lead não encontrado/);
 
     await asUser(otherBroker.id, () => actions.markNotificationAsRead(ownerNotification.id));
+    await asUser(otherBroker.id, () => actions.markAllNotificationsAsRead());
     const [notification] = await db.select({ read: notifications.read }).from(notifications).where(eq(notifications.id, ownerNotification.id));
     assert.equal(notification.read, false, "a notificação de outra conta deve continuar não lida");
+    const [mine] = await db.insert(notifications).values({ userId: otherBroker.id, title: "Própria", message: "Teste", type: "sistema", read: false }).returning();
+    await asUser(otherBroker.id, () => actions.markAllNotificationsAsRead());
+    const [own] = await db.select({ read: notifications.read }).from(notifications).where(eq(notifications.id, mine.id));
+    assert.equal(own.read, true, "marcar todas grava no banco as notificações da própria conta");
+  });
+
+  await t.test("a mensagem esperada volta como valor: em produção o Next esconde o texto de erro lançado", async () => {
+    const email = `sem-conta-${suffix}@example.test`;
+    const result = await asUser(owner.id, () => rawActions.loginUser(email, "senha-errada-de-teste"));
+    assert.deepEqual(result, { ok: false, error: "E-mail ou senha incorretos." });
+    const keyHashes = [`login-account:${email}`, `login-pair:${email}:unknown`].map(key => createHash("sha256").update(key).digest("hex"));
+    await db.delete(authLoginAttempts).where(inArray(authLoginAttempts.keyHash, keyHashes));
   });
 
   await t.test("documentação e modelos permanecem privados por corretor", async () => {
@@ -305,8 +353,17 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
       await assert.rejects(asUser(otherBroker.id, () => actions.createDvpCertificate({...visit, propertyId:pendingProperty.id, captorBrokerId:pendingCaptor.id})), /Imóvel ou parceria inválidos/);
       const saved = await asUser(otherBroker.id, () => actions.saveNegotiationDocuments(client.id, documentation));
       assert.equal(saved.documentation.propertyTitle, valid.title);
+      await assert.rejects(asUser(otherBroker.id, () => actions.createDvpCertificate({...visit, visitDate:"2026-10-12T14:00"})), /data de visita válida/,
+        "sem fuso o servidor leria o horário como UTC");
+      await assert.rejects(asUser(otherBroker.id, () => actions.createDvpCertificate({...visit, visitDate:new Date(Date.now() + 400 * 86_400_000).toISOString()})), /próximos 12 meses/);
       const certificate = await asUser(otherBroker.id, () => actions.createDvpCertificate(visit));
       assert.equal(certificate.certificate.propertyId, valid.id);
+      await assert.rejects(asUser(otherBroker.id, () => actions.createDvpCertificate({...visit, clientName:"  cliente TESTE "})), /já tem um registro de visita/,
+        "o mesmo cliente não ganha um segundo registro para o mesmo imóvel");
+      await assert.rejects(asUser(admin.id, () => actions.respondToPartnershipSplit(certificate.partnership.id, true, 2)), /mudou para a versão 1/,
+        "a confirmação precisa ser da versão que o corretor viu");
+      const answered = await asUser(admin.id, () => actions.respondToPartnershipSplit(certificate.partnership.id, true, 1));
+      assert.ok(answered.partnership.captorAcceptedAt);
       // An owner can still document their own sold/private inventory.
       const [ownerClient] = await db.insert(leads).values({ownerUserId:admin.id, fullName:"Cliente captador", phone:"11900001237", normalizedPhone:"11900001237"}).returning();
       const own = await asUser(admin.id, () => actions.saveNegotiationDocuments(ownerClient.id, {...documentation, propertyId:sold.id}));
@@ -339,7 +396,7 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
       await asUser(otherBroker.id, () => actions.createBuyerProfile({clientInternalName:"Procura aprovada", propertyType:"Apartamento", city, neighborhoods:["Centro"], maxBudget:"400000", minBedrooms:2, minParkingSpots:1}));
       const notices = await db.select().from(notifications).where(eq(notifications.userId, otherBroker.id));
       assert.ok(!notices.some(item => item.propertyId === property.id));
-      await asUser(otherBroker.id, () => actions.createProperty({...base, bathrooms:1, suites:0, photos:[], splitPercentage:"50"}));
+      await asUser(otherBroker.id, () => actions.createProperty({...base, bathrooms:1, suites:0, photos:[], splitPercentage:"50", condition:"usado", acceptsFinancing:true, state:"SP"}));
       const restrictedNotices = await db.select().from(notifications).where(eq(notifications.userId, unapproved.id));
       assert.equal(restrictedNotices.length, 0);
       await db.update(users).set({verificationStatus:"aprovado"}).where(eq(users.id, unapproved.id));
@@ -384,10 +441,10 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
     await asUser(otherBroker.id, () => actions.createBuyerProfile(profile));
     const notices = await db.select().from(notifications).where(eq(notifications.userId, otherBroker.id));
     const notice = notices.find(row => row.type === "ai_match" && row.propertyId === valid.id);
-    assert.ok(notice); assert.match(notice.title, /1 Imóveis Encontrados/);
+    assert.ok(notice); assert.match(notice.title, /1 imóvel compatível/);
     await asUser(admin.id, () => actions.createBuyerProfile(profile));
     const before = await db.select().from(notifications).where(eq(notifications.userId, admin.id));
-    const form = {title:"Nova oferta radar", propertyType:"Apartamento", salePrice:"300000", city, neighborhood:"Centro", bedrooms:2, parkingSpots:1, bathrooms:1, suites:0, areaM2:"80", description:"Imóvel de testes", photos:[], confidentialAddress:"Endereço fictício", ownerName:"Pessoa fictícia", ownerPhone:"11900001234", acceptsPartnership:true, splitPercentage:"50", purpose:"venda"};
+    const form = {title:"Nova oferta radar", propertyType:"Apartamento", salePrice:"300000", city, neighborhood:"Centro", bedrooms:2, parkingSpots:1, bathrooms:1, suites:0, areaM2:"80", description:"Imóvel de testes", photos:[], condition:"usado", acceptsFinancing:true, state:"SP", confidentialAddress:"Endereço fictício", ownerName:"Pessoa fictícia", ownerPhone:"11900001234", acceptsPartnership:true, splitPercentage:"50", purpose:"venda"};
     const created = await asUser(otherBroker.id, () => actions.createProperty(form));
     const after = await db.select().from(notifications).where(eq(notifications.userId, admin.id));
     assert.equal(after.length, before.length + 1); assert.ok(after.some(row => row.propertyId === created.property.id));
@@ -397,6 +454,26 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
     assert.equal(unchanged.length, after.length);
     await db.delete(properties).where(eq(properties.city, city));
     await db.delete(buyerProfiles).where(eq(buyerProfiles.city, city));
+  });
+
+  await t.test("limite de anúncios do plano vale no servidor, inclusive ao reativar um anúncio", async () => {
+    const inventory = strict(await import("../src/lib/actions/property-inventory"));
+    const city = `Limite ${suffix}`;
+    const base = {brokerId: otherBroker.id, title:"Anúncio do limite", propertyType:"Apartamento", salePrice:"300000", city, neighborhood:"Centro", bedrooms:2, parkingSpots:1, areaM2:"80", description:"Teste", confidentialAddress:"Endereço fictício", ownerName:"Pessoa fictícia", ownerPhone:"11900001234", acceptsPartnership:false, status:"disponivel", purpose:"venda"};
+    const active = await db.select({ id: properties.id }).from(properties).where(and(eq(properties.brokerId, otherBroker.id), inArray(properties.status, ["disponivel", "em_negociacao"])));
+    await db.insert(properties).values(Array.from({length: 10 - active.length}, (_, index) => ({...base, title:`Anúncio ${index}`, status: index % 2 ? "em_negociacao" : "disponivel"})));
+    const [archived] = await db.insert(properties).values({...base, title:"Anúncio arquivado", status:"arquivado"}).returning();
+    try {
+      const { brokerId: _brokerId, status: _status, ...fields } = base;
+      const form = {...fields, bathrooms:1, suites:0, photos:[], splitPercentage:"50", condition:"usado", acceptsFinancing:true, state:"SP"};
+      await assert.rejects(asUser(otherBroker.id, () => actions.createProperty(form)), /permite 10 anúncios ativos e você já tem 10/);
+      await assert.rejects(asUser(otherBroker.id, () => inventory.updateOwnPropertyStatus(archived.id, archived.updatedAt.toISOString(), "disponivel")), /permite 10 anúncios/);
+      const sold = await asUser(otherBroker.id, () => inventory.updateOwnPropertyStatus(archived.id, archived.updatedAt.toISOString(), "vendido"));
+      assert.equal(sold.property.status, "vendido", "trocar entre situações inativas não consome vaga");
+      const page = await asUser(otherBroker.id, () => inventory.getOwnProperties());
+      assert.equal(page.activeListings, 10); assert.equal(page.listingLimit, 10);
+      await assert.rejects(asUser(otherBroker.id, () => actions.createProperty({...form, condition:undefined})), /condição do imóvel/);
+    } finally { await db.delete(properties).where(eq(properties.city, city)); }
   });
 
   await t.test("inventário privado não vaza para visitantes ou outras contas", async () => {
@@ -484,8 +561,36 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
     assert.equal(afterRenewal.nextBillingDate!.getTime(), referrer.nextBillingDate!.getTime(), "a segunda cobrança não pode gerar outro bônus");
   });
 
+  await t.test("estorno desfaz exatamente a confirmação, do mais recente para o mais antigo, e retira o bônus de indicação", async () => {
+    const [first] = await db.select().from(transactions).where(eq(transactions.id, payment.id));
+    const [renewal] = await db.select().from(transactions).where(and(eq(transactions.userId, owner.id), eq(transactions.status, "pago"), ne(transactions.id, payment.id)));
+    assert.equal(first.confirmedBy, admin.id); assert.ok(first.confirmedAt); assert.equal(first.referralRewardedUserId, otherBroker.id);
+    await assert.rejects(asUser(otherBroker.id, () => actions.refundPixSubscriptionPayment(renewal.id, "Pagamento devolvido")), /restrita à administração/);
+    await assert.rejects(asUser(admin.id, () => actions.refundPixSubscriptionPayment(renewal.id, "x")), /motivo/);
+    await assert.rejects(asUser(admin.id, () => actions.refundPixSubscriptionPayment(first.id, "Pagamento devolvido")), /Estorne primeiro o pagamento mais recente/);
+    await asUser(admin.id, () => actions.refundPixSubscriptionPayment(renewal.id, "Pagamento devolvido ao corretor"));
+    let [subscriber] = await db.select().from(users).where(eq(users.id, owner.id));
+    assert.equal(subscriber.nextBillingDate!.getTime(), first.periodEnd!.getTime());
+    assert.equal(subscriber.subscriptionStatus, "ativo");
+    await asUser(admin.id, () => actions.refundPixSubscriptionPayment(first.id, "Pix devolvido ao corretor"));
+    [subscriber] = await db.select().from(users).where(eq(users.id, owner.id));
+    assert.equal(subscriber.nextBillingDate, null);
+    assert.equal(subscriber.subscriptionStatus, "pendente");
+    assert.equal(subscriber.referralRewardedAt, null, "um novo primeiro pagamento pode premiar a indicação de novo");
+    const [referrer] = await db.select().from(users).where(eq(users.id, otherBroker.id));
+    assert.equal(referrer.nextBillingDate!.getTime(), referrerExpiry.getTime(), "o indicador volta à data anterior ao bônus");
+    const [refunded] = await db.select().from(transactions).where(eq(transactions.id, first.id));
+    assert.equal(refunded.status, "estornado"); assert.equal(refunded.refundedBy, admin.id); assert.equal(refunded.refundReason, "Pix devolvido ao corretor");
+    await assert.rejects(asUser(admin.id, () => actions.refundPixSubscriptionPayment(first.id, "De novo")), /Só mensalidades Pix confirmadas/);
+  });
+
   await t.test("cadastro inicia 30 dias gratuitos e vincula indicação sem cobrar nem premiar antes do pagamento", async () => {
     const [before] = await db.select().from(users).where(eq(users.id, otherBroker.id));
+    await assert.rejects(asUser(owner.id, () => actions.registerUserWithPix({
+      name: "Corretor teste UF", email: `uf-${suffix}@example.test`, whatsapp: "11999990005",
+      creci: "999998-F", state: "XX", city: "São Paulo", plan: "40", billingCycle: "monthly",
+      password: "test-only-password-12345",
+    })), /estado/);
     const startedAt = Date.now();
     const result = await asUser(owner.id, () => actions.registerUserWithPix({
       name: "Corretor teste cadastro", email: `new-${suffix}@example.test`, whatsapp: "11999990004",
@@ -501,6 +606,12 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
     assert.equal(result.user.referralRewardedAt, null);
     assert.ok(result.user.nextBillingDate!.getTime() >= startedAt + 30 * 86_400_000);
     assert.ok(result.user.nextBillingDate!.getTime() <= Date.now() + 30 * 86_400_000);
+    assert.equal(result.user.avatarUrl, null, "conta nova não recebe foto de outra pessoa");
+    await assert.rejects(asUser(owner.id, () => actions.registerUserWithPix({
+      name: "Corretor repetido", email: `NEW-${suffix}@example.test`, whatsapp: "11999990006",
+      creci: "999997-F", state: "BA", city: "Salvador", plan: "10", billingCycle: "monthly",
+      password: "test-only-password-12345",
+    })), /já tem cadastro/);
     const initialPayments = await db.select().from(transactions).where(eq(transactions.userId, result.user.id));
     assert.equal(initialPayments.length, 0);
     const [after] = await db.select().from(users).where(eq(users.id, otherBroker.id));
@@ -522,12 +633,20 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
     const keyHashes: string[] = [];
     const hash = (key: string) => createHash("sha256").update(key).digest("hex");
     try {
-      for (let i=0; i<8; i++) {
+      // Uma conexão só esgota o próprio par (5) e para antes de contar na conta: não trava o login de outra pessoa.
+      const single = `single-${suffix}@example.test`, singleAddress = "192.0.2.100";
+      keyHashes.push(hash(`login-pair:${single}:${singleAddress}`), hash(`login-address:${singleAddress}`), hash(`login-account:${single}`));
+      for (let i=0; i<10; i++) await assert.rejects(asUser(owner.id, () => actions.loginUser(single,"wrong-password"), {address:singleAddress}), /incorretos|Muitas tentativas/);
+      const [accountCounter] = await db.select().from(authLoginAttempts).where(eq(authLoginAttempts.keyHash, hash(`login-account:${single}`)));
+      assert.equal(accountCounter.attempts, 5);
+      assert.equal(accountCounter.blockedUntil, null);
+      for (let i=0; i<30; i++) {
         const address = `192.0.2.${i+1}`;
         keyHashes.push(hash(`login-pair:${email}:${address}`), hash(`login-address:${address}`));
         await assert.rejects(asUser(owner.id, () => actions.loginUser(email,"wrong-password"), {address}), /incorretos/);
       }
-      await assert.rejects(asUser(owner.id, () => actions.loginUser(email,"wrong-password"), {address:"192.0.2.9"}), /Muitas tentativas/);
+      keyHashes.push(hash("login-pair:" + email + ":192.0.2.31"), hash("login-address:192.0.2.31"));
+      await assert.rejects(asUser(owner.id, () => actions.loginUser(email,"wrong-password"), {address:"192.0.2.31"}), /Muitas tentativas/);
       const concurrentEmail=`concurrent-${suffix}@example.test`, address="192.0.2.20";
       keyHashes.push(hash(`login-account:${concurrentEmail}`),hash(`login-pair:${concurrentEmail}:${address}`),hash(`login-address:${address}`));
       const results=await Promise.allSettled(Array.from({length:8},()=>asUser(owner.id,()=>actions.loginUser(concurrentEmail,"wrong-password"),{address})));

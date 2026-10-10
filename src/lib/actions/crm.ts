@@ -1,5 +1,7 @@
 "use server";
 
+import { ActionError, isUniqueViolation } from "../action-result";
+
 import { db, leads, leadActivities } from "../db";
 import { eq, and, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
@@ -16,7 +18,7 @@ function normalizePhone(phone: string) {
 function parseLeadDate(value?: string) {
   if (!value?.trim()) return null;
   const date = new Date(value);
-  if (!Number.isFinite(date.getTime())) throw new Error("Informe uma data válida para o próximo retorno.");
+  if (!Number.isFinite(date.getTime())) throw new ActionError("Informe uma data válida para o próximo retorno.");
   return date;
 }
 
@@ -41,17 +43,17 @@ export async function createLead(data: {
   const fullName = data.fullName.trim();
   const phone = data.phone.trim();
   const normalizedPhone = normalizePhone(phone);
-  if (fullName.length < 2 || fullName.length > 120) throw new Error("Informe o nome do lead.");
-  if (normalizedPhone.length < 8 || normalizedPhone.length > 15) throw new Error("Informe um telefone válido com DDD.");
-  if (!(["comprador", "proprietario", "locatario", "parceiro"] as string[]).includes(data.leadType)) throw new Error("Tipo de lead inválido.");
-  if (!(["indicacao", "whatsapp", "portal", "site", "ligacao", "rede_social", "outro"] as string[]).includes(data.source)) throw new Error("Origem do lead inválida.");
+  if (fullName.length < 2 || fullName.length > 120) throw new ActionError("Informe o nome do lead.");
+  if (normalizedPhone.length < 8 || normalizedPhone.length > 15) throw new ActionError("Informe um telefone válido com DDD.");
+  if (!(["comprador", "proprietario", "locatario", "parceiro"] as string[]).includes(data.leadType)) throw new ActionError("Tipo de lead inválido.");
+  if (!(["indicacao", "whatsapp", "portal", "site", "ligacao", "rede_social", "outro"] as string[]).includes(data.source)) throw new ActionError("Origem do lead inválida.");
   const email = data.email?.trim().toLowerCase() || null;
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Informe um e-mail válido.");
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new ActionError("Informe um e-mail válido.");
   const maxBudget = data.maxBudget?.trim() || null;
-  if (maxBudget && (!Number.isFinite(Number(maxBudget)) || Number(maxBudget) <= 0)) throw new Error("O orçamento deve ser maior que zero.");
+  if (maxBudget && (!Number.isFinite(Number(maxBudget)) || Number(maxBudget) <= 0)) throw new ActionError("O orçamento deve ser maior que zero.");
   const nextActionAt = parseLeadDate(data.nextActionAt);
   const notes = data.notes?.trim() || null;
-  if (notes && notes.length > 3000) throw new Error("As observações devem ter até 3.000 caracteres.");
+  if (notes && notes.length > 3000) throw new ActionError("As observações devem ter até 3.000 caracteres.");
 
   try {
     const result = await db.transaction(async (tx) => {
@@ -85,7 +87,7 @@ export async function createLead(data: {
     revalidatePath("/");
     return { success: true, ...result };
   } catch (error) {
-    if ((error as { code?: string }).code === "23505") throw new Error("Já existe um lead com este telefone na sua carteira.");
+    if (isUniqueViolation(error)) throw new ActionError("Já existe um lead com este telefone na sua carteira.");
     throw error;
   }
 }
@@ -98,39 +100,39 @@ export async function importLeadsCsv(rows: Array<{
   const actor = await requireCurrentUser();
   requireActiveBroker(actor);
   if (!Array.isArray(rows) || rows.length < 1 || rows.length > 100) {
-    throw new Error("Importe de 1 a 100 contatos por arquivo.");
+    throw new ActionError("Importe de 1 a 100 contatos por arquivo.");
   }
   const typeMap: Record<string, string> = { comprador: "comprador", proprietario: "proprietario", "proprietário": "proprietario", "proprietario / vendedor": "proprietario", "proprietário / vendedor": "proprietario", locatario: "locatario", "locatário": "locatario", parceiro: "parceiro", "corretor parceiro": "parceiro" };
   const sourceMap: Record<string, string> = { indicacao: "indicacao", "indicação": "indicacao", whatsapp: "whatsapp", portal: "portal", "portal imobiliario": "portal", "portal imobiliário": "portal", site: "site", ligacao: "ligacao", "ligação": "ligacao", "rede social": "rede_social", rede_social: "rede_social", outro: "outro" };
   const seen = new Set<string>();
   const cleaned = rows.map((row, index) => {
-    if (!row || typeof row !== "object" || Array.isArray(row)) throw new Error(`Linha ${index + 2}: registro inválido.`);
+    if (!row || typeof row !== "object" || Array.isArray(row)) throw new ActionError(`Linha ${index + 2}: registro inválido.`);
     const fullName = String(row.fullName || "").trim();
     const phone = String(row.phone || "").trim();
     const normalizedPhone = normalizePhone(phone);
     const line = index + 2;
-    if (fullName.length < 2 || fullName.length > 120) throw new Error(`Linha ${line}: nome inválido.`);
-    if (phone.length > 30 || normalizedPhone.length < 8 || normalizedPhone.length > 15) throw new Error(`Linha ${line}: telefone inválido (inclua DDD).`);
-    if (seen.has(normalizedPhone)) throw new Error(`Linha ${line}: telefone repetido no arquivo.`);
+    if (fullName.length < 2 || fullName.length > 120) throw new ActionError(`Linha ${line}: nome inválido.`);
+    if (phone.length > 30 || normalizedPhone.length < 8 || normalizedPhone.length > 15) throw new ActionError(`Linha ${line}: telefone inválido (inclua DDD).`);
+    if (seen.has(normalizedPhone)) throw new ActionError(`Linha ${line}: telefone repetido no arquivo.`);
     seen.add(normalizedPhone);
     const email = String(row.email || "").trim().toLowerCase() || null;
-    if (email && (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) throw new Error(`Linha ${line}: e-mail inválido.`);
+    if (email && (email.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email))) throw new ActionError(`Linha ${line}: e-mail inválido.`);
     const leadTypeInput = String(row.leadType || "comprador").trim().toLowerCase();
     const sourceInput = String(row.source || "outro").trim().toLowerCase();
     const leadType = typeMap[leadTypeInput];
     const source = sourceMap[sourceInput];
-    if (!leadType) throw new Error(`Linha ${line}: tipo deve ser comprador, proprietario, locatario ou parceiro.`);
-    if (!source) throw new Error(`Linha ${line}: origem inválida.`);
+    if (!leadType) throw new ActionError(`Linha ${line}: tipo deve ser comprador, proprietario, locatario ou parceiro.`);
+    if (!source) throw new ActionError(`Linha ${line}: origem inválida.`);
     const maxBudget = String(row.maxBudget || "").trim().replace(/[R$\s]/g, "").replace(/\.(?=\d{3}(?:\D|$))/g, "").replace(",", ".") || null;
-    if (maxBudget && (!/^\d+(?:\.\d{1,2})?$/.test(maxBudget) || !Number.isFinite(Number(maxBudget)) || Number(maxBudget) <= 0 || Number(maxBudget) > 9999999999.99)) throw new Error(`Linha ${line}: orçamento inválido.`);
+    if (maxBudget && (!/^\d+(?:\.\d{1,2})?$/.test(maxBudget) || !Number.isFinite(Number(maxBudget)) || Number(maxBudget) <= 0 || Number(maxBudget) > 9999999999.99)) throw new ActionError(`Linha ${line}: orçamento inválido.`);
     const minBedrooms = String(row.minBedrooms || "").trim() ? Number(row.minBedrooms) : null;
-    if (minBedrooms !== null && (!Number.isInteger(minBedrooms) || minBedrooms < 1 || minBedrooms > 20)) throw new Error(`Linha ${line}: quartos mínimos inválidos.`);
+    if (minBedrooms !== null && (!Number.isInteger(minBedrooms) || minBedrooms < 1 || minBedrooms > 20)) throw new ActionError(`Linha ${line}: quartos mínimos inválidos.`);
     const notes = String(row.notes || "").trim() || null;
-    if (notes && notes.length > 3000) throw new Error(`Linha ${line}: observação acima de 3.000 caracteres.`);
+    if (notes && notes.length > 3000) throw new ActionError(`Linha ${line}: observação acima de 3.000 caracteres.`);
     const propertyType = String(row.propertyType || "").trim();
     const city = String(row.city || "").trim();
     const neighborhoodText = String(row.neighborhoods || "");
-    if (propertyType.length > 80 || city.length > 120 || neighborhoodText.length > 2500) throw new Error(`Linha ${line}: preferências acima do limite permitido.`);
+    if (propertyType.length > 80 || city.length > 120 || neighborhoodText.length > 2500) throw new ActionError(`Linha ${line}: preferências acima do limite permitido.`);
     return {
       ownerUserId: actor.id, fullName, phone, normalizedPhone, email, leadType, source,
       propertyType: propertyType || null,
@@ -155,19 +157,19 @@ export async function updateLead(leadId: string, data: Parameters<typeof createL
   const fullName = data.fullName.trim();
   const phone = data.phone.trim();
   const normalizedPhone = normalizePhone(phone);
-  if (fullName.length < 2 || fullName.length > 120) throw new Error("Informe o nome do lead.");
-  if (normalizedPhone.length < 8 || normalizedPhone.length > 15) throw new Error("Informe um telefone válido com DDD.");
-  if (!( ["comprador", "proprietario", "locatario", "parceiro"] as string[]).includes(data.leadType)) throw new Error("Tipo de lead inválido.");
-  if (!( ["indicacao", "whatsapp", "portal", "site", "ligacao", "rede_social", "outro"] as string[]).includes(data.source)) throw new Error("Origem do lead inválida.");
+  if (fullName.length < 2 || fullName.length > 120) throw new ActionError("Informe o nome do lead.");
+  if (normalizedPhone.length < 8 || normalizedPhone.length > 15) throw new ActionError("Informe um telefone válido com DDD.");
+  if (!( ["comprador", "proprietario", "locatario", "parceiro"] as string[]).includes(data.leadType)) throw new ActionError("Tipo de lead inválido.");
+  if (!( ["indicacao", "whatsapp", "portal", "site", "ligacao", "rede_social", "outro"] as string[]).includes(data.source)) throw new ActionError("Origem do lead inválida.");
   const email = data.email?.trim().toLowerCase() || null;
-  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new Error("Informe um e-mail válido.");
+  if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) throw new ActionError("Informe um e-mail válido.");
   const maxBudget = data.maxBudget?.trim() || null;
-  if (maxBudget && (!Number.isFinite(Number(maxBudget)) || Number(maxBudget) <= 0)) throw new Error("O orçamento deve ser maior que zero.");
+  if (maxBudget && (!Number.isFinite(Number(maxBudget)) || Number(maxBudget) <= 0)) throw new ActionError("O orçamento deve ser maior que zero.");
   const nextActionAt = parseLeadDate(data.nextActionAt);
   const notes = data.notes?.trim() || null;
-  if (notes && notes.length > 3000) throw new Error("As observações devem ter até 3.000 caracteres.");
+  if (notes && notes.length > 3000) throw new ActionError("As observações devem ter até 3.000 caracteres.");
   const [ownedLead] = await db.select({ id: leads.id }).from(leads).where(and(eq(leads.id, leadId), eq(leads.ownerUserId, actor.id))).limit(1);
-  if (!ownedLead) throw new Error("Lead não encontrado na sua carteira.");
+  if (!ownedLead) throw new ActionError("Lead não encontrado na sua carteira.");
 
   try {
     const result = await db.transaction(async (tx) => {
@@ -199,7 +201,7 @@ export async function updateLead(leadId: string, data: Parameters<typeof createL
     revalidatePath("/");
     return { success: true, ...result };
   } catch (error) {
-    if ((error as { code?: string }).code === "23505") throw new Error("Já existe outro lead com este telefone na sua carteira.");
+    if (isUniqueViolation(error)) throw new ActionError("Já existe outro lead com este telefone na sua carteira.");
     throw error;
   }
 }
@@ -207,11 +209,11 @@ export async function updateLead(leadId: string, data: Parameters<typeof createL
 export async function updateLeadStage(leadId: string, nextStage: string, lostReason?: string) {
   const actor = await requireCurrentUser();
   requireActiveBroker(actor);
-  if (!(LEAD_STAGES as readonly string[]).includes(nextStage)) throw new Error("Etapa inválida.");
+  if (!(LEAD_STAGES as readonly string[]).includes(nextStage)) throw new ActionError("Etapa inválida.");
   const [lead] = await db.select({ id: leads.id, stage: leads.stage }).from(leads).where(and(eq(leads.id, leadId), eq(leads.ownerUserId, actor.id))).limit(1);
-  if (!lead) throw new Error("Lead não encontrado na sua carteira.");
+  if (!lead) throw new ActionError("Lead não encontrado na sua carteira.");
   const cleanLostReason = lostReason?.trim() || null;
-  if (nextStage === "perdido" && !cleanLostReason) throw new Error("Informe o motivo da perda.");
+  if (nextStage === "perdido" && !cleanLostReason) throw new ActionError("Informe o motivo da perda.");
   const result = await db.transaction(async (tx) => {
     const [saved] = await tx.update(leads).set({ stage: nextStage, lostReason: nextStage === "perdido" ? cleanLostReason : null, updatedAt: new Date() }).where(and(eq(leads.id, leadId), eq(leads.ownerUserId, actor.id))).returning();
     const [activity] = await tx.insert(leadActivities).values({
@@ -235,11 +237,11 @@ export async function addLeadActivity(data: {
 }) {
   const actor = await requireCurrentUser();
   requireActiveBroker(actor);
-  if (!(LEAD_ACTIVITY_TYPES as readonly string[]).includes(data.activityType)) throw new Error("Tipo de atividade inválido.");
+  if (!(LEAD_ACTIVITY_TYPES as readonly string[]).includes(data.activityType)) throw new ActionError("Tipo de atividade inválido.");
   const description = data.description.trim();
-  if (description.length < 2 || description.length > 2000) throw new Error("Descreva o contato em até 2.000 caracteres.");
+  if (description.length < 2 || description.length > 2000) throw new ActionError("Descreva o contato em até 2.000 caracteres.");
   const [lead] = await db.select({ id: leads.id }).from(leads).where(and(eq(leads.id, data.leadId), eq(leads.ownerUserId, actor.id))).limit(1);
-  if (!lead) throw new Error("Lead não encontrado na sua carteira.");
+  if (!lead) throw new ActionError("Lead não encontrado na sua carteira.");
   const nextAction = data.nextAction?.trim() || null;
   const nextActionAt = parseLeadDate(data.nextActionAt);
   const [activity] = await db.transaction(async (tx) => {
@@ -265,9 +267,9 @@ export async function completeLeadFollowUp(leadId: string) {
     nextAction: leads.nextAction,
     nextActionAt: leads.nextActionAt,
   }).from(leads).where(and(eq(leads.id, leadId), eq(leads.ownerUserId, actor.id))).limit(1);
-  if (!lead) throw new Error("Lead não encontrado na sua carteira.");
-  if (["fechado", "perdido"].includes(lead.stage)) throw new Error("Leads encerrados não têm retornos ativos.");
-  if (!lead.nextActionAt) throw new Error("Este lead não tem retorno agendado.");
+  if (!lead) throw new ActionError("Lead não encontrado na sua carteira.");
+  if (["fechado", "perdido"].includes(lead.stage)) throw new ActionError("Leads encerrados não têm retornos ativos.");
+  if (!lead.nextActionAt) throw new ActionError("Este lead não tem retorno agendado.");
 
   const result = await db.transaction(async (tx) => {
     const [updated] = await tx.update(leads).set({

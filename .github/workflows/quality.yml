@@ -31,7 +31,9 @@ jobs:
           node-version: "22"
           cache: npm
       - run: npm ci
-      - run: npm run db:test:push
+      # Banco montado só pelas migrations (as mesmas que vão para produção), não pelo schema do Drizzle.
+      - run: npm run db:test:migrate
+      - run: npm run db:test:migrate
       - run: npm test
       - run: npm run lint
       - run: npm run typecheck

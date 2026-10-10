@@ -14,3 +14,9 @@ test('rejects malformed statuses and invalid costs', () => {
  assert.throws(() => validateNegotiationDocuments({...data, costs:[-1,0,0,0,0,0]}));
  assert.deepEqual(validateNegotiationDocuments(data),data);
 });
+test('grava só os campos conhecidos: chaves extras enviadas são descartadas', () => {
+ const tampered = { ...data, extra: 'x'.repeat(10_000), statuses: {}, customGroups: { comprador: ['Doc'], vendedor: [], imovel: [], outro: ['x'] } } as unknown as NegotiationDocuments;
+ assert.throws(() => validateNegotiationDocuments(tampered), /lista de documentos/);
+ const clean = validateNegotiationDocuments({ ...data, extra: 'x'.repeat(10_000) } as unknown as NegotiationDocuments);
+ assert.deepEqual(Object.keys(clean).sort(), ['city', 'costs', 'fgts', 'financing', 'propertyId', 'propertyTitle', 'statuses']);
+});

@@ -11,9 +11,10 @@
     "db:up": "docker compose up -d",
     "db:down": "docker compose down",
     "db:push": "drizzle-kit push",
+    "db:migrate": "tsx scripts/migrate.ts",
     "db:studio": "drizzle-kit studio",
     "typecheck": "tsc --noEmit",
-    "db:test:push": "drizzle-kit push --config=drizzle.test.config.ts",
+    "db:test:migrate": "tsx scripts/migrate.ts --teste",
     "test:integration": "NEGOCIAR_LAR_REQUIRE_INTEGRATION=1 node --import tsx --test tests/authorization.integration.test.ts"
   },
   "dependencies": {

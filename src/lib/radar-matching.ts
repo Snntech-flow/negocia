@@ -1,3 +1,5 @@
+import { normalizeText as normalize } from "./normalize-text";
+
 export type RadarProperty = {
   id: string; title: string; propertyType: string; city: string; neighborhood: string; salePrice: string;
   bedrooms: number; parkingSpots: number; purpose?: string; acceptsPartnership: boolean; status: string;
@@ -7,7 +9,6 @@ export type RadarProfile = {
   id: string; clientInternalName: string; propertyType: string; city: string; neighborhoods: string[];
   maxBudget: string; minBedrooms: number; minParkingSpots: number; broker: { id: string; name: string };
 };
-const normalize = (text: string) => text.trim().toLocaleLowerCase("pt-BR");
 
 export function evaluateRadarMatch(property: RadarProperty, profile: RadarProfile) {
   const price = Number(property.salePrice);

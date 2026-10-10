@@ -30,6 +30,17 @@ test("aceita um imóvel válido e rejeita mídia insegura ou entrada excessiva",
   assert.throws(() => validatePropertyInput({ ...property, salePrice: "Infinity" }));
 });
 
+test("posição solar e vista aceitam só as opções da tela, incluindo Não definido e Lateral", () => {
+  for (const solarPosition of ["nascente", "norte_sul", "poente", "nao_definido"]) {
+    assert.doesNotThrow(() => validatePropertyInput({ ...property, solarPosition }), solarPosition);
+  }
+  for (const viewType of ["frente", "fundos", "lateral", "lagoa", "av_principal", "nao_definido"]) {
+    assert.doesNotThrow(() => validatePropertyInput({ ...property, viewType }), viewType);
+  }
+  assert.throws(() => validatePropertyInput({ ...property, solarPosition: "sul" }), /posição solar/);
+  assert.throws(() => validatePropertyInput({ ...property, viewType: "<b>mar</b>" }), /tipo de vista/);
+});
+
 test("limita orçamento e listas do perfil de comprador", () => {
   const profile = {
     clientInternalName: "Cliente",

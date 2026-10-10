@@ -1,6 +1,7 @@
 "use client";
 import { useState } from 'react';
 import { saveNegotiationDocuments, saveMyDocumentationTemplate, getMyDocumentationTemplate } from '@/lib/actions';
+import { unwrap } from '@/lib/action-result';
 import { clientDocumentList, costLabels, documentGroups, type NegotiationDocuments } from '@/lib/negotiation-documents';
 import type { LeadItem, LeadMatchProperty } from './LeadCRM';
 const field = 'w-full rounded-lg border border-slate-700 bg-slate-900 p-2 text-sm text-white';
@@ -19,12 +20,12 @@ export default function NegotiationDocumentation({ lead, properties, chosenPrope
   }
   async function template(load: boolean) {
     setBusy(true); setMessage('');
-    try { if (load) { const saved = await getMyDocumentationTemplate(); if (!saved) setMessage('Você ainda não salvou um modelo pessoal.'); else {setData({...saved, propertyId: data.propertyId, propertyTitle: data.propertyTitle, city: data.city || saved.city, statuses: {}}); setMessage('Modelo pessoal aplicado. Salve para manter neste cliente.');} }
-    else {await saveMyDocumentationTemplate(data);setMessage('Modelo pessoal salvo para reutilizar.');} }
+    try { if (load) { const saved = unwrap(await getMyDocumentationTemplate()); if (!saved) setMessage('Você ainda não salvou um modelo pessoal.'); else {setData({...saved, propertyId: data.propertyId, propertyTitle: data.propertyTitle, city: data.city || saved.city, statuses: {}}); setMessage('Modelo pessoal aplicado. Salve para manter neste cliente.');} }
+    else {unwrap(await saveMyDocumentationTemplate(data));setMessage('Modelo pessoal salvo para reutilizar.');} }
     catch(error) {setMessage(error instanceof Error ? error.message : 'Não foi possível acessar o modelo.');} finally {setBusy(false);}
   }
   const text = `Olá, ${lead.fullName}! Para avançarmos na negociação${data.propertyTitle ? ` do imóvel ${data.propertyTitle}` : ''}, por favor separe os seguintes documentos:\n\n${clientDocumentList(data, audience).map(item => `• ${item}`).join('\n')}\n\nA lista será ajustada conforme as exigências da operação. Combine comigo um canal seguro para encaminhar seus documentos.`;
-  async function save() { setBusy(true); setMessage(''); try { const result = await saveNegotiationDocuments(lead.id, data); onSaved(result.documentation); setMessage('Documentação salva.'); } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível salvar.'); } finally { setBusy(false); } }
+  async function save() { setBusy(true); setMessage(''); try { const result = unwrap(await saveNegotiationDocuments(lead.id, data)); onSaved(result.documentation); setMessage('Documentação salva.'); } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível salvar.'); } finally { setBusy(false); } }
   function print() {
     const page = window.open('', '_blank'); if (!page) { setMessage('Permita a abertura da janela para imprimir.'); return; }
     const pre = page.document.createElement('pre'); pre.style.cssText = 'white-space:pre-wrap;font:16px/1.6 Arial;margin:40px;color:#083858'; pre.textContent = `NEGOCIA LAR · LISTA DE DOCUMENTOS\n\n${text}`; page.document.title = 'Lista de documentos'; page.document.body.appendChild(pre); page.print();

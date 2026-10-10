@@ -16,6 +16,9 @@ export const users = pgTable("users", {
   role: text("role").default("corretor").notNull(), // 'corretor', 'admin', 'imobiliaria'
   isVerified: boolean("is_verified").default(false).notNull(),
   verificationStatus: text("verification_status").default("pendente").notNull(), // 'pendente', 'aprovado', 'suspenso'
+  // Quem da equipe mudou a situação do CRECI por último, e quando.
+  verificationReviewedBy: uuid("verification_reviewed_by").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
+  verificationReviewedAt: timestamp("verification_reviewed_at"),
   
   // Dados de Faturamento / Assinatura
   plan: text("plan").default("pro").notNull(), // 'free', 'pro', 'enterprise'
@@ -236,7 +239,26 @@ export const transactions = pgTable("transactions", {
   paymentMethod: text("payment_method").notNull(), // 'pix', 'cartao_credito'
   status: text("status").default("pendente").notNull(), // 'pago', 'pendente', 'estornado'
   description: text("description").notNull(),
+  // Confirmação manual do Pix e o que ela mudou, para o estorno desfazer exatamente isso.
+  confirmedBy: uuid("confirmed_by").references(() => users.id, { onDelete: "set null" }),
+  confirmedAt: timestamp("confirmed_at"),
+  previousBillingDate: timestamp("previous_billing_date"),
+  previousSubscriptionStatus: text("previous_subscription_status"),
+  periodEnd: timestamp("period_end"),
+  referralRewardedUserId: uuid("referral_rewarded_user_id").references(() => users.id, { onDelete: "set null" }),
+  referralPreviousBillingDate: timestamp("referral_previous_billing_date"),
+  referralPeriodEnd: timestamp("referral_period_end"),
+  refundedBy: uuid("refunded_by").references(() => users.id, { onDelete: "set null" }),
+  refundedAt: timestamp("refunded_at"),
+  refundReason: text("refund_reason"),
   createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+// Registro das migrations de supabase/migrations aplicadas por scripts/migrate.ts.
+export const appMigrations = pgTable("app_migrations", {
+  name: text("name").primaryKey(),
+  checksum: text("checksum").notNull(),
+  appliedAt: timestamp("applied_at").defaultNow().notNull(),
 });
 
 export const notifications = pgTable("notifications", {
