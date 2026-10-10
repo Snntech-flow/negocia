@@ -11,7 +11,8 @@ import BrokerCrmClients from "./BrokerCrmClients";
 import React, { FormEvent, useEffect, useMemo, useState } from "react";
 import { Calculator, Bot, LayoutDashboard, List, KanbanSquare, Building2, CalendarClock, CheckCircle2, Clock3, Download, FileUp, MapPin, Pencil, Phone, Plus, Search, UserRound, X } from "lucide-react";
 import { addLeadActivity, completeLeadFollowUp, createDvpCertificate, createLead, importLeadsCsv, updateLead, updateLeadStage } from "@/lib/actions";
-import { loadStateCities, uniqueCities } from "@/lib/cities";
+import { cityFilterOptions, loadStateCities } from "@/lib/cities";
+import { BRAZILIAN_STATES } from "@/lib/brazil-states";
 import { unwrap } from "@/lib/action-result";
 import { askText } from "@/lib/dialogs";
 
@@ -253,6 +254,16 @@ export default function LeadCRM({
   const [typeFilter, setTypeFilter] = useState("todos");
   const [sourceFilter, setSourceFilter] = useState("todos");
   const [cityFilter, setCityFilter] = useState("todas");
+  // O cliente guarda só a cidade: o estado do filtro escolhe de qual UF vêm as cidades (começa na do corretor).
+  const [filterState, setFilterState] = useState(currentUserState || "");
+  const [filterStateCities, setFilterStateCities] = useState<{ uf: string; cities: string[] } | null>(null);
+  useEffect(() => {
+    if (!filterState) return;
+    let cancelled = false;
+    void loadStateCities(filterState).then((cities) => { if (!cancelled) setFilterStateCities({ uf: filterState, cities }); });
+    return () => { cancelled = true; };
+  }, [filterState]);
+  const filterCitiesLoaded = filterStateCities?.uf === filterState;
   const [followUpFilter, setFollowUpFilter] = useState("todos");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<LeadItem | null>(null);
@@ -337,7 +348,7 @@ export default function LeadCRM({
   const clientPage = pagination.key === filterKey ? Math.min(pagination.page, Math.max(1, Math.ceil(visibleLeads.length / 15))) : 1;
   const ownProperties = properties.filter(property => currentUserId && property.brokerId === currentUserId && `${property.title} ${property.city} ${property.neighborhood}`.toLocaleLowerCase("pt-BR").includes(propertySearch.toLocaleLowerCase("pt-BR")));
   const openClient = (id: string) => { setSelectedLeadId(id); setError(null); };
-  const availableCities = uniqueCities(leads.map((lead) => lead.city));
+  const cityOptions = cityFilterOptions(leads.map((lead) => lead.city), filterCitiesLoaded ? filterStateCities.cities : []);
 
   const overdueCount = leads.filter((lead) =>
     lead.nextActionAt && new Date(lead.nextActionAt).getTime() < now
@@ -673,11 +684,18 @@ export default function LeadCRM({
             <option value="todos">Todas as origens</option>
             {sources.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
           </select>
-          <select value={cityFilter} onChange={(event) => setCityFilter(event.target.value)} className={selectClass} aria-label="Filtrar cidade">
-            <option value="todas">Todas as cidades</option>
-            {availableCities.map((city) => <option key={city} value={city}>{city}</option>)}
-            {!availableCities.length && <option value="" disabled>Nenhum cliente com cidade cadastrada ainda</option>}
+          <div className="flex gap-2">
+          <select value={filterState} onChange={(event) => { setFilterState(event.target.value); setCityFilter("todas"); }} className={`${selectClass} w-20 shrink-0`} aria-label="Estado das cidades do filtro">
+            {!filterState && <option value="">UF</option>}
+            {BRAZILIAN_STATES.map((uf) => <option key={uf} value={uf}>{uf}</option>)}
           </select>
+          <select value={cityFilter} onChange={(event) => setCityFilter(event.target.value)} className={`${selectClass} min-w-0 flex-1`} aria-label="Filtrar cidade">
+            <option value="todas">Todas as cidades</option>
+            {cityOptions.withClients.length > 0 && <optgroup label="Com clientes">{cityOptions.withClients.map((city) => <option key={city} value={city}>{city}</option>)}</optgroup>}
+            {cityOptions.others.length > 0 && <optgroup label={`${cityOptions.withClients.length ? "Outras cidades" : "Cidades"} (${filterState})`}>{cityOptions.others.map((city) => <option key={city} value={city}>{city}</option>)}</optgroup>}
+            {!cityOptions.others.length && <option value="" disabled>{!filterState ? "Escolha o estado ao lado" : filterCitiesLoaded ? "Não foi possível carregar as cidades agora" : "Carregando as cidades…"}</option>}
+          </select>
+          </div>
           <select value={followUpFilter} onChange={(event) => setFollowUpFilter(event.target.value)} className={selectClass} aria-label="Filtrar retornos">
             <option value="todos">Qualquer retorno</option>
             <option value="atrasados">Retorno atrasado</option>

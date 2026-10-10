@@ -12,6 +12,14 @@ export function uniqueCities(names: Array<string | null | undefined>) {
   return [...byKey.values()].sort((a, b) => a.localeCompare(b, "pt-BR"));
 }
 
+// Filtro de cidade do CRM: primeiro as cidades que já têm cliente, depois os municípios da UF do corretor
+// (sem repetir, mesmo com acento ou caixa diferente). Antes só havia as dos clientes: carteira nova = filtro vazio.
+export function cityFilterOptions(clientCities: Array<string | null | undefined>, stateCities: string[]) {
+  const withClients = uniqueCities(clientCities);
+  const taken = new Set(withClients.map(cityKey));
+  return { withClients, others: uniqueCities(stateCities).filter((city) => !taken.has(cityKey(city))) };
+}
+
 const stateCities = new Map<string, Promise<string[]>>();
 
 // Municípios do IBGE da UF, para o campo Cidade sugerir o nome oficial. Falha devolve lista vazia e tenta de novo depois.
