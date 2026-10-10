@@ -119,3 +119,64 @@ export function financeStatus(entry: { kind: string; paidAt: string | null; dueD
   if (entry.dueDate < today) return "vencido";
   return entry.kind === "receita" ? "a_receber" : "a_pagar";
 }
+
+// Período do financeiro: de um mês a outro (aaaa-mm), no máximo 24 meses.
+export const MAX_PERIOD_MONTHS = 24;
+export const FINANCE_PRESETS = [
+  { id: "mes", label: "Este mês" },
+  { id: "mes_passado", label: "Mês passado" },
+  { id: "3m", label: "Últimos 3 meses" },
+  { id: "6m", label: "Últimos 6 meses" },
+  { id: "12m", label: "Últimos 12 meses" },
+  { id: "ano", label: "Este ano" },
+] as const;
+export type FinancePreset = typeof FINANCE_PRESETS[number]["id"];
+
+export const shiftMonth = (month: string, months: number) => addMonthsKeepingDay(`${month}-01`, months).slice(0, 7);
+
+export function monthsBetween(from: string, to: string) {
+  const months: string[] = [];
+  for (let month = from; month <= to && months.length <= MAX_PERIOD_MONTHS; month = shiftMonth(month, 1)) months.push(month);
+  return months;
+}
+
+export function presetPeriod(preset: FinancePreset, today: string) {
+  const current = today.slice(0, 7);
+  switch (preset) {
+    case "mes_passado": return { from: shiftMonth(current, -1), to: shiftMonth(current, -1) };
+    case "3m": return { from: shiftMonth(current, -2), to: current };
+    case "6m": return { from: shiftMonth(current, -5), to: current };
+    case "12m": return { from: shiftMonth(current, -11), to: current };
+    case "ano": return { from: `${current.slice(0, 4)}-01`, to: current };
+    default: return { from: current, to: current };
+  }
+}
+
+export function validatePeriod(from: unknown, to: unknown) {
+  if (!isMonth(from) || !isMonth(to)) throw new ActionError("Período inválido.");
+  if (from > to) throw new ActionError("O mês inicial vem depois do final.");
+  if (monthsBetween(from, to).length > MAX_PERIOD_MONTHS) throw new ActionError(`Escolha um período de até ${MAX_PERIOD_MONTHS} meses.`);
+  return { from, to };
+}
+
+// O gráfico mostra pelo menos 6 meses terminando no fim do período, para comparar com os anteriores.
+export const chartStart = (from: string, to: string) => (shiftMonth(to, -5) < from ? shiftMonth(to, -5) : from);
+
+// Período anterior de mesmo tamanho, para comparar.
+export function previousPeriod(from: string, to: string) {
+  const length = monthsBetween(from, to).length;
+  return { from: shiftMonth(from, -length), to: shiftMonth(from, -1) };
+}
+
+// Variação em % contra o período anterior; sem base (anterior zero), não há porcentagem.
+export function percentChange(current: number, previous: number) {
+  if (!previous) return null;
+  return Math.round(((current - previous) / Math.abs(previous)) * 100);
+}
+
+// Total por categoria de um tipo, do maior para o menor.
+export function categoryTotals(entries: { kind: string; category: string; amount: string }[], kind: FinanceKind) {
+  const totals = new Map<string, number>();
+  for (const entry of entries) if (entry.kind === kind) totals.set(entry.category, (totals.get(entry.category) ?? 0) + toCents(entry.amount));
+  return [...totals].map(([category, cents]) => ({ category, label: financeCategoryLabel(kind, category), cents })).sort((a, b) => b.cents - a.cents);
+}

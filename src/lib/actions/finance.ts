@@ -6,7 +6,7 @@ import { db, brokerFinanceEntries, leads } from "../db";
 import { and, asc, eq, gte, isNull, lt, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { requireActiveBroker, requireCurrentUser } from "../auth";
-import { addMonthsKeepingDay, brasiliaToday, isIsoDate, isMonth, monthRange, validateFinanceEntryInput, type FinanceEntryInput } from "../finance";
+import { addMonthsKeepingDay, brasiliaToday, chartStart, isIsoDate, previousPeriod, shiftMonth, validateFinanceEntryInput, validatePeriod, type FinanceEntryInput } from "../finance";
 
 const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -24,25 +24,35 @@ async function assertOwnLead(ownerId: string, leadId: string | null) {
   if (!lead) throw new ActionError("Cliente não encontrado na sua carteira.");
 }
 
-// Lançamentos do mês (pela data prevista), clientes para vincular e o que está vencido em aberto em qualquer mês.
-async function getFinanceMonthImpl(input: { month?: string } = {}) {
+// Lançamentos do período (pela data prevista), totais por mês para o gráfico, totais do período anterior para
+// comparar, clientes para vincular e o que está vencido em aberto em qualquer mês.
+async function getFinancePeriodImpl(input: { from?: string; to?: string } = {}) {
   const actor = await requireCurrentUser();
   const today = brasiliaToday();
-  const month = input.month ?? today.slice(0, 7);
-  if (!isMonth(month)) throw new ActionError("Mês inválido.");
-  const { start, end } = monthRange(month);
+  const { from, to } = validatePeriod(input.from ?? today.slice(0, 7), input.to ?? input.from ?? today.slice(0, 7));
+  const end = `${shiftMonth(to, 1)}-01`;
+  const previous = previousPeriod(from, to);
   const own = eq(brokerFinanceEntries.ownerUserId, actor.id);
-  const [entries, clients, overdue] = await Promise.all([
+  const due = brokerFinanceEntries.dueDate;
+  const [entries, clients, overdue, monthly, before] = await Promise.all([
     db.select(entryColumns).from(brokerFinanceEntries)
       .leftJoin(leads, and(eq(leads.id, brokerFinanceEntries.leadId), eq(leads.ownerUserId, actor.id)))
-      .where(and(own, gte(brokerFinanceEntries.dueDate, start), lt(brokerFinanceEntries.dueDate, end)))
-      .orderBy(asc(brokerFinanceEntries.dueDate), asc(brokerFinanceEntries.createdAt)),
+      .where(and(own, gte(due, `${from}-01`), lt(due, end)))
+      .orderBy(asc(due), asc(brokerFinanceEntries.createdAt)).limit(3000),
     db.select({ id: leads.id, fullName: leads.fullName }).from(leads).where(eq(leads.ownerUserId, actor.id)).orderBy(asc(leads.fullName)).limit(500),
     db.select({ kind: brokerFinanceEntries.kind, count: sql<number>`count(*)::int`, total: sql<string>`coalesce(sum(${brokerFinanceEntries.amount}), 0)::text` })
-      .from(brokerFinanceEntries).where(and(own, isNull(brokerFinanceEntries.paidAt), lt(brokerFinanceEntries.dueDate, today)))
+      .from(brokerFinanceEntries).where(and(own, isNull(brokerFinanceEntries.paidAt), lt(due, today)))
+      .groupBy(brokerFinanceEntries.kind),
+    db.select({ month: sql<string>`to_char(${due}, 'YYYY-MM')`, kind: brokerFinanceEntries.kind,
+      total: sql<string>`sum(${brokerFinanceEntries.amount})::text`,
+      realized: sql<string>`coalesce(sum(${brokerFinanceEntries.amount}) filter (where ${brokerFinanceEntries.paidAt} is not null), 0)::text` })
+      .from(brokerFinanceEntries).where(and(own, gte(due, `${chartStart(from, to)}-01`), lt(due, end)))
+      .groupBy(sql`1`, brokerFinanceEntries.kind),
+    db.select({ kind: brokerFinanceEntries.kind, total: sql<string>`sum(${brokerFinanceEntries.amount})::text` })
+      .from(brokerFinanceEntries).where(and(own, gte(due, `${previous.from}-01`), lt(due, `${shiftMonth(previous.to, 1)}-01`)))
       .groupBy(brokerFinanceEntries.kind),
   ]);
-  return { month, today, entries, clients, overdue };
+  return { from, to, today, entries, clients, overdue, monthly, previous: { ...previous, totals: before } };
 }
 
 async function createFinanceEntryImpl(input: FinanceEntryInput) {
@@ -103,7 +113,7 @@ async function deleteFinanceEntryImpl(id: string) {
   return { success: true };
 }
 
-export async function getFinanceMonth(...args: Parameters<typeof getFinanceMonthImpl>) { return runAction(() => getFinanceMonthImpl(...args)); }
+export async function getFinancePeriod(...args: Parameters<typeof getFinancePeriodImpl>) { return runAction(() => getFinancePeriodImpl(...args)); }
 export async function createFinanceEntry(...args: Parameters<typeof createFinanceEntryImpl>) { return runAction(() => createFinanceEntryImpl(...args)); }
 export async function updateFinanceEntry(...args: Parameters<typeof updateFinanceEntryImpl>) { return runAction(() => updateFinanceEntryImpl(...args)); }
 export async function setFinanceEntryPaid(...args: Parameters<typeof setFinanceEntryPaidImpl>) { return runAction(() => setFinanceEntryPaidImpl(...args)); }

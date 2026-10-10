@@ -705,15 +705,25 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
       ["2026-03-31", null, "Comissão parcelada (3/3)"],
     ]);
 
-    const february = await asUser(alice.id, () => finance.getFinanceMonth({ month: "2026-02" }));
+    const february = await asUser(alice.id, () => finance.getFinancePeriod({ from: "2026-02", to: "2026-02" }));
     assert.equal(february.entries.length, 1);
     assert.equal(february.entries[0].leadName, "Cliente da Alice");
     assert.ok(february.clients.some((client) => client.id === aliceClient.id));
     assert.equal(february.overdue.find((row) => row.kind === "receita")?.count, 2, "fevereiro e março estão em aberto com data passada");
-    const brunoView = await asUser(bruno.id, () => finance.getFinanceMonth({ month: "2026-02" }));
+    const brunoView = await asUser(bruno.id, () => finance.getFinancePeriod({ from: "2026-02", to: "2026-02" }));
     assert.equal(brunoView.entries.length, 0);
     assert.equal(brunoView.clients.length, 0);
-    await assert.rejects(asUser(bruno.id, () => finance.getFinanceMonth({ month: "2026-13" })), /Mês inválido/);
+    await assert.rejects(asUser(bruno.id, () => finance.getFinancePeriod({ from: "2026-13", to: "2026-13" })), /Período inválido/);
+    await assert.rejects(asUser(bruno.id, () => finance.getFinancePeriod({ from: "2026-05", to: "2026-02" })), /mês inicial/);
+    await assert.rejects(asUser(bruno.id, () => finance.getFinancePeriod({ from: "2024-01", to: "2026-02" })), /até 24 meses/);
+    // Período de 3 meses: totais por mês para o gráfico (6 meses, terminando em março) e o período anterior para comparar.
+    const quarter = await asUser(alice.id, () => finance.getFinancePeriod({ from: "2026-01", to: "2026-03" }));
+    assert.equal(quarter.entries.length, 3);
+    assert.deepEqual(quarter.monthly.map((row) => [row.month, row.kind, row.total, row.realized]).sort(), [
+      ["2026-01", "receita", "1000.00", "1000.00"], ["2026-02", "receita", "1000.00", "0"], ["2026-03", "receita", "1000.00", "0"],
+    ]);
+    assert.deepEqual([quarter.previous.from, quarter.previous.to, quarter.previous.totals.length], ["2025-10", "2025-12", 0]);
+    assert.equal((await asUser(bruno.id, () => finance.getFinancePeriod({ from: "2026-01", to: "2026-03" }))).monthly.length, 0);
 
     const target = created[1];
     await assert.rejects(asUser(bruno.id, () => finance.updateFinanceEntry(target.id, { kind: "despesa", description: "Alterado", category: "impostos", amount: "1", dueDate: "2026-02-28" })), /não encontrado/);
@@ -736,7 +746,7 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
 
     // Conta vencida continua vendo os lançamentos, mas não lança.
     await assert.rejects(asUser(expired.id, () => finance.createFinanceEntry({ kind: "despesa", description: "Combustível", category: "deslocamento", amount: "50", dueDate: "2026-10-01" })), /Ative sua assinatura/);
-    assert.equal((await asUser(expired.id, () => finance.getFinanceMonth({}))).entries.length, 0);
+    assert.equal((await asUser(expired.id, () => finance.getFinancePeriod({}))).entries.length, 0);
 
     await asUser(alice.id, () => finance.deleteFinanceEntry(target.id));
     assert.equal((await db.select().from(brokerFinanceEntries).where(eq(brokerFinanceEntries.id, target.id))).length, 0);

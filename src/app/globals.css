@@ -173,3 +173,13 @@ body {
 
 /* O campo de senha tem o próprio olho (PasswordInput); o do Edge apareceria duplicado ao lado. */
 input::-ms-reveal { display: none; }
+
+/* Gráficos do Financeiro: cores por papel. Azul = receitas, laranja = despesas (par validado para daltonismo
+   e contraste sobre o cartão branco); grade e textos recessivos. O modo escuro troca só estas variáveis. */
+.finance-viz {
+  --fin-receita: #2a78d6;
+  --fin-despesa: #eb6834;
+  --fin-grid: #e5e9ee;
+  --fin-muted: #52606d;
+  --fin-hover: rgb(8 56 88 / 6%);
+}

@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { addMonthsKeepingDay, brasiliaToday, financeStatus, isIsoDate, monthRange, summarizeFinance, validateFinanceEntryInput } from "../src/lib/finance";
+import { addMonthsKeepingDay, brasiliaToday, categoryTotals, chartStart, financeStatus, isIsoDate, monthRange, monthsBetween, percentChange, presetPeriod, previousPeriod, summarizeFinance, validateFinanceEntryInput, validatePeriod } from "../src/lib/finance";
 
 test("repetir todo mês mantém o dia e usa o último dia do mês curto", () => {
   assert.equal(addMonthsKeepingDay("2026-01-31", 1), "2026-02-28");
@@ -53,4 +53,32 @@ test("lançamento exige tipo, categoria da lista, valor positivo e data válida"
   assert.throws(() => validateFinanceEntryInput({ ...base, paidAt: "ontem" }), /pagou/);
   assert.throws(() => validateFinanceEntryInput({ ...base, repeatMonths: 13 }), /1 a 12/);
   assert.throws(() => validateFinanceEntryInput({ ...base, leadId: "1; drop table" }), /Cliente inválido/);
+});
+
+test("período: atalhos, meses do gráfico, período anterior e limite de 24 meses", () => {
+  assert.deepEqual(presetPeriod("mes", "2026-01-15"), { from: "2026-01", to: "2026-01" });
+  assert.deepEqual(presetPeriod("mes_passado", "2026-01-15"), { from: "2025-12", to: "2025-12" });
+  assert.deepEqual(presetPeriod("3m", "2026-01-15"), { from: "2025-11", to: "2026-01" });
+  assert.deepEqual(presetPeriod("12m", "2026-10-10"), { from: "2025-11", to: "2026-10" });
+  assert.deepEqual(presetPeriod("ano", "2026-10-10"), { from: "2026-01", to: "2026-10" });
+  assert.deepEqual(monthsBetween("2025-11", "2026-02"), ["2025-11", "2025-12", "2026-01", "2026-02"]);
+  assert.equal(chartStart("2026-10", "2026-10"), "2026-05", "um mês só mostra os 5 anteriores para comparar");
+  assert.equal(chartStart("2025-01", "2026-10"), "2025-01");
+  assert.deepEqual(previousPeriod("2026-01", "2026-03"), { from: "2025-10", to: "2025-12" });
+  assert.throws(() => validatePeriod("2026-03", "2026-01"), /mês inicial/);
+  assert.throws(() => validatePeriod("2024-01", "2026-01"), /até 24 meses/);
+  assert.throws(() => validatePeriod("2026-1", "2026-01"), /Período inválido/);
+  assert.deepEqual(validatePeriod("2024-02", "2026-01"), { from: "2024-02", to: "2026-01" });
+});
+
+test("comparação e categorias", () => {
+  assert.equal(percentChange(120, 100), 20);
+  assert.equal(percentChange(80, 100), -20);
+  assert.equal(percentChange(50, 0), null);
+  assert.equal(percentChange(-50, -100), 50, "saldo negativo que melhora é variação positiva");
+  const totals = categoryTotals([
+    { kind: "despesa", category: "marketing", amount: "10.10" }, { kind: "despesa", category: "impostos", amount: "50" },
+    { kind: "despesa", category: "marketing", amount: "0.20" }, { kind: "receita", category: "comissao_venda", amount: "999" },
+  ], "despesa");
+  assert.deepEqual(totals, [{ category: "impostos", label: "Impostos", cents: 5000 }, { category: "marketing", label: "Marketing e divulgação", cents: 1030 }]);
 });
