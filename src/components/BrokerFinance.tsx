@@ -122,7 +122,8 @@ export default function BrokerFinance({ blockedReason, onMessage }: { blockedRea
   async function togglePaid(entry: Entry) {
     const paidAt = entry.paidAt ? null : today;
     await run(`paid:${entry.id}`, async () => unwrap(await setFinanceEntryPaid(entry.id, paidAt)),
-      paidAt ? (entry.kind === "receita" ? "Marcado como recebido hoje." : "Marcado como pago hoje.") : "Lançamento reaberto.");
+      paidAt ? (entry.kind === "receita" ? "Marcado como recebido hoje." : "Marcado como pago hoje.")
+        : (entry.kind === "receita" ? "Recebimento desfeito: o lançamento voltou para \"A receber\"." : "Pagamento desfeito: o lançamento voltou para \"A pagar\"."));
   }
   async function remove(entry: Entry) {
     if (!(await askConfirm({ title: `Excluir "${entry.description}"?`, message: "Não dá para desfazer.", confirmLabel: "Excluir", danger: true }))) return;
@@ -241,7 +242,7 @@ export default function BrokerFinance({ blockedReason, onMessage }: { blockedRea
                 <div className="flex flex-wrap items-center gap-2 sm:justify-end">
                   <span className={`rounded-full border px-2 py-0.5 text-[11px] font-bold ${status.className}`}>{status.label}</span>
                   <span className={`min-w-28 text-right font-bold ${income ? "text-emerald-700" : "text-red-700"}`}>{income ? "+" : "−"} {brl(toCents(entry.amount))}</span>
-                  <button type="button" disabled={!!blockedReason || busy === `paid:${entry.id}`} onClick={() => void togglePaid(entry)} className="inline-flex items-center gap-1 rounded-lg border border-slate-700 px-2.5 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-800 disabled:opacity-50">{entry.paidAt ? <><RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />Reabrir</> : <><CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />{income ? "Recebi" : "Paguei"}</>}</button>
+                  <button type="button" disabled={!!blockedReason || busy === `paid:${entry.id}`} onClick={() => void togglePaid(entry)} title={entry.paidAt ? `Desfazer o ${income ? "recebimento" : "pagamento"}: o lançamento volta para "${income ? "A receber" : "A pagar"}" (use se marcou por engano)` : undefined} className="inline-flex items-center gap-1 rounded-lg border border-slate-700 px-2.5 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-800 disabled:opacity-50">{entry.paidAt ? <><RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />Desfazer</> : <><CheckCircle2 className="h-3.5 w-3.5" aria-hidden="true" />{income ? "Recebi" : "Paguei"}</>}</button>
                   <button type="button" aria-label={`Editar ${entry.description}`} title="Editar" disabled={!!blockedReason} onClick={() => startEdit(entry)} className="rounded-lg border border-slate-700 p-1.5 text-slate-300 hover:bg-slate-800 disabled:opacity-50"><Pencil className="h-3.5 w-3.5" /></button>
                   <button type="button" aria-label={`Excluir ${entry.description}`} title="Excluir" disabled={!!blockedReason || busy === `del:${entry.id}`} onClick={() => void remove(entry)} className="rounded-lg border border-red-500/40 p-1.5 text-red-400 hover:bg-red-500/10 disabled:opacity-50"><Trash2 className="h-3.5 w-3.5" /></button>
                 </div>

@@ -15,6 +15,7 @@ import { cityFilterOptions, loadStateCities } from "@/lib/cities";
 import { BRAZILIAN_STATES } from "@/lib/brazil-states";
 import { unwrap } from "@/lib/action-result";
 import { askText } from "@/lib/dialogs";
+import { chaveDosFiltros, filtrosPadrao, lerFiltros } from "@/lib/lead-filters";
 
 export interface LeadItem {
   documentation?: NegotiationDocuments | null;
@@ -273,6 +274,32 @@ export default function LeadCRM({
   const [notice, setNotice] = useState<string | null>(null);
   const [csvImportOpen, setCsvImportOpen] = useState(false);
   const [now, setNow] = useState(0);
+  // Filtros lembrados neste aparelho, por corretor (lead-filters.ts): carrega uma vez e só então passa a guardar — senão o
+  // primeiro desenho, com o padrão, apagaria o que estava guardado.
+  const [filtrosCarregados, setFiltrosCarregados] = useState(false);
+  useEffect(() => {
+    // Como o BillingPopup: lê o aparelho depois do primeiro desenho (o servidor não tem o que guardar).
+    const frame = requestAnimationFrame(() => {
+      const chave = chaveDosFiltros(currentUserId);
+      if (chave) {
+        let guardado: string | null = null;
+        try { guardado = window.localStorage.getItem(chave); } catch { /* sem armazenamento: segue sem lembrar */ }
+        const f = lerFiltros(guardado, filtrosPadrao(currentUserState));
+        setMonthFilter(f.month); setStageFilter(f.stage); setTypeFilter(f.type); setSourceFilter(f.source);
+        setFilterState(f.state); setCityFilter(f.city); setFollowUpFilter(f.followUp);
+      }
+      setFiltrosCarregados(true);
+    });
+    return () => cancelAnimationFrame(frame);
+  }, [currentUserId, currentUserState]);
+  useEffect(() => {
+    const chave = chaveDosFiltros(currentUserId);
+    if (!filtrosCarregados || !chave) return;
+    try {
+      window.localStorage.setItem(chave, JSON.stringify({ month: monthFilter, stage: stageFilter, type: typeFilter, source: sourceFilter,
+        state: filterState, city: cityFilter, followUp: followUpFilter }));
+    } catch { /* idem */ }
+  }, [filtrosCarregados, currentUserId, monthFilter, stageFilter, typeFilter, sourceFilter, filterState, cityFilter, followUpFilter]);
 
   useEffect(() => {
     const updateClock = () => setNow(Date.now());
@@ -666,6 +693,8 @@ export default function LeadCRM({
 
       {(crmView === "clients" || crmView === "pipeline") && (
       <div className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-3 sm:p-4">
+        {/* Vídeo da corretora piloto (11/10/2026): ela escolhia etapa/tipo/origem achando que gravava no cliente. */}
+        <p className="text-xs text-slate-500"><span className="font-bold text-slate-300">Filtros da lista</span> — servem para encontrar clientes e ficam lembrados neste aparelho; não alteram o cadastro. Para mudar a etapa de um cliente, abra o cliente.</p>
         <label className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
           <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar nome, telefone, e-mail ou bairro" className={`${inputClass} pl-9`} />

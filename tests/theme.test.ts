@@ -23,3 +23,30 @@ test("script do tema: claro por padrão, escuro escolhido, automático segue o a
   assert.equal(boot("automatico", false), "claro");
   assert.equal(boot(new Error("armazenamento bloqueado")), undefined, "sem acesso ao armazenamento, a página segue no claro (CSS padrão)");
 });
+
+// Vídeo da corretora piloto (11/10/2026), simulador de amortização: a área logada pinta bg-slate-900 de BRANCO e text-white
+// de azul-escuro (globals.css) — a opção escolhida ("Reduzir prazo") ficava branca, igual à não escolhida, e parecia que o
+// clique marcava a outra. Botão de escolha (aria-pressed) não pode depender dessas classes para mostrar o que está marcado.
+test("botões de escolha (aria-pressed) não usam as classes que o tema da área logada reescreve", async () => {
+  const { readdirSync, readFileSync } = await import("node:fs");
+  const { join } = await import("node:path");
+  const dir = join(__dirname, "..", "src", "components");
+  const culpados: string[] = [];
+  for (const nome of readdirSync(dir).filter((f) => f.endsWith(".tsx"))) {
+    for (const trecho of readFileSync(join(dir, nome), "utf8").split(/<button\b/).slice(1)) {
+      // A tag de abertura termina no ">" FORA de chaves: o "=>" de onClick={() => …} não fecha a tag (o guard lia só até
+      // ali e passava por sorte, sem ver o className — sabotado em 11/10).
+      let fim = 0;
+      for (let i = 0, prof = 0; i < trecho.length; i++) {
+        const c = trecho[i];
+        if (c === "{") prof++;
+        else if (c === "}") prof--;
+        else if (c === ">" && prof === 0) { fim = i; break; }
+      }
+      const tag = trecho.slice(0, fim + 1);
+      // Só as classes PURAS que o tema reescreve: "hover:text-white" o tema trata (texto azul no hover) e não é o problema.
+      if (/aria-pressed/.test(tag) && /(^|[\s"'`{])(bg-slate-900|text-white)(?=[\s"'`}]|$)/.test(tag)) culpados.push(nome);
+    }
+  }
+  assert.deepEqual(culpados, []);
+});
