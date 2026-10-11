@@ -49,7 +49,7 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
   process.env.NEGOCIAR_LAR_SESSION_SECRET = "test-only-session-secret-at-least-32-bytes";
   (globalThis as typeof globalThis & { AsyncLocalStorage: typeof NodeAsyncLocalStorage }).AsyncLocalStorage = NodeAsyncLocalStorage;
 
-  const [{ db, users, leads, buyerProfiles, transactions, notifications, properties, partnerships, partnershipActivities, partnershipTermAcceptances, authLoginAttempts, brokerFinanceEntries }, { and, eq, inArray, ne }, { workAsyncStorage }, { workUnitAsyncStorage }, rawActions, rawFinance, rawTerms] = await Promise.all([
+  const [{ db, users, leads, buyerProfiles, transactions, notifications, properties, partnerships, partnershipActivities, partnershipTermAcceptances, authLoginAttempts, brokerFinanceEntries, dvpCertificates }, { and, eq, inArray, ne }, { workAsyncStorage }, { workUnitAsyncStorage }, rawActions, rawFinance, rawTerms, rawVisit] = await Promise.all([
     import("../src/lib/db"),
     import("drizzle-orm"),
     import("next/dist/server/app-render/work-async-storage.external"),
@@ -57,10 +57,12 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
     import("../src/lib/actions"),
     import("../src/lib/actions/finance"),
     import("../src/lib/actions/partnership-terms"),
+    import("../src/lib/actions/visit-control"),
   ]);
   const actions = strict(rawActions);
   const finance = strict(rawFinance);
   const terms = strict(rawTerms);
+  const visit = strict(rawVisit);
 
   const suffix = cryptoRandomSuffix();
   const registeredIds: string[] = [];
@@ -874,6 +876,42 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
       if (previousVercel === undefined) delete process.env.VERCEL; else process.env.VERCEL = previousVercel;
       await db.delete(partnerships).where(eq(partnerships.propertyId, property.id));
       await db.delete(properties).where(eq(properties.id, property.id));
+    }
+  });
+
+  await t.test("controle de visita: só quem registrou a visita imprime, só imóvel à venda, e o endereço protegido não sai", async () => {
+    const broker = (n: number) => ({
+      name: `Teste Visita ${n}`, email: `visit${n}-${suffix}@example.test`, creci: `${n}${suffix.slice(0, 6)}V`, whatsapp: `1199999004${n}`,
+      city: "Salvador", state: "BA", role: "corretor", verificationStatus: "aprovado", subscriptionStatus: "ativo", nextBillingDate: null, plan: "10",
+    });
+    const [captor] = await db.insert(users).values(broker(1)).returning();
+    const [partner] = await db.insert(users).values(broker(2)).returning();
+    const [outsider] = await db.insert(users).values(broker(3)).returning();
+    registeredIds.push(captor.id, partner.id, outsider.id);
+    const imovel = (purpose: string, title: string) => ({ brokerId: captor.id, title, propertyType: "Casa Solta", salePrice: "500000",
+      city: "Salvador", neighborhood: "Centro", bedrooms: 3, parkingSpots: 2, areaM2: "150", description: "Teste",
+      confidentialAddress: "Rua Protegida 123", ownerName: "Pessoa fictícia", ownerPhone: "11900005566", acceptsPartnership: true,
+      status: "disponivel", purpose });
+    const [venda] = await db.insert(properties).values(imovel("venda", "Casa à venda")).returning();
+    const [aluguel] = await db.insert(properties).values(imovel("aluguel", "Casa para alugar")).returning();
+    const registro = (propertyId: string, hash: string) => ({ certificateHash: `${hash}${suffix}`.slice(0, 32), propertyId, captorBrokerId: captor.id,
+      partnerBrokerId: partner.id, clientName: "Cliente da Visita", clientCpfPartial: "***.456.789-**",
+      visitDate: new Date("2026-10-11T23:30:00Z"), lockExpirationDate: new Date("2027-01-11T00:00:00Z") });
+    try {
+      const [dvp] = await db.insert(dvpCertificates).values(registro(venda.id, "VISITAVENDA")).returning();
+      const [dvpAluguel] = await db.insert(dvpCertificates).values(registro(aluguel.id, "VISITAALUGUEL")).returning();
+      const dados = await asUser(partner.id, () => visit.getVisitControl(dvp.id));
+      assert.equal(dados.corretor.nome, "Teste Visita 2");
+      assert.deepEqual([dados.corretor.uf, dados.imovel.bairro, dados.imovel.cidade, dados.cliente.nome], ["BA", "Centro", "Salvador", "Cliente da Visita"]);
+      assert.equal(dados.dataDaVisita, "2026-10-11", "23h30 UTC é 20h30 em Brasília: o dia é 11");
+      assert.ok(!JSON.stringify(dados).includes("Rua Protegida"), "o endereço protegido não sai");
+      await assert.rejects(asUser(captor.id, () => visit.getVisitControl(dvp.id)), /não encontrado/);
+      await assert.rejects(asUser(outsider.id, () => visit.getVisitControl(dvp.id)), /não encontrado/);
+      await assert.rejects(asUser(partner.id, () => visit.getVisitControl(dvpAluguel.id)), /à venda/);
+      await assert.rejects(asUser(partner.id, () => visit.getVisitControl("não-é-id")), /não encontrado/);
+    } finally {
+      await db.delete(dvpCertificates).where(inArray(dvpCertificates.propertyId, [venda.id, aluguel.id]));
+      await db.delete(properties).where(inArray(properties.id, [venda.id, aluguel.id]));
     }
   });
 

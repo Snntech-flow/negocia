@@ -20,6 +20,7 @@ const BillingPopup = dynamic(() => import("./BillingPopup"));
 const AdminPanel = dynamic(() => import("./AdminPanel"));
 import DialogHost from "./DialogHost";
 import PartnershipTerms from "./PartnershipTerms";
+import VisitControlPrint from "./VisitControlPrint";
 import { askConfirm, askText } from "@/lib/dialogs";
 import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
@@ -1148,6 +1149,7 @@ export default function NegociaLarApp({
                         <div><strong>Prazo de acompanhamento interno:</strong> {new Date(dvp.lockExpirationDate).toLocaleDateString("pt-BR")} <span className="text-slate-500">(não cria uma trava contratual)</span></div>
                         <div className="sm:col-span-2"><strong>Divisão informada:</strong> {dvp.commissionModel === "three_party_referral_40_40_20" ? `Captador ${dvp.captorCommissionPercent}% · corretor do comprador ${dvp.partnerCommissionPercent}% · indicador externo ${dvp.referrerCommissionPercent}% (${dvp.externalReferrerName}, CRECI ${dvp.externalReferrerCreci}${dvp.externalReferrerWhatsapp ? `, WhatsApp ${dvp.externalReferrerWhatsapp}` : ""})` : `${dvp.captorCommissionPercent}% captador · ${dvp.partnerCommissionPercent}% corretor do comprador`} <span className="text-slate-500">{dvp.commissionModel === "three_party_referral_40_40_20" ? "(aguardando confirmação dos dois corretores)" : "(condição cadastrada, a combinar entre as partes)"}</span></div>
                       </div>
+                      {currentUser?.id === dvp.partnerBrokerId && <div className="pt-1"><VisitControlPrint dvpId={dvp.id} /></div>}
                     </div>
                   ))}
                 </div>
