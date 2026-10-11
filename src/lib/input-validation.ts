@@ -1,6 +1,7 @@
 import { ActionError } from "./action-result";
 import { isBrazilianState } from "./brazil-states";
 import { CONDITIONS, DOCUMENTATION_STATUSES, GARAGE_TYPES, IPTU_PERIODS, PURPOSES, SOLAR_POSITIONS, VIEW_TYPES } from "./property-options";
+import { mesAnoValido } from "./delivery-forecast";
 
 type Input = Record<string, unknown>;
 
@@ -122,6 +123,8 @@ export function validatePropertyInput(value: unknown) {
   for (const field of ["acceptsTrade", "hideStreet", "acceptsFinancing", "acceptsPartnership"]) {
     if (input[field] != null && typeof input[field] !== "boolean") throw new ActionError(`${field} inválido.`);
   }
+  if (input.deliveryForecast != null && input.deliveryForecast !== "" && (typeof input.deliveryForecast !== "string" || !mesAnoValido(input.deliveryForecast.slice(0, 7))))
+    throw new ActionError("Informe a previsão de entrega como mês e ano.");
   list(input, "privateAmenities", "Itens privativos", 50, 120);
   list(input, "condoAmenities", "Itens do condomínio", 50, 120);
   list(input, "photos", "Fotos", 40, 2048, true);

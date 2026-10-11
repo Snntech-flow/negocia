@@ -43,6 +43,7 @@ import type { MarketplaceQuery } from "./marketplace-query";
 async function getMarketplaceDataImpl(input: MarketplaceQuery = {}) { return readMarketplaceData(input); }
 
 import * as crmActions from "./actions/crm";
+import { previsaoParaBanco } from "./delivery-forecast";
 async function createLeadImpl(...args: Parameters<typeof crmActions.createLead>) { return crmActions.createLead(...args); }
 async function importLeadsCsvImpl(...args: Parameters<typeof crmActions.importLeadsCsv>) { return crmActions.importLeadsCsv(...args); }
 async function updateLeadImpl(...args: Parameters<typeof crmActions.updateLead>) { return crmActions.updateLead(...args); }
@@ -258,6 +259,7 @@ async function createPropertyImpl(formData: PropertyInput) {
         solarPosition: formData.solarPosition || null,
         viewType: formData.viewType || null,
         propertyAge: formData.propertyAge ?? null,
+        deliveryForecast: previsaoParaBanco(formData.condition, formData.deliveryForecast),
         documentationStatus: formData.documentationStatus || null,
         acceptsFinancing,
         privateAmenities: formData.privateAmenities || [],

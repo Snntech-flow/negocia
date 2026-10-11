@@ -96,6 +96,7 @@ export async function getMarketplaceData(input: MarketplaceQuery = {}) {
         solarPosition: properties.solarPosition,
         viewType: properties.viewType,
         propertyAge: properties.propertyAge,
+        deliveryForecast: properties.deliveryForecast,
         iptuPeriod: properties.iptuPeriod,
         documentationStatus: properties.documentationStatus,
         acceptsFinancing: properties.acceptsFinancing,

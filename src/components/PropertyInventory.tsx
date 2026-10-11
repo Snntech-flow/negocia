@@ -12,7 +12,7 @@ type OwnedProperty = ActionData<Awaited<ReturnType<typeof getOwnProperties>>>["i
 type Option = { readonly id: string; readonly label: string };
 type Field = {
   key: keyof PropertyInput; label: string; required?: boolean;
-  kind?: "number" | "count" | "list" | "text" | "boolean" | "checklist" | "photos";
+  kind?: "number" | "count" | "list" | "text" | "boolean" | "checklist" | "photos" | "month";
   // Sem "Não informado" quando o campo é obrigatório na vitrine (condição) ou já tem "Não definido".
   options?: readonly Option[]; allowEmpty?: boolean; choices?: string[]; max?: number;
 };
@@ -44,6 +44,7 @@ const groups: { title: string; fields: Field[] }[] = [
     { key: "bedrooms", label: "Quartos", kind: "count", required: true }, { key: "suites", label: "Suítes", kind: "count", required: true },
     { key: "bathrooms", label: "Banheiros", kind: "count", required: true }, { key: "parkingSpots", label: "Vagas", kind: "count", required: true },
     { key: "hotelRoomsCount", label: "Quartos de hotel/pousada", kind: "count" }, { key: "propertyAge", label: "Idade do imóvel (anos)", kind: "count" },
+    { key: "deliveryForecast", label: "Previsão de entrega (só em construção ou na planta)", kind: "month" },
     { key: "garageType", label: "Garagem", options: GARAGE_TYPES, allowEmpty: true },
     { key: "solarPosition", label: "Posição solar", options: SOLAR_POSITIONS },
     { key: "viewType", label: "Vista", options: VIEW_TYPES },
@@ -165,7 +166,7 @@ export default function PropertyInventory({ reloadKey, onChanged }: { reloadKey:
                   {field.options.map(option => <option key={option.id} value={option.id}>{option.label}</option>)}
                 </select>
                 : field.kind === "text" ? <textarea id={id} name={field.key} required={field.required} rows={3} defaultValue={String(value ?? "")} className={inputClass} />
-                : <input id={id} name={field.key} required={field.required} type={["number", "count"].includes(field.kind || "") ? "number" : "text"} min={field.kind === "number" && field.required && field.key !== "splitPercentage" ? "0.01" : "0"} step={field.kind === "count" ? "1" : "0.01"} defaultValue={String(value ?? "")} className={inputClass} />}
+                : <input id={id} name={field.key} required={field.required} type={field.kind === "month" ? "month" : ["number", "count"].includes(field.kind || "") ? "number" : "text"} min={field.kind === "number" && field.required && field.key !== "splitPercentage" ? "0.01" : "0"} step={field.kind === "count" ? "1" : "0.01"} defaultValue={field.kind === "month" ? String(value ?? "").slice(0, 7) : String(value ?? "")} className={inputClass} />}
             </label>;
           })}</div>
         </div>)}

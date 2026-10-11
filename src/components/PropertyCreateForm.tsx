@@ -11,6 +11,7 @@ import {
   type Condition, type DocumentationStatus, type GarageType, type Purpose, type SolarPosition, type ViewType,
 } from "@/lib/property-options";
 import PhotoUploader from "./PhotoUploader";
+import { temPrevisaoDeEntrega } from "@/lib/delivery-forecast";
 
 export type CreatedProperty = ActionData<Awaited<ReturnType<typeof createProperty>>>["property"];
 
@@ -137,7 +138,9 @@ export default function PropertyCreateForm({ broker, blockedReason, onCreated, o
         usefulAreaM2: text("usefulAreaM2") || undefined, totalAreaM2: text("totalAreaM2") || undefined,
         areaM2: text("usefulAreaM2") || text("totalAreaM2"),
         solarPosition, viewType,
-        propertyAge: text("propertyAge") ? Number(text("propertyAge")) : undefined,
+        // Em construção/na planta: previsão de entrega (mês/ano) no lugar da idade (pedido da corretora piloto, 11/10/2026).
+        propertyAge: !temPrevisaoDeEntrega(condition) && text("propertyAge") ? Number(text("propertyAge")) : undefined,
+        deliveryForecast: temPrevisaoDeEntrega(condition) ? text("deliveryForecast") || undefined : undefined,
         condoFee: text("condoFee") || "0", iptu: text("iptu") || "0", iptuPeriod,
         acceptsFinancing: acceptsFinancing!, documentationStatus: documentationStatus || undefined,
         privateAmenities, condoAmenities,
@@ -194,7 +197,9 @@ export default function PropertyCreateForm({ broker, blockedReason, onCreated, o
         {!!parkingSpots && <Choices title="Tipo de vaga" options={GARAGE_TYPES} value={garageType} onChange={setGarageType} columns="grid-cols-2" />}
         <div><label htmlFor="pc-useful" className={label}>Área útil privativa (m²)</label><input id="pc-useful" name="usefulAreaM2" type="number" min="0.01" step="0.01" placeholder="Ex: 85" className={input} /></div>
         <div><label htmlFor="pc-total" className={label}>Área total / terreno (m²)</label><input id="pc-total" name="totalAreaM2" type="number" min="0.01" step="0.01" placeholder="Ex: 120" className={input} /></div>
-        <div><label htmlFor="pc-age" className={label}>Idade do imóvel (anos)</label><input id="pc-age" name="propertyAge" type="number" min="0" placeholder="Ex: 5" className={input} /></div>
+        {temPrevisaoDeEntrega(condition)
+          ? <div><label htmlFor="pc-delivery" className={label}>Previsão de entrega (mês/ano)</label><input id="pc-delivery" name="deliveryForecast" type="month" min="2000-01" max="2100-12" className={input} /></div>
+          : <div><label htmlFor="pc-age" className={label}>Idade do imóvel (anos)</label><input id="pc-age" name="propertyAge" type="number" min="0" placeholder="Ex: 5" className={input} /></div>}
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Choices title="Posição solar" icon={<Sun className="w-3.5 h-3.5 text-amber-400" />} options={SOLAR_POSITIONS} value={solarPosition} onChange={setSolarPosition} columns="grid-cols-2" />
@@ -253,7 +258,7 @@ export default function PropertyCreateForm({ broker, blockedReason, onCreated, o
       <div className="space-y-2">
         <p className={label}>Fotos do imóvel ({photos.length}/40) · a primeira é a capa</p>
         <PhotoUploader remaining={40 - photos.length} label="Enviar fotos do celular ou computador" onUploaded={(urls) => setPhotos((current) => [...current, ...urls].slice(0, 40))} />
-        <div className="flex gap-2"><input aria-label="Link de uma foto" value={photoUrl} onChange={(e) => setPhotoUrl(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addUrl("photo"); } }} placeholder="Ou cole o link (https://) de uma foto" className={`${input} text-xs`} /><button type="button" onClick={() => addUrl("photo")} className="bg-amber-500 hover:bg-amber-400 text-slate-950 px-4 py-2 rounded-xl text-xs font-bold">Adicionar</button></div>
+        <div className="flex gap-2"><input aria-label="Link de uma foto" value={photoUrl} onChange={(e) => setPhotoUrl(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addUrl("photo"); } }} placeholder="Ou cole o link (https://) de uma foto" className={`${input} text-xs`} /><button type="button" onClick={() => addUrl("photo")} disabled={!photoUrl.trim()} title={photoUrl.trim() ? "Adicionar a foto deste link" : "Cole o link de uma foto ao lado — para enviar do celular ou computador, use o botão acima"} className="shrink-0 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold disabled:cursor-not-allowed disabled:opacity-40">Adicionar link</button></div>
         {photos.length > 0 && <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 pt-1">{photos.map((url, index) => <div key={url + index} className="relative h-20 rounded-xl overflow-hidden border border-slate-800 bg-slate-950">
           <img src={url} alt={`Foto ${index + 1}`} className="w-full h-full object-cover" />
           <span className="absolute bottom-1 left-1 bg-slate-950/80 text-[9px] px-1 rounded text-white">{index === 0 ? "capa" : `#${index + 1}`}</span>
@@ -266,7 +271,7 @@ export default function PropertyCreateForm({ broker, blockedReason, onCreated, o
       <div className="space-y-2 pt-2 border-t border-slate-800">
         <p className={label}>Planta baixa (opcional, até 10)</p>
         <PhotoUploader remaining={10 - floorPlans.length} label="Enviar planta" onUploaded={(urls) => setFloorPlans((current) => [...current, ...urls].slice(0, 10))} />
-        <div className="flex gap-2"><input aria-label="Link da planta" value={floorPlanUrl} onChange={(e) => setFloorPlanUrl(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addUrl("plan"); } }} placeholder="Ou cole o link (https://) da planta" className={`${input} text-xs`} /><button type="button" onClick={() => addUrl("plan")} className="bg-slate-800 hover:bg-slate-700 text-white px-3 py-2 rounded-xl text-xs font-bold">Adicionar</button></div>
+        <div className="flex gap-2"><input aria-label="Link da planta" value={floorPlanUrl} onChange={(e) => setFloorPlanUrl(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addUrl("plan"); } }} placeholder="Ou cole o link (https://) da planta" className={`${input} text-xs`} /><button type="button" onClick={() => addUrl("plan")} disabled={!floorPlanUrl.trim()} title={floorPlanUrl.trim() ? "Adicionar a planta deste link" : "Cole o link da planta ao lado — para enviar do celular ou computador, use o botão acima"} className="shrink-0 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-xl text-xs font-bold disabled:cursor-not-allowed disabled:opacity-40">Adicionar link</button></div>
         {floorPlans.length > 0 && <div className="flex flex-wrap gap-2">{floorPlans.map((url, index) => <div key={url + index} className="relative h-16 w-24 rounded-lg overflow-hidden border border-slate-800">
           <img src={url} alt={`Planta ${index + 1}`} className="w-full h-full object-cover" />
           <button type="button" aria-label={`Remover planta ${index + 1}`} onClick={() => setFloorPlans(floorPlans.filter((_, i) => i !== index))} className="absolute top-1 right-1 bg-red-600 text-white p-0.5 rounded"><Trash2 className="w-3 h-3" /></button>

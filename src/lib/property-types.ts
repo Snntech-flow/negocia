@@ -31,6 +31,7 @@ export interface Property {
   solarPosition?: string | null;
   viewType?: string | null;
   propertyAge?: number | null;
+  deliveryForecast?: string | null;
   documentationStatus?: string | null;
   acceptsFinancing?: boolean;
   privateAmenities?: string[];

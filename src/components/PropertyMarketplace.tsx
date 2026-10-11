@@ -5,6 +5,7 @@ import { PROPERTY_PAGE_SIZE } from "@/lib/marketplace-query";
 import type { Property } from "@/lib/property-types";
 import { optionLabel, CONDITIONS, PURPOSES } from "@/lib/property-options";
 import Avatar from "./Avatar";
+import { previsaoParaTela } from "@/lib/delivery-forecast";
 
 export default function PropertyMarketplace({ properties, propertyTotal, propertyPage, loading, currentUserId, propertyTypes,
   propertyFilterPurpose, propertyFilterType, propertyFilterSearch, setPropertyFilterPurpose, setPropertyFilterType,
@@ -165,6 +166,7 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
                           {prop.condition && prop.condition !== "usado" && (
                             <span className="bg-emerald-700/90 backdrop-blur text-white text-[11px] font-bold px-2 py-0.5 rounded-md capitalize">
                               {optionLabel(CONDITIONS, prop.condition) || prop.condition}
+                              {prop.deliveryForecast ? ` · entrega ${previsaoParaTela(prop.deliveryForecast)}` : ""}
                             </span>
                           )}
                         </div>

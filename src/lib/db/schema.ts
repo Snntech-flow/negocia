@@ -93,6 +93,7 @@ export const properties = pgTable("properties", {
   solarPosition: text("solar_position"), // 'nascente', 'norte_sul', 'poente'
   viewType: text("view_type"), // 'frente', 'fundos', 'lagoa', 'av_principal'
   propertyAge: integer("property_age"), // Idade do imóvel (anos)
+  deliveryForecast: date("delivery_forecast", { mode: "string" }), // Previsão de entrega (dia 1 do mês) — só em construção/na planta
   iptuPeriod: text("iptu_period").default("anual"), // 'anual', 'mensal'
   
   // Situação Jurídica e Financiamento
