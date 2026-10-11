@@ -326,3 +326,22 @@ export const dvpCertificates = pgTable("dvp_certificates", {
   legalClausesAccepted: boolean("legal_clauses_accepted").default(false).notNull(),
   createdAt: timestamp("created_at").defaultNow().notNull(),
 });
+
+// Termo de Parceria com aceite eletrônico (20261011120000): cada corretor aceita o texto exato (gravado, com a impressão
+// sha-256) da versão do termo e da revisão da divisão da comissão; mudou o texto, aceita de novo.
+export const partnershipTermAcceptances = pgTable("partnership_term_acceptances", {
+  id: uuid("id").defaultRandom().primaryKey(),
+  partnershipId: uuid("partnership_id").references(() => partnerships.id, { onDelete: "cascade" }).notNull(),
+  userId: uuid("user_id").references(() => users.id).notNull(),
+  termVersion: text("term_version").notNull(),
+  commissionRevision: integer("commission_revision").notNull(),
+  textHash: text("text_hash").notNull(),
+  termText: text("term_text").notNull(),
+  acceptedAt: timestamp("accepted_at").defaultNow().notNull(),
+  ip: text("ip"),
+  userAgent: text("user_agent"),
+}, (table) => ({
+  partnershipIdx: index("partnership_term_acceptances_partnership_idx").on(table.partnershipId),
+  uniqueAcceptance: uniqueIndex("partnership_term_acceptances_unique")
+    .on(table.partnershipId, table.userId, table.textHash),
+}));

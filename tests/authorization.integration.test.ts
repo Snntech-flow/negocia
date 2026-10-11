@@ -49,16 +49,18 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
   process.env.NEGOCIAR_LAR_SESSION_SECRET = "test-only-session-secret-at-least-32-bytes";
   (globalThis as typeof globalThis & { AsyncLocalStorage: typeof NodeAsyncLocalStorage }).AsyncLocalStorage = NodeAsyncLocalStorage;
 
-  const [{ db, users, leads, buyerProfiles, transactions, notifications, properties, partnerships, authLoginAttempts, brokerFinanceEntries }, { and, eq, inArray, ne }, { workAsyncStorage }, { workUnitAsyncStorage }, rawActions, rawFinance] = await Promise.all([
+  const [{ db, users, leads, buyerProfiles, transactions, notifications, properties, partnerships, partnershipActivities, partnershipTermAcceptances, authLoginAttempts, brokerFinanceEntries }, { and, eq, inArray, ne }, { workAsyncStorage }, { workUnitAsyncStorage }, rawActions, rawFinance, rawTerms] = await Promise.all([
     import("../src/lib/db"),
     import("drizzle-orm"),
     import("next/dist/server/app-render/work-async-storage.external"),
     import("next/dist/server/app-render/work-unit-async-storage.external"),
     import("../src/lib/actions"),
     import("../src/lib/actions/finance"),
+    import("../src/lib/actions/partnership-terms"),
   ]);
   const actions = strict(rawActions);
   const finance = strict(rawFinance);
+  const terms = strict(rawTerms);
 
   const suffix = cryptoRandomSuffix();
   const registeredIds: string[] = [];
@@ -797,6 +799,79 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
       assert.equal((await db.select().from(brokerFinanceEntries).where(eq(brokerFinanceEntries.partnershipId, partnership.id))).length, 2);
     } finally {
       await db.delete(brokerFinanceEntries).where(inArray(brokerFinanceEntries.ownerUserId, [captor.id, partner.id]));
+      await db.delete(partnerships).where(eq(partnerships.propertyId, property.id));
+      await db.delete(properties).where(eq(properties.id, property.id));
+    }
+  });
+
+  await t.test("Termo de Parceria: só captador e parceiro aceitam, o texto aceito é conferido e gravado, e assinado vale o texto gravado", async () => {
+    const broker = (n: number) => ({
+      name: `Teste Termo ${n}`, email: `term${n}-${suffix}@example.test`, creci: `${4 + n}${suffix.slice(0, 6)}T`, whatsapp: `1199999003${n}`,
+      city: "Salvador", state: "BA", role: "corretor", verificationStatus: "aprovado", subscriptionStatus: "ativo", nextBillingDate: null, plan: "10",
+    });
+    const [captor] = await db.insert(users).values(broker(1)).returning();
+    const [partner] = await db.insert(users).values(broker(2)).returning();
+    const [outsider] = await db.insert(users).values(broker(3)).returning();
+    registeredIds.push(captor.id, partner.id, outsider.id);
+    const [property] = await db.insert(properties).values({ brokerId: captor.id, title: "Casa do termo", propertyType: "Casa Solta", salePrice: "500000",
+      city: "Salvador", neighborhood: "Centro", bedrooms: 3, parkingSpots: 2, areaM2: "150", description: "Teste", confidentialAddress: "Endereço fictício",
+      ownerName: "Pessoa fictícia", ownerPhone: "11900003344", acceptsPartnership: true, status: "disponivel", purpose: "venda" }).returning();
+    const previousVercel = process.env.VERCEL; process.env.VERCEL = "1";
+    try {
+      const [partnership] = await db.insert(partnerships).values({ propertyId: property.id, captorBrokerId: captor.id, partnerBrokerId: partner.id,
+        status: "em_negociacao", commissionStatus: "aguardando_aceites" }).returning();
+      const doCorretor = async (userId: string) => (await asUser(userId, () => terms.listMyPartnershipTerms())).find((item) => item.id === partnership.id);
+      const sha = (texto: string) => createHash("sha256").update(texto, "utf8").digest("hex");
+
+      // Divisão ainda não confirmada pelos dois: não há termo.
+      assert.equal((await doCorretor(partner.id))?.termo, null);
+      await assert.rejects(asUser(partner.id, () => terms.acceptPartnershipTerm(partnership.id, "0".repeat(64))), /confirmam a divisão/);
+
+      await db.update(partnerships).set({ commissionStatus: "confirmada" }).where(eq(partnerships.id, partnership.id));
+      const lido = (await doCorretor(partner.id))!;
+      assert.ok(lido.termo && !lido.termo.assinado && lido.podeAceitar);
+      assert.match(lido.termo.texto, /CAPTADOR: Teste Termo 1, CRECI .*\/BA\.[\s\S]*"Casa do termo"[\s\S]*CAPTADOR 50% e PARCEIRO 50%/);
+      assert.equal(lido.termo.impressao, sha(lido.termo.texto));
+
+      // Quem não é da parceria não vê nem aceita.
+      assert.equal(await doCorretor(outsider.id), undefined);
+      await assert.rejects(asUser(outsider.id, () => terms.acceptPartnershipTerm(partnership.id, lido.termo!.impressao)), /não encontrada/);
+      await assert.rejects(asUser(partner.id, () => terms.acceptPartnershipTerm(partnership.id, "f".repeat(64))), /mudou enquanto você lia/);
+      assert.equal((await db.select().from(partnershipTermAcceptances).where(eq(partnershipTermAcceptances.partnershipId, partnership.id))).length, 0);
+
+      const primeiro = await asUser(partner.id, () => terms.acceptPartnershipTerm(partnership.id, lido.termo!.impressao), { address: "200.10.20.30" });
+      assert.deepEqual(primeiro, { jaAceito: false, assinado: false });
+      const [gravado] = await db.select().from(partnershipTermAcceptances).where(eq(partnershipTermAcceptances.partnershipId, partnership.id));
+      assert.deepEqual([gravado.userId, gravado.termVersion, gravado.commissionRevision, gravado.textHash, gravado.termText, gravado.ip],
+        [partner.id, "1", 1, lido.termo.impressao, lido.termo.texto, "200.10.20.30"]);
+      assert.deepEqual(await asUser(partner.id, () => terms.acceptPartnershipTerm(partnership.id, lido.termo!.impressao)), { jaAceito: true, assinado: false });
+      const [aviso] = await db.select().from(notifications).where(and(eq(notifications.userId, captor.id), eq(notifications.title, "Termo de Parceria aceito pelo outro corretor")));
+      assert.match(aviso.message, /Teste Termo 2 aceitou .*"Casa do termo"/);
+
+      // O cadastro do imóvel mudou antes do captador aceitar: texto novo, o parceiro precisa aceitar de novo.
+      await db.update(properties).set({ title: "Casa do termo reformada" }).where(eq(properties.id, property.id));
+      const mudou = (await doCorretor(captor.id))!;
+      assert.notEqual(mudou.termo!.impressao, lido.termo.impressao);
+      assert.deepEqual([mudou.termo!.captador.situacao, mudou.termo!.parceiro.situacao], ["pendente", "texto_anterior"]);
+      assert.deepEqual(await asUser(captor.id, () => terms.acceptPartnershipTerm(partnership.id, mudou.termo!.impressao)), { jaAceito: false, assinado: false });
+      assert.deepEqual(await asUser(partner.id, () => terms.acceptPartnershipTerm(partnership.id, mudou.termo!.impressao)), { jaAceito: false, assinado: true });
+
+      // Assinado: vale o texto gravado, mesmo que o imóvel mude de novo; ninguém aceita outra vez.
+      await db.update(properties).set({ title: "Outro título depois da assinatura" }).where(eq(properties.id, property.id));
+      const assinado = (await doCorretor(captor.id))!;
+      assert.deepEqual([assinado.termo!.assinado, assinado.termo!.impressao, assinado.podeAceitar], [true, mudou.termo!.impressao, false]);
+      assert.match(assinado.termo!.texto, /"Casa do termo reformada"/);
+      await assert.rejects(asUser(captor.id, () => terms.acceptPartnershipTerm(partnership.id, mudou.termo!.impressao)), /já aceitaram/);
+      const linha = await db.select({ status: partnershipActivities.newStatus }).from(partnershipActivities).where(eq(partnershipActivities.partnershipId, partnership.id));
+      assert.deepEqual(linha.map((a) => a.status).sort(), ["termo_aceito", "termo_aceito", "termo_aceito_ambos"]);
+      await assert.rejects(db.insert(partnershipTermAcceptances).values({ partnershipId: partnership.id, userId: captor.id, termVersion: "1", commissionRevision: 1,
+        textHash: mudou.termo!.impressao, termText: "duplicado" }), (error: { cause?: { code?: string } }) => error.cause?.code === "23505", "um aceite por corretor e texto");
+
+      // Divisão revisada: o termo assinado era da revisão 1; a revisão 2 precisa de confirmação e de termo novo.
+      await asUser(captor.id, () => actions.revisePartnershipCommission(partnership.id, { commissionModel: "three_party_referral_40_40_20", externalReferrerName: "Indicador Teste", externalReferrerCreci: "TESTE-02" }));
+      assert.equal((await doCorretor(partner.id))!.termo, null);
+    } finally {
+      if (previousVercel === undefined) delete process.env.VERCEL; else process.env.VERCEL = previousVercel;
       await db.delete(partnerships).where(eq(partnerships.propertyId, property.id));
       await db.delete(properties).where(eq(properties.id, property.id));
     }

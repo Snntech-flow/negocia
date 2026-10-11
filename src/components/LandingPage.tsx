@@ -363,9 +363,9 @@ export default function LandingPage({
               <div className="w-10 h-10 rounded-lg bg-amber-50 text-amber-700 flex items-center justify-center font-bold text-sm border border-amber-200">
                 4
               </div>
-              <h4 className="font-bold text-slate-900 text-sm">Condições da parceria</h4>
+              <h4 className="font-bold text-slate-900 text-sm">Termo de Parceria</h4>
               <p className="text-xs text-slate-600 leading-relaxed">
-                A divisão e os termos da parceria precisam ser acordados e formalizados pelas partes. Registrem as condições e formalizem o contrato entre as partes.
+                Os dois corretores confirmam a divisão da comissão e a plataforma gera o Termo de Parceria, com cláusula de não atravessamento. Cada um aceita na NegociaLar, que registra data, hora e IP; depois é só imprimir ou salvar em PDF.
               </p>
             </div>
           </div>

@@ -19,6 +19,7 @@ const SubscriptionPanel = dynamic(() => import("./SubscriptionPanel"));
 const BillingPopup = dynamic(() => import("./BillingPopup"));
 const AdminPanel = dynamic(() => import("./AdminPanel"));
 import DialogHost from "./DialogHost";
+import PartnershipTerms from "./PartnershipTerms";
 import { askConfirm, askText } from "@/lib/dialogs";
 import React, { useEffect, useRef, useState } from "react";
 import Image from "next/image";
@@ -175,7 +176,7 @@ const SCREEN_GUIDANCE: Record<string, { title: string; description: string }> = 
   vitrine: { title: "Vitrine de imóveis compartilhados (MLS)", description: "MLS é uma rede em que corretores compartilham imóveis e oportunidades. Consulte as condições com o captador; o endereço completo e os dados do proprietário ficam restritos a ele." },
   crm: { title: "CRM interno do corretor", description: "Organize clientes e parceiros, acompanhe cada oportunidade por etapa, registre contatos e programe retornos. Os leads ficam privados na sua carteira." },
   radar: { title: "Radar de Compradores", description: "Compare as preferências de compradores cadastrados com os imóveis disponíveis. Confira os critérios do match antes de falar com o corretor responsável." },
-  termo: { title: "Termo de Parceria", description: "Veja um exemplo de como uma parceria pode ser combinada. Esta tela não coleta o aceite dos corretores nem gera contrato; formalizem o acordo fora da plataforma." },
+  termo: { title: "Termo de Parceria", description: "O termo de cada parceria sai com a divisão da comissão confirmada pelos dois corretores. Leia, aceite e acompanhe o aceite do outro; assinado, imprima ou salve em PDF." },
   dvp: { title: "Registro de visita · DVP", description: "Salve os dados da visita para consulta e acompanhamento. O rascunho não é assinado por ninguém, não confirma um acordo e não garante comissão." },
   cadastrar: { title: "Meus imóveis", description: "Edite, arquive ou cadastre imóveis e suas condições de parceria. Os dados completos de endereço e do proprietário ficam visíveis apenas para o corretor captador." },
   admin: { title: "Corretores e pagamentos", description: "Aprove CRECIs e confirme ou estorne pagamentos via Pix. O pagamento é conferido manualmente no extrato do banco." },
@@ -759,7 +760,7 @@ export default function NegociaLarApp({
           {[
             { title: "CRM", active: ["crm", "radar"], items: [{ id: "crm", label: "Minha carteira", icon: Users }, { id: "radar", label: "Radar de Compradores", icon: Radar }] },
             { title: "Atendimento", active: ["atendimento"], items: [{ id: "atendimento", label: "Funil de atendimento", icon: Users }] },
-            { title: "Documentos", active: ["termo", "dvp"], items: [{ id: "termo", label: "Prévia do Termo de Parceria", icon: FileText }, { id: "dvp", label: "Registro de Visita", icon: Stamp }] },
+            { title: "Documentos", active: ["termo", "dvp"], items: [{ id: "termo", label: "Termo de Parceria", icon: FileText }, { id: "dvp", label: "Registro de Visita", icon: Stamp }] },
             { title: "Imóveis", active: ["cadastrar"], items: [{ id: "cadastrar", label: "Meus imóveis", icon: PlusCircle }] },
             { title: "Financeiro", active: ["financeiro"], items: [{ id: "financeiro", label: "Receitas e despesas", icon: Wallet }] },
             ...(currentUser?.role === "admin" ? [{ title: "Administração", active: ["admin"], items: [{ id: "admin", label: "Corretores e pagamentos", icon: UserCheck }] }] : []),
@@ -909,62 +910,8 @@ export default function NegociaLarApp({
           </div>
         )}
 
-        {/* TAB 3: TERMO DE CO-CORRETAGEM ANTI-BYPASS */}
-        {workspaceReady && activeTab === "termo" && (
-          <div className="max-w-3xl mx-auto space-y-6">
-            <div>
-              <h2 className="text-xl font-bold text-white flex items-center gap-2">
-                <Scale className="w-5 h-5 text-amber-500" />
-                Termo de Parceria com Cláusula Anti-Atravessamento (Anti-Bypass)
-              </h2>
-              <p className="text-sm text-slate-400">
-                Prévia demonstrativa de um futuro termo. Ainda não há aceite eletrônico nem contrato emitido pelo sistema.
-              </p>
-            </div>
-
-            {/* Alerta de Proteção */}
-            <div className="bg-red-950/30 border border-red-500/40 p-4 rounded-2xl flex items-start gap-3">
-              <AlertTriangle className="w-5 h-5 text-red-400 shrink-0 mt-0.5" />
-              <div className="text-xs space-y-1 text-slate-300">
-                  <span className="font-bold text-amber-300">MODELO DEMONSTRATIVO:</span>
-                <p>
-                  Este texto de exemplo não foi aceito pelas partes e não gera obrigações. As condições da parceria precisam ser revisadas e formalizadas fora do sistema.
-                </p>
-              </div>
-            </div>
-
-            <div className="bg-slate-900 rounded-2xl border border-slate-800 p-6 space-y-6">
-              {/* Cabeçalho do Contrato */}
-              <div className="text-center pb-4 border-b border-slate-800">
-                <div className="text-xs font-mono text-amber-400 uppercase tracking-widest font-bold">
-                  RASCUNHO DE TERMO DE PARCERIA — SEM VALIDADE CONTRATUAL
-                </div>
-                <div className="text-xs text-slate-400 mt-1">
-                  Prévia demonstrativa. Consulte assessoria jurídica para definir cláusulas aplicáveis.
-                </div>
-              </div>
-
-              {/* Partes Envolvidas */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                  <div className="text-xs text-amber-400 font-bold mb-1">CORRETOR CAPTADOR</div>
-                  {activeProperty ? <><div className="text-sm font-semibold text-white">{activeProperty.broker.name}</div><div className="text-xs text-slate-400">CRECI {activeProperty.broker.creci} · {activeProperty.title}</div></>
-                    : <div className="text-xs text-slate-400">O captador do imóvel escolhido na Vitrine.</div>}
-                </div>
-
-                <div className="bg-slate-950 p-4 rounded-xl border border-slate-800">
-                  <div className="text-xs text-amber-400 font-bold mb-1">CORRETOR PARCEIRO</div>
-                  <div className="text-sm font-semibold text-white">{currentBroker.name}</div>
-                  <div className="text-xs text-slate-400">CRECI {currentBroker.creci}</div>
-                </div>
-              </div>
-
-              <div className="rounded-xl border border-red-500/40 bg-red-950/30 p-4 text-center text-xs leading-relaxed text-slate-300">
-                O aceite eletrônico ainda não está disponível. Esta tela é apenas uma prévia para conversa; revise e formalize qualquer parceria fora da plataforma.
-              </div>
-            </div>
-          </div>
-        )}
+        {/* TAB 3: TERMO DE PARCERIA (aceite eletrônico dos dois corretores) */}
+        {workspaceReady && activeTab === "termo" && <PartnershipTerms />}
 
         {/* TAB 4: DVP DIGITAL (DOCUMENTO DE VISITA PRESENCIAL) */}
         {workspaceReady && activeTab === "dvp" && (
@@ -1217,7 +1164,7 @@ export default function NegociaLarApp({
                 <div className="space-y-3">
                   {partnershipList.map((partnership) => {
                     const transitions: Record<string, string[]> = { proposta: ["visita_agendada", "recusado"], visita_agendada: ["em_negociacao", "recusado"], em_negociacao: ["fechado", "recusado"] };
-                    const labels: Record<string, string> = { proposta: "Proposta", visita_agendada: "Visita agendada", em_negociacao: "Em negociação", fechado: "Encerrada como fechada", recusado: "Recusada", divisao_confirmada: "Divisão confirmada por um corretor", divisao_recusada: "Divisão não aceita" };
+                    const labels: Record<string, string> = { proposta: "Proposta", visita_agendada: "Visita agendada", em_negociacao: "Em negociação", fechado: "Encerrada como fechada", recusado: "Recusada", divisao_confirmada: "Divisão confirmada por um corretor", divisao_confirmada_um: "Divisão confirmada por um corretor", divisao_confirmada_ambos: "Divisão confirmada pelos dois", divisao_recusada: "Divisão não aceita", divisao_revisada: "Divisão revisada", termo_aceito: "Termo de Parceria aceito", termo_aceito_ambos: "Termo de Parceria assinado pelos dois" };
                     const nextStatuses = transitions[partnership.status] || [];
                     const history = partnershipActivityList.filter((activity) => activity.partnershipId === partnership.id);
                     return <article key={partnership.id} className="rounded-xl border border-slate-800 bg-slate-950 p-4">
