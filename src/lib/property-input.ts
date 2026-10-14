@@ -1,5 +1,6 @@
 import { ActionError } from "./action-result";
 import { percentualDoCaptador, type PartnershipModels } from "./partnership-models";
+import { capaDasFotos } from "./photo-order";
 import { validatePropertyInput } from "./input-validation";
 import { previsaoParaBanco } from "./delivery-forecast";
 
@@ -75,6 +76,8 @@ export function propertyChanges(input: PropertyInput) {
     hideStreet: input.hideStreet ?? true, condoFee: input.condoFee || "0", iptu: input.iptu || "0",
     iptuPeriod: input.iptuPeriod || "anual", state: input.state ? input.state.toUpperCase() : null, garageType: input.garageType || null,
     photos: input.photos || [], floorPlanPhotos: input.floorPlanPhotos || [],
+    // A capa é a primeira foto (14/10/2026): antes a edição não mandava a capa e gravava vazio.
+    coverPhoto: capaDasFotos(input.photos),
     privateAmenities: input.privateAmenities || [], condoAmenities: input.condoAmenities || [],
     // Previsão de entrega só em construção/na planta; trocar a condição para pronto/usado apaga a previsão.
     deliveryForecast: previsaoParaBanco(input.condition || "usado", input.deliveryForecast),

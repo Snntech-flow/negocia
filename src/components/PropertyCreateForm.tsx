@@ -2,7 +2,7 @@
 
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
 import { OPCOES_DE_CONDICAO, type PartnershipModels } from "@/lib/partnership-models";
-import { Building2, CheckSquare, DollarSign, Eye, Home, Image as ImageIcon, Layers, Lock, MapPin, PlusCircle, Search, Square, Sun, Trash2, Users, Video } from "lucide-react";
+import { Building2, CheckSquare, DollarSign, Eye, Home, Image as ImageIcon, Layers, Lock, MapPin, PlusCircle, Search, Square, Sun, Users, Video } from "lucide-react";
 import { createProperty } from "@/lib/actions";
 import { unwrap, type ActionData } from "@/lib/action-result";
 import { BRAZILIAN_STATES, isBrazilianState } from "@/lib/brazil-states";
@@ -12,6 +12,7 @@ import {
   type Condition, type DocumentationStatus, type GarageType, type Purpose, type SolarPosition, type ViewType,
 } from "@/lib/property-options";
 import PhotoUploader from "./PhotoUploader";
+import PhotoGrid from "./PhotoGrid";
 import { temPrevisaoDeEntrega } from "@/lib/delivery-forecast";
 
 export type CreatedProperty = ActionData<Awaited<ReturnType<typeof createProperty>>>["property"];
@@ -152,7 +153,7 @@ export default function PropertyCreateForm({ broker, blockedReason, onCreated, o
         condoName: text("condoName") || undefined, streetNumber: number || undefined, block: block || undefined, floor: floor || undefined,
         confidentialAddress,
         videoUrl: text("videoUrl") || undefined,
-        coverPhoto: photos[0], photos, floorPlanPhotos: floorPlans,
+        photos, floorPlanPhotos: floorPlans,
         description: text("description"),
         ownerName: text("ownerName"), ownerPhone: text("ownerPhone"),
         acceptsPartnership, partnershipModels: partnershipModels ?? undefined, confirmaParceria: acceptsPartnership && confirmaParceria,
@@ -263,23 +264,13 @@ export default function PropertyCreateForm({ broker, blockedReason, onCreated, o
         <p className={label}>Fotos do imóvel ({photos.length}/40) · a primeira é a capa</p>
         <PhotoUploader remaining={40 - photos.length} label="Enviar fotos do celular ou computador" onUploaded={(urls) => setPhotos((current) => [...current, ...urls].slice(0, 40))} />
         <div className="flex gap-2"><input aria-label="Link de uma foto" value={photoUrl} onChange={(e) => setPhotoUrl(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addUrl("photo"); } }} placeholder="Ou cole o link (https://) de uma foto" className={`${input} text-xs`} /><button type="button" onClick={() => addUrl("photo")} disabled={!photoUrl.trim()} title={photoUrl.trim() ? "Adicionar a foto deste link" : "Cole o link de uma foto ao lado — para enviar do celular ou computador, use o botão acima"} className="shrink-0 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold disabled:cursor-not-allowed disabled:opacity-40">Adicionar link</button></div>
-        {photos.length > 0 && <div className="grid grid-cols-3 sm:grid-cols-6 gap-2 pt-1">{photos.map((url, index) => <div key={url + index} className="relative h-20 rounded-xl overflow-hidden border border-slate-800 bg-slate-950">
-          <img src={url} alt={`Foto ${index + 1}`} className="w-full h-full object-cover" />
-          <span className="absolute bottom-1 left-1 bg-slate-950/80 text-[9px] px-1 rounded text-white">{index === 0 ? "capa" : `#${index + 1}`}</span>
-          <div className="absolute top-1 right-1 flex gap-1">
-            {index > 0 && <button type="button" onClick={() => setPhotos([url, ...photos.filter((_, i) => i !== index)])} className="bg-slate-950/80 text-white text-[9px] px-1 rounded">capa</button>}
-            <button type="button" aria-label={`Remover foto ${index + 1}`} onClick={() => setPhotos(photos.filter((_, i) => i !== index))} className="bg-red-600 text-white p-0.5 rounded"><Trash2 className="w-3 h-3" /></button>
-          </div>
-        </div>)}</div>}
+        <PhotoGrid fotos={photos} onChange={setPhotos} />
       </div>
       <div className="space-y-2 pt-2 border-t border-slate-800">
         <p className={label}>Planta baixa (opcional, até 10)</p>
         <PhotoUploader remaining={10 - floorPlans.length} label="Enviar planta" onUploaded={(urls) => setFloorPlans((current) => [...current, ...urls].slice(0, 10))} />
         <div className="flex gap-2"><input aria-label="Link da planta" value={floorPlanUrl} onChange={(e) => setFloorPlanUrl(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addUrl("plan"); } }} placeholder="Ou cole o link (https://) da planta" className={`${input} text-xs`} /><button type="button" onClick={() => addUrl("plan")} disabled={!floorPlanUrl.trim()} title={floorPlanUrl.trim() ? "Adicionar a planta deste link" : "Cole o link da planta ao lado — para enviar do celular ou computador, use o botão acima"} className="shrink-0 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-xl text-xs font-bold disabled:cursor-not-allowed disabled:opacity-40">Adicionar link</button></div>
-        {floorPlans.length > 0 && <div className="flex flex-wrap gap-2">{floorPlans.map((url, index) => <div key={url + index} className="relative h-16 w-24 rounded-lg overflow-hidden border border-slate-800">
-          <img src={url} alt={`Planta ${index + 1}`} className="w-full h-full object-cover" />
-          <button type="button" aria-label={`Remover planta ${index + 1}`} onClick={() => setFloorPlans(floorPlans.filter((_, i) => i !== index))} className="absolute top-1 right-1 bg-red-600 text-white p-0.5 rounded"><Trash2 className="w-3 h-3" /></button>
-        </div>)}</div>}
+        <PhotoGrid fotos={floorPlans} onChange={setFloorPlans} nome="Planta" capa={false} />
       </div>
       <div className="pt-2 border-t border-slate-800"><label htmlFor="pc-video" className={`${label} flex items-center gap-1.5`}><Video className="w-3.5 h-3.5 text-amber-400" />Link do vídeo (YouTube, Vimeo ou tour 360)</label><input id="pc-video" name="videoUrl" type="url" placeholder="https://" className={`${input} text-xs`} /></div>
       <div className="space-y-3 pt-2 border-t border-slate-800">

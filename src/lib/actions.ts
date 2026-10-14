@@ -2,6 +2,7 @@
 
 import { ActionError, isUniqueViolation, runAction } from "./action-result";
 import { conferirDivisao, ehCondicaoValida, percentualDoCaptador } from "./partnership-models";
+import { capaDasFotos } from "./photo-order";
 
 import { validateNegotiationDocuments, type NegotiationDocuments } from "./negotiation-documents";
 
@@ -273,7 +274,7 @@ async function createPropertyImpl(formData: PropertyInput) {
         condoAmenities: formData.condoAmenities || [],
         description: formData.description,
         videoUrl: formData.videoUrl || null,
-        coverPhoto: formData.coverPhoto || formData.photos?.[0] || null,
+        coverPhoto: capaDasFotos(formData.photos), // a primeira foto é a capa
         photos: formData.photos || [],
         floorPlanPhotos: formData.floorPlanPhotos || [],
         confidentialAddress: formData.confidentialAddress,

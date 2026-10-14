@@ -183,6 +183,7 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
 
   await t.test("carteira permite edição e arquivamento apenas pelo dono, com controle de versão", async () => {
     const inventory = strict(await import("../src/lib/actions/property-inventory"));
+    const [fotoSala, fotoFachada] = ["https://fotos.exemplo.test/sala.jpg", "https://fotos.exemplo.test/fachada.jpg"];
     const form = { title: "Imóvel editável", propertyType: "Apartamento", salePrice: "550000", city: "São Paulo", neighborhood: "Centro",
       bedrooms: 2, suites: 1, bathrooms: 2, parkingSpots: 1, areaM2: "80", description: "Descrição original",
       confidentialAddress: "Rua protegida, 123", ownerName: "Proprietário privado", ownerPhone: "11933332222",
@@ -199,8 +200,12 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
       assert.equal(own.items[0].ownerName, form.ownerName);
       const saved = await asUser(otherBroker.id, () => inventory.updateOwnProperty(property.id, revision,
         { ...form, title: "Título atualizado", salePrice: "575000", hideStreet: false, propertyAge: 0, ownerPhone: "11944443333",
-          brokerId: owner.id, status: "vendido", partnershipModels: "ambos", confirmaParceria: true } as typeof form));
+          brokerId: owner.id, status: "vendido", partnershipModels: "ambos", confirmaParceria: true,
+          photos: [fotoSala, fotoFachada], coverPhoto: fotoFachada } as unknown as typeof form));
       assert.equal(saved.property.title, "Título atualizado");
+      // a ordem da grade é a gravada e a capa é a primeira foto — a capa mandada pelo navegador não manda
+      assert.deepEqual(saved.property.photos, [fotoSala, fotoFachada]);
+      assert.equal(saved.property.coverPhoto, fotoSala);
       assert.equal(saved.property.brokerId, otherBroker.id);
       assert.equal(saved.property.status, "disponivel");
       assert.equal(saved.property.propertyAge, 0);
@@ -219,6 +224,10 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
       const visible = await asUser(admin.id, () => actions.getMarketplaceData({ section: "vitrine", search: "Título atualizado" }));
       assert.ok(visible.properties.some(item => item.id === property.id));
       await assert.rejects(asUser(owner.id, () => inventory.updateOwnPropertyStatus(property.id, restored.property.updatedAt.toISOString(), "disponivel")), /assinatura/);
+      // imóvel editado antes de 14/10/2026 ficou com a capa vazia: a Vitrine e o CRM mostram a primeira foto
+      await db.update(properties).set({ coverPhoto: null }).where(eq(properties.id, property.id));
+      const semCapa = await asUser(admin.id, () => actions.getMarketplaceData({ section: "vitrine", search: "Título atualizado" }));
+      assert.equal(semCapa.properties.find(item => item.id === property.id)?.coverPhoto, fotoSala);
     } finally { await db.delete(properties).where(eq(properties.id, property.id)); }
   });
 

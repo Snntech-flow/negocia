@@ -111,7 +111,8 @@ export async function getMarketplaceData(input: MarketplaceQuery = {}) {
         condoName: sql<string | null>`CASE WHEN ${ownsProperty} THEN ${properties.condoName} ELSE NULL END`,
         hideStreet: properties.hideStreet,
         videoUrl: properties.videoUrl,
-        coverPhoto: properties.coverPhoto,
+        // imóvel editado antes de 14/10/2026 ficou com a capa vazia: vale a primeira foto
+        coverPhoto: sql<string | null>`coalesce(${properties.coverPhoto}, ${properties.photos}->>0)`,
         floorPlanPhotos: properties.floorPlanPhotos,
         acceptsPartnership: properties.acceptsPartnership,
         splitPercentage: properties.splitPercentage,

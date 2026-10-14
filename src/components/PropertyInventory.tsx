@@ -7,6 +7,7 @@ import { BRAZILIAN_STATES } from "@/lib/brazil-states";
 import { PROPERTY_STATUS_LABELS, PROPERTY_STATUSES, type PropertyInput, type PropertyStatus } from "@/lib/property-input";
 import { CONDITIONS, CONDO_AMENITIES_GROUPS, DOCUMENTATION_STATUSES, GARAGE_TYPES, IPTU_PERIODS, PRIVATE_AMENITIES_LIST, PURPOSES, SOLAR_POSITIONS, VIEW_TYPES } from "@/lib/property-options";
 import PhotoUploader from "./PhotoUploader";
+import PhotoGrid from "./PhotoGrid";
 import { OPCOES_DE_CONDICAO, rotuloDaCondicao } from "@/lib/partnership-models";
 
 type OwnedProperty = ActionData<Awaited<ReturnType<typeof getOwnProperties>>>["items"][number];
@@ -67,16 +68,34 @@ const groups: { title: string; fields: Field[] }[] = [
     { key: "floorPlanPhotos", label: "Plantas (até 10)", kind: "photos", max: 10 },
   ] },
 ];
+const linkHttps = (value: string) => { try { return new URL(value).protocol === "https:"; } catch { return false; } };
 const inputClass = "mt-1 w-full rounded-lg border border-slate-300 bg-white p-2.5 text-sm text-slate-900";
 
+// Fotos e plantas na edição: grade com troca de posição (a primeira foto é a capa), envio do aparelho e link colado.
+// O formulário grava a lista na ordem da grade, uma URL por linha, pelo campo escondido.
 function PhotoListField({ field, initial }: { field: Field; initial: string[] }) {
-  const [text, setText] = useState(initial.join("\n"));
-  const urls = text.split(/\r?\n/).map((value) => value.trim()).filter(Boolean);
+  const [urls, setUrls] = useState(initial);
+  const [link, setLink] = useState("");
+  const [erro, setErro] = useState("");
+  const max = field.max || 40;
+  const fotos = field.key === "photos";
+  function adicionarLink() {
+    const valor = link.trim();
+    if (!valor) return;
+    if (!linkHttps(valor)) { setErro("Cole um link que comece com https://"); return; }
+    if (urls.length >= max) { setErro(`Limite de ${max} atingido.`); return; }
+    setUrls([...urls, valor]); setLink(""); setErro("");
+  }
   return <div className="sm:col-span-2 space-y-2">
-    <label htmlFor={`edit-${field.key}`} className="block text-sm font-semibold text-slate-700">{field.label} · {urls.length}/{field.max}
-      <textarea id={`edit-${field.key}`} name={field.key} rows={3} value={text} onChange={(event) => setText(event.target.value)} placeholder="Uma URL HTTPS por linha" className={inputClass} />
-    </label>
-    <PhotoUploader remaining={(field.max || 40) - urls.length} label={field.key === "photos" ? "Enviar fotos do imóvel" : "Enviar fotos da planta"} onUploaded={(added) => setText((current) => [current.trim(), ...added].filter(Boolean).join("\n"))} />
+    <p className="text-sm font-semibold text-slate-700">{field.label} · {urls.length}/{max}{fotos ? " · a primeira é a capa" : ""}</p>
+    <textarea name={field.key} value={urls.join("\n")} readOnly hidden />
+    <PhotoGrid fotos={urls} onChange={setUrls} nome={fotos ? "Foto" : "Planta"} capa={fotos} />
+    <PhotoUploader remaining={max - urls.length} label={fotos ? "Enviar fotos do imóvel" : "Enviar fotos da planta"} onUploaded={(added) => setUrls((current) => [...current, ...added].slice(0, max))} />
+    <div className="flex gap-2">
+      <input aria-label={fotos ? "Link de uma foto" : "Link da planta"} value={link} onChange={(event) => setLink(event.target.value)} onKeyDown={(event) => { if (event.key === "Enter") { event.preventDefault(); adicionarLink(); } }} placeholder={fotos ? "Ou cole o link (https://) de uma foto" : "Ou cole o link (https://) da planta"} className="w-full rounded-lg border border-slate-300 bg-white p-2.5 text-xs text-slate-900" />
+      <button type="button" onClick={adicionarLink} disabled={!link.trim()} className="shrink-0 rounded-lg border border-slate-300 bg-white px-4 py-2 text-xs font-bold text-slate-700 hover:bg-slate-50 disabled:cursor-not-allowed disabled:opacity-40">Adicionar link</button>
+    </div>
+    {erro && <p role="alert" className="text-xs text-red-700">{erro}</p>}
   </div>;
 }
 
