@@ -1,4 +1,5 @@
 import { ActionError } from "./action-result";
+import { percentualDoCaptador, type PartnershipModels } from "./partnership-models";
 import { validatePropertyInput } from "./input-validation";
 import { previsaoParaBanco } from "./delivery-forecast";
 
@@ -52,7 +53,12 @@ export interface PropertyInput {
   ownerName: string;
   ownerPhone: string;
   acceptsPartnership: boolean;
-  splitPercentage: string;
+  /** Mantido por compatibilidade: o servidor calcula pela condição (50 ou 40). */
+  splitPercentage?: string;
+  /** Condição de parceria: só 50/50, só 40/40/20 ou as duas (src/lib/partnership-models.ts). */
+  partnershipModels?: PartnershipModels;
+  /** "Confirmo que este imóvel aceita parceria nas condições informadas" — publicar na rede exige. */
+  confirmaParceria?: boolean;
 }
 
 // Explicit allowlist prevents incoming brokerId, status or timestamps being applied.
@@ -60,7 +66,7 @@ const keys = ["title", "propertyType", "salePrice", "purpose", "acceptsTrade", "
   "condoFee", "iptu", "iptuPeriod", "city", "state", "neighborhood", "cep", "street", "streetNumber", "block", "floor", "condoName",
   "hideStreet", "bedrooms", "suites", "bathrooms", "parkingSpots", "garageType", "areaM2", "usefulAreaM2", "totalAreaM2",
   "solarPosition", "viewType", "propertyAge", "deliveryForecast", "documentationStatus", "acceptsFinancing", "privateAmenities", "condoAmenities",
-  "description", "videoUrl", "coverPhoto", "photos", "floorPlanPhotos", "confidentialAddress", "ownerName", "ownerPhone", "acceptsPartnership", "splitPercentage"] as const;
+  "description", "videoUrl", "coverPhoto", "photos", "floorPlanPhotos", "confidentialAddress", "ownerName", "ownerPhone", "acceptsPartnership", "partnershipModels"] as const;
 export function propertyChanges(input: PropertyInput) {
   try { validatePropertyInput(input); } catch (error) { throw new PropertyInventoryError(error instanceof Error ? error.message : "Dados inválidos."); }
   const result = Object.fromEntries(keys.map(key => [key, input[key] === "" ? null : input[key] ?? null]));
@@ -72,6 +78,9 @@ export function propertyChanges(input: PropertyInput) {
     privateAmenities: input.privateAmenities || [], condoAmenities: input.condoAmenities || [],
     // Previsão de entrega só em construção/na planta; trocar a condição para pronto/usado apaga a previsão.
     deliveryForecast: previsaoParaBanco(input.condition || "usado", input.deliveryForecast),
+    // O percentual do captador acompanha a condição; não é mais um número livre.
+    partnershipModels: input.partnershipModels || "ambos",
+    splitPercentage: percentualDoCaptador(input.partnershipModels || "ambos"),
   } as PropertyInput;
 }
 export const PROPERTY_STATUSES = ["disponivel", "em_negociacao", "vendido", "alugado", "arquivado"] as const;

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState, type FormEvent, type ReactNode } from "react";
+import { OPCOES_DE_CONDICAO, type PartnershipModels } from "@/lib/partnership-models";
 import { Building2, CheckSquare, DollarSign, Eye, Home, Image as ImageIcon, Layers, Lock, MapPin, PlusCircle, Search, Square, Sun, Trash2, Users, Video } from "lucide-react";
 import { createProperty } from "@/lib/actions";
 import { unwrap, type ActionData } from "@/lib/action-result";
@@ -60,6 +61,9 @@ export default function PropertyCreateForm({ broker, blockedReason, onCreated, o
   const [acceptsFinancing, setAcceptsFinancing] = useState<boolean | null>(null);
   const [acceptsTrade, setAcceptsTrade] = useState(false);
   const [acceptsPartnership, setAcceptsPartnership] = useState(true);
+  // Condição de parceria (14/10/2026): o corretor escolhe — nada vem marcado — e confirma que o imóvel aceita parceria.
+  const [partnershipModels, setPartnershipModels] = useState<PartnershipModels | null>(null);
+  const [confirmaParceria, setConfirmaParceria] = useState(false);
   const [privateAmenities, setPrivateAmenities] = useState<string[]>([]);
   const [condoAmenities, setCondoAmenities] = useState<string[]>([]);
   const [cep, setCep] = useState("");
@@ -151,7 +155,7 @@ export default function PropertyCreateForm({ broker, blockedReason, onCreated, o
         coverPhoto: photos[0], photos, floorPlanPhotos: floorPlans,
         description: text("description"),
         ownerName: text("ownerName"), ownerPhone: text("ownerPhone"),
-        acceptsPartnership, splitPercentage: "50.00",
+        acceptsPartnership, partnershipModels: partnershipModels ?? undefined, confirmaParceria: acceptsPartnership && confirmaParceria,
       }));
       onCreated(result.property);
     } catch (problem) {
@@ -298,10 +302,31 @@ export default function PropertyCreateForm({ broker, blockedReason, onCreated, o
 
     <div className={section}>
       <h3 className={heading}><Users className="w-4 h-4 text-amber-500" />8. Parceria</h3>
+      <p className="text-[11px] text-slate-300 leading-relaxed">Na vitrine da rede só entra imóvel que aceita parceria. Imóvel que não aceita fica só na sua carteira — ninguém da rede vê.</p>
       <button type="button" aria-pressed={acceptsPartnership} onClick={() => setAcceptsPartnership(!acceptsPartnership)} className={`w-full p-4 rounded-xl border-2 text-left transition flex items-start gap-3 ${acceptsPartnership ? "bg-emerald-950/20 border-emerald-500" : "bg-slate-950 border-slate-800"}`}>
         {acceptsPartnership ? <CheckSquare className="w-5 h-5 text-emerald-400 shrink-0" /> : <Square className="w-5 h-5 text-slate-600 shrink-0" />}
-        <span><span className="block text-xs font-bold text-white">Oferecer na rede para parceria</span><span className="block text-[11px] text-slate-300">Corretores aprovados veem o imóvel na vitrine e podem propor visita. Divisão de partida: 50% para você e 50% para o corretor do comprador. Desmarcado, o imóvel fica só na sua carteira.</span></span>
+        <span><span className="block text-xs font-bold text-white">Oferecer na rede para parceria</span><span className="block text-[11px] text-slate-300">Corretores aprovados veem o imóvel na vitrine e podem propor visita. Desmarcado, o imóvel fica só na sua carteira.</span></span>
       </button>
+      {acceptsPartnership && <>
+        <fieldset className="space-y-2">
+          <legend className={label}>Condição de parceria deste imóvel *</legend>
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+            {OPCOES_DE_CONDICAO.map((o) => (
+              // Cores fixas (não as classes que o tema da área logada reescreve — ver tests/theme.test.ts): a escolhida em azul com ✓.
+              <label key={o.valor} className={`p-3 rounded-xl border-2 cursor-pointer transition ${partnershipModels === o.valor ? "border-[#083858] bg-[#083858] text-[#ffffff]" : "border-[#cbd5e1] bg-[#ffffff] text-[#083858] hover:border-[#083858]"}`}>
+                <input type="radio" name="partnershipModels" value={o.valor} required checked={partnershipModels === o.valor} onChange={() => setPartnershipModels(o.valor)} className="sr-only" />
+                <span className="block text-xs font-bold">{partnershipModels === o.valor ? "✓ " : ""}{o.rotulo}</span>
+                <span className={`block text-[11px] leading-snug mt-0.5 ${partnershipModels === o.valor ? "text-[#dbeafe]" : "text-[#475569]"}`}>{o.ajuda}</span>
+              </label>
+            ))}
+          </div>
+          <p className="text-[11px] text-slate-400 leading-relaxed">Quem busca na vitrine vê a condição antes de entrar em contato, e o registro de visita só aceita a divisão que você escolher aqui.</p>
+        </fieldset>
+        <label className="flex items-start gap-3 p-3 rounded-xl border border-amber-500/40 bg-amber-950/20 cursor-pointer">
+          <input type="checkbox" required checked={confirmaParceria} onChange={(e) => setConfirmaParceria(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-amber-500" />
+          <span className="text-[11px] text-slate-200 leading-relaxed"><strong className="text-white">Confirmo que este imóvel aceita parceria</strong> nas condições acima. Publicar na rede é compromisso com os corretores parceiros — não é para recusar parceria depois.</span>
+        </label>
+      </>}
     </div>
 
     <button type="submit" disabled={busy || !!blockedReason} className="w-full bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-black py-4 rounded-2xl transition shadow-xl shadow-amber-500/20 text-sm flex items-center justify-center gap-2 disabled:opacity-60">

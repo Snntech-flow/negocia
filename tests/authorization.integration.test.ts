@@ -199,7 +199,7 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
       assert.equal(own.items[0].ownerName, form.ownerName);
       const saved = await asUser(otherBroker.id, () => inventory.updateOwnProperty(property.id, revision,
         { ...form, title: "Título atualizado", salePrice: "575000", hideStreet: false, propertyAge: 0, ownerPhone: "11944443333",
-          brokerId: owner.id, status: "vendido" } as typeof form));
+          brokerId: owner.id, status: "vendido", partnershipModels: "ambos", confirmaParceria: true } as typeof form));
       assert.equal(saved.property.title, "Título atualizado");
       assert.equal(saved.property.brokerId, otherBroker.id);
       assert.equal(saved.property.status, "disponivel");
@@ -402,7 +402,7 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
       await asUser(otherBroker.id, () => actions.createBuyerProfile({clientInternalName:"Procura aprovada", propertyType:"Apartamento", city, neighborhoods:["Centro"], maxBudget:"400000", minBedrooms:2, minParkingSpots:1}));
       const notices = await db.select().from(notifications).where(eq(notifications.userId, otherBroker.id));
       assert.ok(!notices.some(item => item.propertyId === property.id));
-      await asUser(otherBroker.id, () => actions.createProperty({...base, bathrooms:1, suites:0, photos:[], splitPercentage:"50", condition:"usado", acceptsFinancing:true, state:"SP"}));
+      await asUser(otherBroker.id, () => actions.createProperty({...base, bathrooms:1, suites:0, photos:[], splitPercentage:"50", condition:"usado", acceptsFinancing:true, state:"SP", partnershipModels:"ambos", confirmaParceria:true}));
       const restrictedNotices = await db.select().from(notifications).where(eq(notifications.userId, unapproved.id));
       assert.equal(restrictedNotices.length, 0);
       await db.update(users).set({verificationStatus:"aprovado"}).where(eq(users.id, unapproved.id));
@@ -450,7 +450,7 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
     assert.ok(notice); assert.match(notice.title, /1 imóvel compatível/);
     await asUser(admin.id, () => actions.createBuyerProfile(profile));
     const before = await db.select().from(notifications).where(eq(notifications.userId, admin.id));
-    const form = {title:"Nova oferta radar", propertyType:"Apartamento", salePrice:"300000", city, neighborhood:"Centro", bedrooms:2, parkingSpots:1, bathrooms:1, suites:0, areaM2:"80", description:"Imóvel de testes", photos:[], condition:"usado", acceptsFinancing:true, state:"SP", confidentialAddress:"Endereço fictício", ownerName:"Pessoa fictícia", ownerPhone:"11900001234", acceptsPartnership:true, splitPercentage:"50", purpose:"venda"};
+    const form = {title:"Nova oferta radar", propertyType:"Apartamento", salePrice:"300000", city, neighborhood:"Centro", bedrooms:2, parkingSpots:1, bathrooms:1, suites:0, areaM2:"80", description:"Imóvel de testes", photos:[], condition:"usado", acceptsFinancing:true, state:"SP", confidentialAddress:"Endereço fictício", ownerName:"Pessoa fictícia", ownerPhone:"11900001234", acceptsPartnership:true, splitPercentage:"50", purpose:"venda", partnershipModels:"ambos" as const, confirmaParceria:true};
     const created = await asUser(otherBroker.id, () => actions.createProperty(form));
     const after = await db.select().from(notifications).where(eq(notifications.userId, admin.id));
     assert.equal(after.length, before.length + 1); assert.ok(after.some(row => row.propertyId === created.property.id));
@@ -471,7 +471,7 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
     const [archived] = await db.insert(properties).values({...base, title:"Anúncio arquivado", status:"arquivado"}).returning();
     try {
       const { brokerId: _brokerId, status: _status, ...fields } = base;
-      const form = {...fields, bathrooms:1, suites:0, photos:[], splitPercentage:"50", condition:"usado", acceptsFinancing:true, state:"SP"};
+      const form = {...fields, bathrooms:1, suites:0, photos:[], splitPercentage:"50", condition:"usado", acceptsFinancing:true, state:"SP", partnershipModels:"ambos" as const, confirmaParceria:true};
       await assert.rejects(asUser(otherBroker.id, () => actions.createProperty(form)), /permite 10 anúncios ativos e você já tem 10/);
       await assert.rejects(asUser(otherBroker.id, () => inventory.updateOwnPropertyStatus(archived.id, archived.updatedAt.toISOString(), "disponivel")), /permite 10 anúncios/);
       const sold = await asUser(otherBroker.id, () => inventory.updateOwnPropertyStatus(archived.id, archived.updatedAt.toISOString(), "vendido"));
@@ -480,6 +480,47 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
       assert.equal(page.activeListings, 10); assert.equal(page.listingLimit, 10);
       await assert.rejects(asUser(otherBroker.id, () => actions.createProperty({...form, condition:undefined})), /condição do imóvel/);
     } finally { await db.delete(properties).where(eq(properties.city, city)); }
+  });
+
+  await t.test("condição de parceria: publicar exige escolher e confirmar; visita e revisão só com a divisão que o imóvel aceita — no servidor e no banco", async () => {
+    const inventory = strict(await import("../src/lib/actions/property-inventory"));
+    const city = `Condição ${suffix}`;
+    const form = {title:"Imóvel com condição", propertyType:"Apartamento", salePrice:"400000", city, neighborhood:"Centro", bedrooms:2, parkingSpots:1, bathrooms:1, suites:0, areaM2:"70", description:"Teste da condição de parceria", photos:[], condition:"usado", acceptsFinancing:true, state:"SP", confidentialAddress:"Endereço fictício", ownerName:"Pessoa fictícia", ownerPhone:"11900000000", acceptsPartnership:true, purpose:"venda"};
+    try {
+      // publicar na rede: escolher a condição e confirmar — nada presumido
+      await assert.rejects(asUser(otherBroker.id, () => actions.createProperty(form)), /condição de parceria/);
+      await assert.rejects(asUser(otherBroker.id, () => actions.createProperty({...form, partnershipModels:"50_50"})), /confirme que este imóvel aceita parceria/);
+      const so40 = (await asUser(otherBroker.id, () => actions.createProperty({...form, title:"Imóvel de outro corretor", partnershipModels:"40_40_20", confirmaParceria:true}))).property;
+      assert.equal(so40.partnershipModels, "40_40_20"); assert.ok(so40.partnershipConfirmedAt); assert.equal(so40.partnershipReviewPending, false);
+      assert.equal(so40.splitPercentage, "40.00", "o percentual do captador acompanha a condição");
+      const carteira = (await asUser(otherBroker.id, () => actions.createProperty({...form, title:"Só na carteira", acceptsPartnership:false}))).property;
+      assert.equal(carteira.partnershipConfirmedAt, null, "na carteira não se pede confirmação");
+
+      // registro de visita e revisão: só a divisão que o imóvel aceita
+      const [so50] = await db.insert(properties).values({...form, brokerId:admin.id, title:"Só 50/50", partnershipModels:"50_50", partnershipConfirmedAt:new Date(), partnershipReviewPending:false}).returning();
+      const visita = {propertyId:so50.id, captorBrokerId:admin.id, partnerBrokerId:otherBroker.id, clientName:"Cliente da condição", clientCpfPartial:"***.123.456-**", visitDate:new Date().toISOString(), commissionSplit:"50"};
+      await assert.rejects(asUser(otherBroker.id, () => actions.createDvpCertificate({...visita, commissionModel:"three_party_referral_40_40_20", externalReferrerName:"Indicador fictício", externalReferrerCreci:"TESTE-03"})), /só faz parceria 50\/50/);
+      await asUser(otherBroker.id, () => actions.createDvpCertificate({...visita, commissionModel:"two_party_50_50"}));
+      const [parceria] = await db.select().from(partnerships).where(eq(partnerships.propertyId, so50.id)).limit(1);
+      assert.equal(parceria.commissionModel, "two_party_50_50");
+      await assert.rejects(asUser(otherBroker.id, () => actions.revisePartnershipCommission(parceria.id, { commissionModel:"three_party_referral_40_40_20", externalReferrerName:"Indicador fictício", externalReferrerCreci:"TESTE-03" })), /só faz parceria 50\/50/);
+      // o banco recusa mesmo sem passar pelas ações (o Drizzle embrulha: a frase do banco vem em `cause`)
+      const doBanco = (frase: RegExp) => (e: unknown) => frase.test(String((e as { cause?: { message?: string } }).cause?.message ?? e));
+      await assert.rejects(db.update(partnerships).set({ commissionModel:"three_party_referral_40_40_20" }).where(eq(partnerships.id, parceria.id)), doBanco(/só faz parceria 50\/50/));
+      await assert.rejects(db.insert(partnerships).values({ propertyId:so40.id, captorBrokerId:otherBroker.id, partnerBrokerId:admin.id, commissionModel:"two_party_50_50" }), doBanco(/só faz parceria 40\/40\/20/));
+
+      // imóvel de antes (revisão pendente): salvar na rede pede a confirmação, que encerra a revisão
+      const [antigo] = await db.insert(properties).values({...form, brokerId:otherBroker.id, title:"Imóvel antigo"}).returning();
+      assert.equal(antigo.partnershipReviewPending, true); assert.equal(antigo.partnershipModels, "ambos");
+      const revisao = antigo.updatedAt.toISOString();
+      await assert.rejects(asUser(otherBroker.id, () => inventory.updateOwnProperty(antigo.id, revisao, {...form, partnershipModels:"50_50"})), /Confirme que este imóvel aceita parceria/);
+      const revisado = (await asUser(otherBroker.id, () => inventory.updateOwnProperty(antigo.id, revisao, {...form, partnershipModels:"50_50", confirmaParceria:true}))).property;
+      assert.equal(revisado.partnershipReviewPending, false); assert.ok(revisado.partnershipConfirmedAt); assert.equal(revisado.partnershipModels, "50_50");
+      assert.equal(revisado.splitPercentage, "50.00");
+    } finally {
+      await db.delete(dvpCertificates).where(inArray(dvpCertificates.propertyId, db.select({ id: properties.id }).from(properties).where(eq(properties.city, city))));
+      await db.delete(properties).where(eq(properties.city, city));
+    }
   });
 
   await t.test("inventário privado não vaza para visitantes ou outras contas", async () => {

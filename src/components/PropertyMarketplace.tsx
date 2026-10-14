@@ -1,6 +1,7 @@
 "use client";
 
 import { Building2, ShieldCheck, Search, PlusCircle, Lock, Image as ImageIcon, MapPin, Bed, Bath, Car, Maximize2, CheckCircle2, Share2, Stamp } from "lucide-react";
+import { rotuloDaCondicao } from "@/lib/partnership-models";
 import { PROPERTY_PAGE_SIZE } from "@/lib/marketplace-query";
 import type { Property } from "@/lib/property-types";
 import { optionLabel, CONDITIONS, PURPOSES } from "@/lib/property-options";
@@ -17,7 +18,6 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
 }) {
   const formatBRL = (value: string) => Number(value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   const area = (value: string) => Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
-  const percent = (value: string) => Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
   return (
 <div className="space-y-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -26,7 +26,7 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
                   <Building2 className="w-5 h-5 text-orange-700" />
                   Imóveis Disponíveis para Parceria
                 </h2>
-            <p className="text-sm text-slate-400">Imóveis cadastrados por corretores; condições de parceria devem ser confirmadas entre as partes.</p>
+            <p className="text-sm text-slate-400">Todo imóvel desta vitrine aceita parceria, na condição que o captador informou em cada um: só 50/50, só 40/40/20 ou as duas.</p>
               </div>
               <div className="flex items-center gap-2 text-xs text-slate-300 bg-slate-900 border border-slate-800 px-3 py-2 rounded-lg">
                 <ShieldCheck className="w-4 h-4 text-emerald-400" />
@@ -148,7 +148,7 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
                         /> : <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-slate-400"><ImageIcon className="h-10 w-10" /><span className="text-xs">Sem fotos cadastradas</span></div>}
                         <div className="absolute top-3 left-3 flex flex-wrap gap-1.5 max-w-[85%]">
                           <span className="bg-amber-500 text-slate-950 text-xs font-black px-2.5 py-1 rounded-md shadow-lg flex items-center gap-1">
-                            {prop.acceptsPartnership ? `Parceria ${percent(prop.splitPercentage)}%` : "Só na sua carteira"}
+                            {prop.acceptsPartnership ? rotuloDaCondicao(prop.partnershipModels) : "Só na sua carteira"}
                           </span>
                           <span className="bg-slate-900/90 backdrop-blur text-white text-xs font-medium px-2.5 py-1 rounded-md border border-slate-700">
                             {prop.propertyType}

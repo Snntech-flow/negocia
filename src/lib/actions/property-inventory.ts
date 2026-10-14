@@ -36,7 +36,16 @@ async function updateOwnPropertyImpl(id: string, revision: string, input: Proper
     if (!current) throw new PropertyInventoryError("Imóvel não encontrado na sua carteira.");
     if (current.updatedAt.getTime() !== Date.parse(revision)) throw new PropertyInventoryError("Este imóvel foi alterado em outra sessão. Recarregue antes de salvar.");
     const updatedAt = new Date(Math.max(Date.now(), current.updatedAt.getTime() + 1));
-    const [updated] = await tx.update(properties).set({ ...changes, updatedAt }).where(and(eq(properties.id, id), eq(properties.brokerId, actor.id))).returning();
+    // Condição de parceria (14/10/2026): entrar na rede, trocar a condição ou revisar o imóvel antigo pede a confirmação
+    // do captador — ela grava a data e encerra a revisão. Na carteira, não se aplica.
+    const naRede = changes.acceptsPartnership === true;
+    const precisaConfirmar = naRede && (!current.acceptsPartnership || current.partnershipReviewPending || current.partnershipModels !== changes.partnershipModels);
+    if (precisaConfirmar && input.confirmaParceria !== true) {
+      throw new PropertyInventoryError("Confirme que este imóvel aceita parceria nas condições informadas para mantê-lo na rede.");
+    }
+    const parceria = precisaConfirmar ? { partnershipConfirmedAt: new Date(), partnershipReviewPending: false }
+      : naRede ? {} : { partnershipReviewPending: false };
+    const [updated] = await tx.update(properties).set({ ...changes, ...parceria, updatedAt }).where(and(eq(properties.id, id), eq(properties.brokerId, actor.id))).returning();
     return updated;
   });
   revalidatePath("/");

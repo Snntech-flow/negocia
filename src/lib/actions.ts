@@ -1,6 +1,7 @@
 "use server";
 
 import { ActionError, isUniqueViolation, runAction } from "./action-result";
+import { conferirDivisao, ehCondicaoValida, percentualDoCaptador } from "./partnership-models";
 
 import { validateNegotiationDocuments, type NegotiationDocuments } from "./negotiation-documents";
 
@@ -219,6 +220,12 @@ async function createPropertyImpl(formData: PropertyInput) {
   const state = formData.state.toUpperCase();
   const condition = formData.condition;
   const acceptsFinancing = formData.acceptsFinancing;
+  // Condição de parceria (14/10/2026): na rede, o captador escolhe e confirma — nada presumido. Na carteira não se aplica.
+  if (formData.acceptsPartnership) {
+    if (!ehCondicaoValida(formData.partnershipModels)) throw new ActionError("Escolha a condição de parceria deste imóvel: só 50/50, só 40/40/20 ou as duas.");
+    if (formData.confirmaParceria !== true) throw new ActionError("Para publicar na rede, confirme que este imóvel aceita parceria nas condições informadas.");
+  }
+  const partnershipModels = ehCondicaoValida(formData.partnershipModels) ? formData.partnershipModels : "ambos";
   const targetBrokerId = actor.id;
 
   const newProperty = await db.transaction(async (tx) => {
@@ -273,7 +280,10 @@ async function createPropertyImpl(formData: PropertyInput) {
         ownerName: formData.ownerName,
         ownerPhone: formData.ownerPhone,
         acceptsPartnership: formData.acceptsPartnership,
-        splitPercentage: formData.splitPercentage,
+        splitPercentage: percentualDoCaptador(partnershipModels),
+        partnershipModels,
+        partnershipConfirmedAt: formData.acceptsPartnership ? new Date() : null,
+        partnershipReviewPending: false,
         status: "disponivel",
       })
       .returning();
@@ -420,7 +430,7 @@ async function createDvpCertificateImpl(data: {
   const actor = await requireCurrentUser();
   requireActiveBroker(actor);
   if (data.partnerBrokerId !== actor.id) throw new ActionError("O corretor parceiro deve ser o usuário conectado.");
-  const [property] = await db.select({ brokerId: properties.brokerId, acceptsPartnership: properties.acceptsPartnership, title: properties.title, status: properties.status, verificationStatus: users.verificationStatus })
+  const [property] = await db.select({ brokerId: properties.brokerId, acceptsPartnership: properties.acceptsPartnership, partnershipModels: properties.partnershipModels, title: properties.title, status: properties.status, verificationStatus: users.verificationStatus })
     .from(properties).innerJoin(users, eq(properties.brokerId, users.id)).where(eq(properties.id, data.propertyId)).limit(1);
   if (!property || property.brokerId !== data.captorBrokerId || property.brokerId === actor.id || !canUseProperty(property, actor.id)) {
     throw new ActionError("Imóvel ou parceria inválidos para este registro.");
@@ -439,6 +449,7 @@ async function createDvpCertificateImpl(data: {
     throw new ActionError("Escolha uma divisão de comissão válida.");
   }
   const commissionModel = data.commissionModel === "three_party_referral_40_40_20" ? data.commissionModel : "two_party_50_50";
+  conferirDivisao(property.partnershipModels, commissionModel); // a condição que o captador deu ao imóvel
   const externalReferrerName = data.externalReferrerName?.trim() || null;
   const externalReferrerCreci = data.externalReferrerCreci?.trim().toUpperCase() || null;
   const externalReferrerWhatsapp = data.externalReferrerWhatsapp?.trim() || null;
@@ -767,6 +778,8 @@ async function revisePartnershipCommissionImpl(partnershipId: string, input: {
     )).for("update").limit(1);
     if (!partnership) throw new ActionError("Parceria não encontrada na sua carteira.");
     if (["fechado", "recusado"].includes(partnership.status)) throw new ActionError("Não é possível revisar uma parceria encerrada.");
+    const [imovel] = await tx.select({ partnershipModels: properties.partnershipModels }).from(properties).where(eq(properties.id, partnership.propertyId)).limit(1);
+    conferirDivisao(imovel?.partnershipModels, commissionModel); // a condição que o captador deu ao imóvel
     const describe = (model: string, captor: string, partner: string, referrer: string, name: string | null, creci: string | null) =>
       model === "three_party_referral_40_40_20" ? `40/40/20 (indicador: ${name || "sem nome"}, CRECI ${creci || "não informado"})` : `${captor}/${partner}`;
     const previousTerms = describe(partnership.commissionModel, partnership.captorCommissionPercent, partnership.partnerCommissionPercent, partnership.referrerCommissionPercent, partnership.externalReferrerName, partnership.externalReferrerCreci);

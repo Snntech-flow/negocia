@@ -7,6 +7,7 @@ import { BRAZILIAN_STATES } from "@/lib/brazil-states";
 import { PROPERTY_STATUS_LABELS, PROPERTY_STATUSES, type PropertyInput, type PropertyStatus } from "@/lib/property-input";
 import { CONDITIONS, CONDO_AMENITIES_GROUPS, DOCUMENTATION_STATUSES, GARAGE_TYPES, IPTU_PERIODS, PRIVATE_AMENITIES_LIST, PURPOSES, SOLAR_POSITIONS, VIEW_TYPES } from "@/lib/property-options";
 import PhotoUploader from "./PhotoUploader";
+import { OPCOES_DE_CONDICAO, rotuloDaCondicao } from "@/lib/partnership-models";
 
 type OwnedProperty = ActionData<Awaited<ReturnType<typeof getOwnProperties>>>["items"][number];
 type Option = { readonly id: string; readonly label: string };
@@ -53,7 +54,9 @@ const groups: { title: string; fields: Field[] }[] = [
   ] },
   { title: "Negócio e parceria", fields: [
     { key: "acceptsPartnership", label: "Disponível para parceria", kind: "boolean" },
-    { key: "splitPercentage", label: "Divisão da comissão (%)", kind: "number", required: true },
+    // Condição de parceria (14/10/2026) no lugar do percentual livre; entrar na rede, trocar a condição ou revisar pede a confirmação.
+    { key: "partnershipModels", label: "Condição de parceria", options: OPCOES_DE_CONDICAO.map((o) => ({ id: o.valor, label: o.rotulo })) },
+    { key: "confirmaParceria", label: "Confirmo que este imóvel aceita parceria nas condições informadas (pedido ao entrar na rede, trocar a condição ou revisar)", kind: "boolean" },
     { key: "acceptsTrade", label: "Aceita permuta", kind: "boolean" }, { key: "tradeDetails", label: "Detalhes da permuta", kind: "text" },
     { key: "acceptsFinancing", label: "Aceita financiamento", kind: "boolean" },
     { key: "documentationStatus", label: "Documentação", options: DOCUMENTATION_STATUSES, allowEmpty: true },
@@ -175,8 +178,9 @@ export default function PropertyInventory({ reloadKey, onChanged }: { reloadKey:
     </form> : <>
       <div className="flex flex-wrap gap-3"><input aria-label="Buscar na minha carteira" value={search} maxLength={200} onChange={event => { setSearch(event.target.value); setPage(1); }} placeholder="Buscar título, cidade ou bairro" className="min-w-0 flex-1 rounded-lg border border-slate-300 p-2.5 text-sm" />
         <select aria-label="Status dos meus imóveis" value={status} onChange={event => { setStatus(event.target.value); setPage(1); }} className="rounded-lg border border-slate-300 p-2.5 text-sm"><option value="todos">Todos os status</option>{PROPERTY_STATUSES.map(value => <option key={value} value={value}>{PROPERTY_STATUS_LABELS[value]}</option>)}</select></div>
+      {!loading && items.some((p) => p.acceptsPartnership && p.partnershipReviewPending) && <p role="note" className="rounded-xl border border-amber-300 bg-amber-50 px-4 py-3 text-sm text-amber-900"><strong>Confira a condição de parceria.</strong> Os imóveis marcados com “Revisar” estão na rede como 50/50 ou 40/40/20 — o que valia até hoje. Abra cada um em Editar, ajuste se ele só faz uma das divisões, marque a confirmação e salve.</p>}
       {loading ? <p role="status" className="text-sm text-slate-600">Carregando carteira…</p> : items.length ? <div className="space-y-3">{items.map(property => <article key={property.id} className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 p-4">
-        <div className="min-w-0"><h3 className="font-bold text-slate-900">{property.title}</h3><p className="text-sm text-slate-600">{property.neighborhood}, {property.city} · {Number(property.salePrice).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</p><span className="text-xs font-semibold text-slate-500">{PROPERTY_STATUS_LABELS[property.status as PropertyStatus] || property.status}</span></div>
+        <div className="min-w-0"><h3 className="font-bold text-slate-900">{property.title}</h3><p className="text-sm text-slate-600">{property.neighborhood}, {property.city} · {Number(property.salePrice).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</p><span className="text-xs font-semibold text-slate-500">{PROPERTY_STATUS_LABELS[property.status as PropertyStatus] || property.status} · {property.acceptsPartnership ? rotuloDaCondicao(property.partnershipModels) : "Só na carteira"}</span>{property.acceptsPartnership && property.partnershipReviewPending && <span className="ml-2 rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-900">Revisar</span>}</div>
         <div className="flex flex-wrap items-center gap-2"><button disabled={busy} type="button" onClick={() => { setEditing(property); setError(""); setMessage(""); }} className="rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold">Editar</button>
           <select disabled={busy} aria-label={`Status: ${property.title}`} value={property.status} onChange={event => { void changeStatus(property, event.target.value as PropertyStatus); }} className="rounded-lg border border-slate-300 px-3 py-2 text-sm">{PROPERTY_STATUSES.map(value => <option key={value} value={value}>{PROPERTY_STATUS_LABELS[value]}</option>)}</select>
           {property.status !== "arquivado" ? <button disabled={busy} type="button" onClick={() => { void changeStatus(property, "arquivado"); }} className="rounded-lg bg-slate-100 px-3 py-2 text-sm font-semibold">Arquivar</button> : <button disabled={busy} type="button" onClick={() => { void changeStatus(property, "disponivel"); }} className="rounded-lg bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800">Restaurar anúncio</button>}

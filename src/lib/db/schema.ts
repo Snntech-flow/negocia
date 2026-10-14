@@ -123,6 +123,10 @@ export const properties = pgTable("properties", {
   // Regras de Co-corretagem
   acceptsPartnership: boolean("accepts_partnership").default(true).notNull(),
   splitPercentage: numeric("split_percentage", { precision: 5, scale: 2 }).default("50.00").notNull(),
+  // Condição de parceria (14/10/2026): só 50/50, só 40/40/20 ou as duas — src/lib/partnership-models.ts.
+  partnershipModels: text("partnership_models").default("ambos").notNull(),
+  partnershipConfirmedAt: timestamp("partnership_confirmed_at", { withTimezone: true }),
+  partnershipReviewPending: boolean("partnership_review_pending").default(true).notNull(),
   
   // 🛡️ DADOS BLINDADOS (Visíveis APENAS pelo corretor captador)
   confidentialAddress: text("confidential_address").notNull(),

@@ -1,6 +1,7 @@
 "use client";
 
 import NegotiationDocumentation from "./NegotiationDocumentation";
+import { divisoesPermitidas } from "@/lib/partnership-models";
 import type { NegotiationDocuments } from "@/lib/negotiation-documents";
 import BrokerWeeklyAgenda from "./BrokerWeeklyAgenda";
 import Image from "next/image";
@@ -63,6 +64,8 @@ export interface LeadMatchProperty {
   brokerId: string;
   acceptsPartnership: boolean;
   splitPercentage: string;
+  /** Condição de parceria: "50_50", "40_40_20" ou "ambos" (src/lib/partnership-models.ts). */
+  partnershipModels?: string;
 }
 
 const stages = [
@@ -501,6 +504,12 @@ export default function LeadCRM({
     if (!selectedLead || !visitProperty || !currentUserId) return;
     const form = new FormData(event.currentTarget);
     const visitDateValue = String(form.get("visitDate") || "");
+    // Condição de parceria (14/10/2026): daqui a visita sai 50/50; imóvel que só faz 40/40/20 precisa dos dados do
+    // indicador, que estão no registro pela Vitrine.
+    if (!divisoesPermitidas(visitProperty.partnershipModels).includes("two_party_50_50")) {
+      setError("Este imóvel só faz parceria 40/40/20. Registre a visita pela Vitrine, onde você informa o corretor indicador.");
+      return;
+    }
     setBusy(true);
     setError(null);
     try {
@@ -514,6 +523,7 @@ export default function LeadCRM({
         clientCpfPartial: String(form.get("clientCpfPartial") || ""),
         visitDate: visitDateValue ? new Date(visitDateValue).toISOString() : "",
         commissionSplit: visitProperty.splitPercentage || "50.00",
+        commissionModel: "two_party_50_50",
       }));
       if (result.activity) {
         const activity: LeadActivityItem = { ...result.activity, leadId: selectedLead.id };

@@ -43,6 +43,8 @@ export interface Property {
   floorPlanPhotos?: string[];
   acceptsPartnership: boolean;
   splitPercentage: string;
+  /** Condição de parceria: "50_50", "40_40_20" ou "ambos" (src/lib/partnership-models.ts). */
+  partnershipModels?: string;
   status: string;
   broker: {
     id: string;

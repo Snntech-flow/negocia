@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import { divisoesPermitidas, rotuloDaCondicao } from "@/lib/partnership-models";
 import { PROPERTY_PAGE_SIZE } from "@/lib/marketplace-query";
 import RadarMatches from "./RadarMatches";
 import WhiteLabelSheet from "./WhiteLabelSheet";
@@ -100,6 +101,8 @@ interface PartnershipItem {
   commissionRevision: number;
   captorAcceptedAt: Date | null;
   partnerAcceptedAt: Date | null;
+  /** Condição de parceria do imóvel (50_50 / 40_40_20 / ambos) — a revisão só oferece o que ela permite. */
+  propertyPartnershipModels?: string;
   commissionModel: string;
   captorCommissionPercent: string;
   partnerCommissionPercent: string;
@@ -586,6 +589,9 @@ export default function NegociaLarApp({
   };
 
   const activeProperty = selectedPropertyForTerm;
+  // Condição de parceria do imóvel (14/10/2026): o registro de visita só oferece a divisão que o captador aceita.
+  const divisoesDoImovel = divisoesPermitidas(activeProperty?.partnershipModels);
+  const modeloDaVisita = divisoesDoImovel.includes(commissionModel) ? commissionModel : divisoesDoImovel[0];
 
   if (currentView === "landing") {
     return (
@@ -956,7 +962,7 @@ export default function NegociaLarApp({
                   clientCpfPartial: clientCpf,
                   visitDate,
                   commissionSplit: activeProperty.splitPercentage || "50.00",
-                  commissionModel,
+                  commissionModel: modeloDaVisita,
                   externalReferrerName: String(fd.get("externalReferrerName") || ""),
                   externalReferrerCreci: String(fd.get("externalReferrerCreci") || ""),
                   externalReferrerWhatsapp: String(fd.get("externalReferrerWhatsapp") || ""),
@@ -1006,7 +1012,7 @@ export default function NegociaLarApp({
                     }, ...prev]);
                   }
                   setDvpEmitted(true);
-                  showToast(commissionModel === "three_party_referral_40_40_20"
+                  showToast(modeloDaVisita === "three_party_referral_40_40_20"
                     ? `Registro salvo. A divisão 40/40/20 aguarda a confirmação dos dois corretores na plataforma.`
                     : `Registro ${res.certificate.certificateHash} salvo como rascunho; ainda não há aceite eletrônico.`);
                 }
@@ -1044,13 +1050,14 @@ export default function NegociaLarApp({
                 <div className="rounded-xl border border-slate-700 bg-slate-950 p-4 space-y-3">
                   <div>
                     <label htmlFor="commission-model" className="block text-xs font-semibold text-slate-200">Como a comissão será dividida?</label>
-                    <select id="commission-model" value={commissionModel} onChange={(event) => setCommissionModel(event.target.value as typeof commissionModel)} className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2.5 text-xs text-white">
-                      <option value="two_party_50_50">50% captador · 50% corretor do comprador</option>
-                      <option value="three_party_referral_40_40_20">40% captador · 40% corretor do comprador · 20% indicador externo</option>
+                    <select id="commission-model" value={modeloDaVisita} onChange={(event) => setCommissionModel(event.target.value as typeof commissionModel)} className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2.5 text-xs text-white">
+                      {divisoesDoImovel.includes("two_party_50_50") && <option value="two_party_50_50">50% captador · 50% corretor do comprador</option>}
+                      {divisoesDoImovel.includes("three_party_referral_40_40_20") && <option value="three_party_referral_40_40_20">40% captador · 40% corretor do comprador · 20% indicador externo</option>}
                     </select>
-                    {commissionModel === "three_party_referral_40_40_20" && <p className="mt-2 text-[11px] leading-relaxed text-slate-400">Os 20% são destinados ao corretor que conectou a oportunidade, calculados sobre a comissão total. Como ele não tem acesso à plataforma, informe os dados abaixo. Os dois corretores cadastrados precisam confirmar esta proposta.</p>}
+                    <p className="mt-1 text-[11px] text-slate-400">Condição que o captador deu a este imóvel: <strong>{rotuloDaCondicao(activeProperty?.partnershipModels)}</strong>.</p>
+                    {modeloDaVisita === "three_party_referral_40_40_20" && <p className="mt-2 text-[11px] leading-relaxed text-slate-400">Os 20% são destinados ao corretor que conectou a oportunidade, calculados sobre a comissão total. Como ele não tem acesso à plataforma, informe os dados abaixo. Os dois corretores cadastrados precisam confirmar esta proposta.</p>}
                   </div>
-                  {commissionModel === "three_party_referral_40_40_20" && <div className="grid gap-3 sm:grid-cols-3">
+                  {modeloDaVisita === "three_party_referral_40_40_20" && <div className="grid gap-3 sm:grid-cols-3">
                     <div><label className="block text-[11px] text-slate-300 mb-1" htmlFor="external-referrer-name">Nome do corretor indicador</label><input id="external-referrer-name" name="externalReferrerName" required minLength={2} maxLength={120} placeholder="Nome completo" className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white" /></div>
                     <div><label className="block text-[11px] text-slate-300 mb-1" htmlFor="external-referrer-creci">CRECI do indicador</label><input id="external-referrer-creci" name="externalReferrerCreci" required minLength={2} maxLength={30} placeholder="Ex.: 12345-F" className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white" /></div>
                     <div><label className="block text-[11px] text-slate-300 mb-1" htmlFor="external-referrer-whatsapp">WhatsApp (opcional)</label><input id="external-referrer-whatsapp" name="externalReferrerWhatsapp" maxLength={30} placeholder="(11) 99999-9999" className="w-full rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white" /></div>
@@ -1187,7 +1194,7 @@ export default function NegociaLarApp({
                         </div>}
                         {partnership.captorAcceptedAt && partnership.partnerAcceptedAt && <p className="text-[11px] font-semibold text-emerald-300">Os dois corretores confirmaram esta proposta.</p>}
                         {(currentUser?.id === partnership.captorBrokerId || currentUser?.id === partnership.partnerBrokerId) && partnership.status !== "fechado" && partnership.status !== "recusado" && <details className="border-t border-amber-500/15 pt-3"><summary className="cursor-pointer text-[11px] font-semibold text-amber-200">Revisar proposta de divisão</summary><form onSubmit={(event) => void handleRevisePartnershipCommission(partnership, event)} className="mt-3 grid gap-2 sm:grid-cols-2">
-                          <label className="text-[10px] text-slate-300">Modelo<select name="commissionModel" defaultValue={partnership.commissionModel} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-2 text-xs text-white"><option value="two_party_50_50">50% / 50%</option><option value="three_party_referral_40_40_20">40% / 40% / 20%</option></select></label>
+                          <label className="text-[10px] text-slate-300">Modelo<select name="commissionModel" defaultValue={partnership.commissionModel} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-2 text-xs text-white">{divisoesPermitidas(partnership.propertyPartnershipModels).includes("two_party_50_50") && <option value="two_party_50_50">50% / 50%</option>}{divisoesPermitidas(partnership.propertyPartnershipModels).includes("three_party_referral_40_40_20") && <option value="three_party_referral_40_40_20">40% / 40% / 20%</option>}</select><span className="mt-1 block text-[10px] text-slate-400">{rotuloDaCondicao(partnership.propertyPartnershipModels)}</span></label>
                           <label className="text-[10px] text-slate-300">Nome do indicador externo (se houver)<input name="externalReferrerName" defaultValue={partnership.externalReferrerName || ""} maxLength={120} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-2 text-xs text-white" /></label>
                           <label className="text-[10px] text-slate-300">CRECI do indicador<input name="externalReferrerCreci" defaultValue={partnership.externalReferrerCreci || ""} maxLength={40} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-2 text-xs text-white" /></label>
                           <label className="text-[10px] text-slate-300">WhatsApp do indicador<input name="externalReferrerWhatsapp" defaultValue={partnership.externalReferrerWhatsapp || ""} maxLength={30} className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-2.5 py-2 text-xs text-white" /></label>

@@ -1,4 +1,5 @@
 import { ActionError } from "./action-result";
+import { ehCondicaoValida } from "./partnership-models";
 import { isBrazilianState } from "./brazil-states";
 import { CONDITIONS, DOCUMENTATION_STATUSES, GARAGE_TYPES, IPTU_PERIODS, PURPOSES, SOLAR_POSITIONS, VIEW_TYPES } from "./property-options";
 import { mesAnoValido } from "./delivery-forecast";
@@ -111,7 +112,8 @@ export function validatePropertyInput(value: unknown) {
     ["usefulAreaM2", "a área útil", 999999.99, false],
     ["totalAreaM2", "a área total", 999999.99, false],
   ] as const) decimal(input, field, label, max, required, !required);
-  decimal(input, "splitPercentage", "a divisão da comissão", 100, true);
+  if (input.splitPercentage != null && input.splitPercentage !== "") decimal(input, "splitPercentage", "a divisão da comissão", 100, true);
+  if (input.partnershipModels != null && !ehCondicaoValida(input.partnershipModels)) throw new ActionError("Escolha a condição de parceria: só 50/50, só 40/40/20 ou as duas.");
   for (const [field, label, max, required] of [
     ["bedrooms", "o número de quartos", 100, true],
     ["suites", "o número de suítes", 100, true],
@@ -120,7 +122,7 @@ export function validatePropertyInput(value: unknown) {
     ["hotelRoomsCount", "o número de quartos do hotel", 10000, false],
     ["propertyAge", "a idade do imóvel", 1000, false],
   ] as const) count(input, field, label, max, required);
-  for (const field of ["acceptsTrade", "hideStreet", "acceptsFinancing", "acceptsPartnership"]) {
+  for (const field of ["acceptsTrade", "hideStreet", "acceptsFinancing", "acceptsPartnership", "confirmaParceria"]) {
     if (input[field] != null && typeof input[field] !== "boolean") throw new ActionError(`${field} inválido.`);
   }
   if (input.deliveryForecast != null && input.deliveryForecast !== "" && (typeof input.deliveryForecast !== "string" || !mesAnoValido(input.deliveryForecast.slice(0, 7))))
