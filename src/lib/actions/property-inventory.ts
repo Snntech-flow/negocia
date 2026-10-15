@@ -10,13 +10,15 @@ import { ACTIVE_LISTING_STATUSES, listingLimit } from "../plans";
 import { isActiveListingStatus, reserveListingSlot } from "../listing-limit";
 import { propertyChanges, PropertyInventoryError, PROPERTY_STATUSES, validatePropertyRevision, type PropertyInput, type PropertyStatus } from "../property-input";
 
-async function getOwnPropertiesImpl(input: { page?: number; search?: string; status?: string } = {}) {
+async function getOwnPropertiesImpl(input: { page?: number; search?: string; status?: string; id?: string } = {}) {
   const actor = await requireCurrentUser();
-  const { page = 1, search = "", status = "todos" } = input;
+  const { page = 1, search = "", status = "todos", id } = input;
   if (!Number.isInteger(page) || page < 1 || page > 100000 || typeof search !== "string" || search.length > 200 ||
-    (status !== "todos" && !PROPERTY_STATUSES.includes(status as PropertyStatus))) throw new ActionError("Filtros inválidos.");
+    (status !== "todos" && !PROPERTY_STATUSES.includes(status as PropertyStatus)) ||
+    (id !== undefined && (typeof id !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(id)))) throw new ActionError("Filtros inválidos.");
   const pattern = `%${search.trim().replace(/[\\%_]/g, character => `\\${character}`)}%`;
-  const scope = and(eq(properties.brokerId, actor.id),
+  // `id`: o botão "Editar em Meus imóveis" da Vitrine abre um imóvel — só se for da carteira de quem pede.
+  const scope = and(eq(properties.brokerId, actor.id), id ? eq(properties.id, id) : undefined,
     status === "todos" ? undefined : eq(properties.status, status),
     search.trim() ? or(ilike(properties.title, pattern), ilike(properties.city, pattern), ilike(properties.neighborhood, pattern)) : undefined);
   const [items, totals, active] = await Promise.all([

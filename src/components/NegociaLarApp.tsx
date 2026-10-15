@@ -23,7 +23,7 @@ import DialogHost from "./DialogHost";
 import PartnershipTerms from "./PartnershipTerms";
 import VisitControlPrint from "./VisitControlPrint";
 import { askConfirm, askText } from "@/lib/dialogs";
-import React, { useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useRef, useState } from "react";
 import Image from "next/image";
 import {
   CreditCard,
@@ -177,12 +177,12 @@ interface PartnershipActivityItem {
 
 const SCREEN_GUIDANCE: Record<string, { title: string; description: string }> = {
   atendimento: { title: "Atendimento aos clientes", description: "Acompanhe o funil de atendimento e as próximas ações de cada cliente." },
-  vitrine: { title: "Vitrine de imóveis compartilhados (MLS)", description: "MLS é uma rede em que corretores compartilham imóveis e oportunidades. Consulte as condições com o captador; o endereço completo e os dados do proprietário ficam restritos a ele." },
+  vitrine: { title: "Vitrine de imóveis compartilhados (MLS)", description: "MLS é uma rede em que corretores compartilham imóveis e oportunidades. Consulte as condições com o captador; o endereço completo e os dados do proprietário ficam restritos a ele. Para mudar fotos, valor ou condição de parceria de um imóvel SEU, use o botão “Editar em Meus imóveis” no cartão dele (ou o menu Imóveis › Meus imóveis)." },
   crm: { title: "CRM interno do corretor", description: "Organize clientes e parceiros, acompanhe cada oportunidade por etapa, registre contatos e programe retornos. Os leads ficam privados na sua carteira." },
   radar: { title: "Radar de Compradores", description: "Compare as preferências de compradores cadastrados com os imóveis disponíveis. Confira os critérios do match antes de falar com o corretor responsável." },
   termo: { title: "Termo de Parceria", description: "O termo de cada parceria sai com a divisão da comissão confirmada pelos dois corretores. Leia, aceite e acompanhe o aceite do outro; assinado, imprima ou salve em PDF." },
   dvp: { title: "Registro de visita · DVP", description: "Salve os dados da visita para consulta e acompanhamento. O rascunho não é assinado por ninguém, não confirma um acordo e não garante comissão." },
-  cadastrar: { title: "Meus imóveis", description: "Edite, arquive ou cadastre imóveis e suas condições de parceria. Os dados completos de endereço e do proprietário ficam visíveis apenas para o corretor captador." },
+  cadastrar: { title: "Meus imóveis", description: "Para mudar fotos, valor ou condição de parceria, clique em “Editar” no imóvel, na lista abaixo. Aqui você também arquiva e cadastra imóveis. Os dados completos de endereço e do proprietário ficam visíveis apenas para o corretor captador." },
   admin: { title: "Corretores e pagamentos", description: "Aprove CRECIs e confirme ou estorne pagamentos via Pix. O pagamento é conferido manualmente no extrato do banco." },
 };
 
@@ -271,6 +271,9 @@ export default function NegociaLarApp({
   const [leadActivityList, setLeadActivityList] = useState(initialLeadActivities);
   const [workspaceError, setWorkspaceError] = useState<string | null>(null);
   const [reloadKey, setReloadKey] = useState(0);
+  // "Editar em Meus imóveis" na Vitrine: abre a carteira já na edição daquele imóvel (14/10/2026).
+  const [imovelParaEditar, setImovelParaEditar] = useState<string | null>(null);
+  const imovelAberto = useCallback(() => setImovelParaEditar(null), []);
   const [pendingPropertyId, setPendingPropertyId] = useState<string | null>(null);
   const [radarList, setRadarList] = useState<BuyerProfile[]>(initialRadar);
   const [selectedPropertyForWhiteLabel, setSelectedPropertyForWhiteLabel] = useState<Property | null>(null);
@@ -839,7 +842,8 @@ export default function NegociaLarApp({
           propertyFilterPurpose={propertyFilterPurpose} propertyFilterType={propertyFilterType} propertyFilterSearch={propertyFilterSearch}
           setPropertyFilterPurpose={setPropertyFilterPurpose} setPropertyFilterType={setPropertyFilterType} setPropertyFilterSearch={setPropertyFilterSearch}
           setPropertyPage={setPropertyPage} onCreate={() => setActiveTab("cadastrar")} blockedReason={blockedReason} onShare={setSelectedPropertyForWhiteLabel}
-          onSchedule={property => { setSelectedPropertyForTerm(property); setActiveTab("dvp"); window.scrollTo({ top: 0, behavior: "smooth" }); }} />}
+          onSchedule={property => { setSelectedPropertyForTerm(property); setActiveTab("dvp"); window.scrollTo({ top: 0, behavior: "smooth" }); }}
+          onEdit={property => { setImovelParaEditar(property.id); setActiveTab("cadastrar"); }} />}
 
         {/* TAB 2: RADAR DE COMPRADORES (MATCH REVERSO) */}
         {workspaceReady && activeTab === "radar" && (
@@ -1221,7 +1225,7 @@ export default function NegociaLarApp({
         {activeTab === "cadastrar" && (
           <div className="max-w-3xl mx-auto space-y-6">
             {currentUser ? <>
-              <PropertyInventory reloadKey={reloadKey} onChanged={() => setReloadKey(value => value + 1)} />
+              <PropertyInventory reloadKey={reloadKey} onChanged={() => setReloadKey(value => value + 1)} abrirImovelId={imovelParaEditar} aoAbrir={imovelAberto} />
               <div>
                 <h2 className="text-xl font-bold text-white flex items-center gap-2"><PlusCircle className="w-5 h-5 text-amber-500" />Cadastrar imóvel</h2>
                 <p className="text-sm text-slate-400">Endereço completo e dados do proprietário ficam visíveis só para você. Campos com * são obrigatórios.</p>

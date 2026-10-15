@@ -8,6 +8,9 @@ import { PROPERTY_STATUS_LABELS, PROPERTY_STATUSES, type PropertyInput, type Pro
 import { CONDITIONS, CONDO_AMENITIES_GROUPS, DOCUMENTATION_STATUSES, GARAGE_TYPES, IPTU_PERIODS, PRIVATE_AMENITIES_LIST, PURPOSES, SOLAR_POSITIONS, VIEW_TYPES } from "@/lib/property-options";
 import PhotoUploader from "./PhotoUploader";
 import PhotoGrid from "./PhotoGrid";
+import MoneyInput from "./MoneyInput";
+import { avisoDeValorBaixo } from "@/lib/money-input";
+import { askConfirm } from "@/lib/dialogs";
 import { fotosComCapaNaFrente } from "@/lib/photo-order";
 import { OPCOES_DE_CONDICAO, rotuloDaCondicao } from "@/lib/partnership-models";
 
@@ -15,7 +18,7 @@ type OwnedProperty = ActionData<Awaited<ReturnType<typeof getOwnProperties>>>["i
 type Option = { readonly id: string; readonly label: string };
 type Field = {
   key: keyof PropertyInput; label: string; required?: boolean;
-  kind?: "number" | "count" | "list" | "text" | "boolean" | "checklist" | "photos" | "month";
+  kind?: "number" | "money" | "count" | "list" | "text" | "boolean" | "checklist" | "photos" | "month";
   // Sem "Não informado" quando o campo é obrigatório na vitrine (condição) ou já tem "Não definido".
   options?: readonly Option[]; allowEmpty?: boolean; choices?: string[]; max?: number;
 };
@@ -27,9 +30,10 @@ const groups: { title: string; fields: Field[] }[] = [
     { key: "propertyType", label: "Tipo de imóvel", required: true },
     { key: "purpose", label: "Finalidade", options: PURPOSES },
     { key: "condition", label: "Condição", options: CONDITIONS },
-    { key: "salePrice", label: "Valor (R$)", kind: "number", required: true },
-    { key: "condoFee", label: "Condomínio (R$)", kind: "number" },
-    { key: "iptu", label: "IPTU (R$)", kind: "number" },
+    // Dinheiro no formato brasileiro (14/10/2026): "720.000" no campo numérico virava 720.
+    { key: "salePrice", label: "Valor (R$)", kind: "money", required: true },
+    { key: "condoFee", label: "Condomínio (R$)", kind: "money" },
+    { key: "iptu", label: "IPTU (R$)", kind: "money" },
     { key: "iptuPeriod", label: "Período do IPTU", options: IPTU_PERIODS },
     { key: "description", label: "Descrição", kind: "text", required: true },
   ] },
@@ -101,7 +105,8 @@ function PhotoListField({ field, initial }: { field: Field; initial: string[] })
   </div>;
 }
 
-export default function PropertyInventory({ reloadKey, onChanged }: { reloadKey: number; onChanged: () => void }) {
+// `abrirImovelId`: veio do botão "Editar em Meus imóveis" da Vitrine — abre a edição daquele imóvel (14/10/2026).
+export default function PropertyInventory({ reloadKey, onChanged, abrirImovelId = null, aoAbrir }: { reloadKey: number; onChanged: () => void; abrirImovelId?: string | null; aoAbrir?: () => void }) {
   const [items, setItems] = useState<OwnedProperty[]>([]);
   const [total, setTotal] = useState(0);
   const [usage, setUsage] = useState<{ active: number; limit: number | null } | null>(null);
@@ -131,6 +136,19 @@ export default function PropertyInventory({ reloadKey, onChanged }: { reloadKey:
     }, 250);
     return () => { cancelled = true; window.clearTimeout(timer); };
   }, [page, search, status, refresh, reloadKey, requestKey]);
+  useEffect(() => {
+    if (!abrirImovelId) return;
+    let cancelled = false;
+    getOwnProperties({ id: abrirImovelId }).then((result) => {
+      if (cancelled) return;
+      const item = unwrap(result).items[0];
+      if (!item) { setError("Este imóvel não está na sua carteira."); return; }
+      setEditing(item); setError(""); setMessage("");
+      requestAnimationFrame(() => document.getElementById("editar-imovel")?.scrollIntoView({ behavior: "smooth", block: "start" }));
+    }).catch((error) => { if (!cancelled) setError(error instanceof Error ? error.message : "Não foi possível abrir o imóvel."); })
+      .finally(() => { if (!cancelled) aoAbrir?.(); });
+    return () => { cancelled = true; };
+  }, [abrirImovelId, aoAbrir]);
   function changed() { setRefresh(value => value + 1); onChanged(); }
   async function changeStatus(property: OwnedProperty, value: PropertyStatus) {
     if (busy) return;
@@ -151,6 +169,11 @@ export default function PropertyInventory({ reloadKey, onChanged }: { reloadKey:
         : field.kind === "list" || field.kind === "photos" ? raw.split(/\r?\n/).map(value => value.trim()).filter(Boolean)
         : field.kind === "count" ? (raw ? Number(raw) : undefined) : (raw || undefined);
     }
+    const avisoDoValor = avisoDeValorBaixo(String(input.purpose ?? ""), Number(input.salePrice));
+    if (avisoDoValor && !(await askConfirm({ title: "Confira o valor antes de salvar", message: avisoDoValor, confirmLabel: "O valor está certo" }))) {
+      document.getElementById("edit-salePrice")?.focus();
+      return;
+    }
     setBusy(true); setError(""); setMessage("");
     try {
       unwrap(await updateOwnProperty(editing.id, new Date(editing.updatedAt).toISOString(), input as unknown as PropertyInput));
@@ -165,7 +188,7 @@ export default function PropertyInventory({ reloadKey, onChanged }: { reloadKey:
     </div>
     {message && <p role="status" className="rounded-lg bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p>}
     {error && <div role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{error} <button type="button" onClick={() => { setEditing(null); setRefresh(value => value + 1); }} className="font-bold underline">Recarregar carteira</button></div>}
-    {editing ? <form key={`${editing.id}:${editing.updatedAt}`} onSubmit={save} className="space-y-5">
+    {editing ? <form id="editar-imovel" key={`${editing.id}:${editing.updatedAt}`} onSubmit={save} className="scroll-mt-28 space-y-5">
       <div className="flex items-start justify-between gap-3"><h3 className="font-bold text-slate-900">Editar: {editing.title}</h3><button type="button" disabled={busy} onClick={() => setEditing(null)} className="text-sm font-semibold text-slate-600">Cancelar edição</button></div>
       <fieldset disabled={busy} className="space-y-5">
         {groups.map(group => <div key={group.title} className="space-y-3 border-t border-slate-200 pt-4">
@@ -173,6 +196,9 @@ export default function PropertyInventory({ reloadKey, onChanged }: { reloadKey:
           <div className="grid gap-3 sm:grid-cols-2">{group.fields.map(field => {
             const value = editing[field.key as keyof OwnedProperty];
             const id = `edit-${field.key}`;
+            if (field.kind === "money") return <label key={field.key} htmlFor={id} className="block text-sm font-semibold text-slate-700">{field.label}
+              <MoneyInput id={id} name={field.key} required={field.required} defaultValue={value as string | number | null} className={inputClass} />
+            </label>;
             if (field.kind === "boolean") return <label key={field.key} className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" name={field.key} defaultChecked={Boolean(value)} />{field.label}</label>;
             if (field.kind === "photos") {
               const lista = Array.isArray(value) ? value.map(String) : [];

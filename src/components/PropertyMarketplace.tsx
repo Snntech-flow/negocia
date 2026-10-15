@@ -1,6 +1,6 @@
 "use client";
 
-import { Building2, ShieldCheck, Search, PlusCircle, Lock, Image as ImageIcon, MapPin, Bed, Bath, Car, Maximize2, CheckCircle2, Share2, Stamp } from "lucide-react";
+import { Building2, ShieldCheck, Search, PlusCircle, Lock, Image as ImageIcon, MapPin, Bed, Bath, Car, Maximize2, CheckCircle2, Pencil, Share2, Stamp } from "lucide-react";
 import { rotuloDaCondicao } from "@/lib/partnership-models";
 import { PROPERTY_PAGE_SIZE } from "@/lib/marketplace-query";
 import type { Property } from "@/lib/property-types";
@@ -10,11 +10,12 @@ import { previsaoParaTela } from "@/lib/delivery-forecast";
 
 export default function PropertyMarketplace({ properties, propertyTotal, propertyPage, loading, currentUserId, propertyTypes,
   propertyFilterPurpose, propertyFilterType, propertyFilterSearch, setPropertyFilterPurpose, setPropertyFilterType,
-  setPropertyFilterSearch, setPropertyPage, onCreate, blockedReason = null, onShare, onSchedule }: {
+  setPropertyFilterSearch, setPropertyPage, onCreate, blockedReason = null, onShare, onSchedule, onEdit }: {
   properties: Property[]; propertyTotal: number; propertyPage: number; loading: boolean; currentUserId: string | null; propertyTypes: string[];
   propertyFilterPurpose: string; propertyFilterType: string; propertyFilterSearch: string;
   setPropertyFilterPurpose: (value: string) => void; setPropertyFilterType: (value: string) => void; setPropertyFilterSearch: (value: string) => void;
   setPropertyPage: (value: number) => void; onCreate: () => void; blockedReason?: string | null; onShare: (property: Property) => void; onSchedule: (property: Property) => void;
+  onEdit?: (property: Property) => void;
 }) {
   const formatBRL = (value: string) => Number(value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   const area = (value: string) => Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
@@ -277,7 +278,12 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
                         title={blockedReason || undefined}
                         onClick={() => onSchedule(prop)}
                         className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs py-2.5 px-3 rounded-xl transition border border-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
-                      ><Stamp className="w-4 h-4 text-emerald-400" />Agendar visita</button> : <button type="button" disabled className="flex cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-xs font-semibold text-slate-500" title={prop.broker.id === currentUserId ? "Esta é uma captação sua; escolha um imóvel de outro corretor para iniciar uma parceria." : "Este imóvel não está aceitando parcerias."}><Stamp className="h-4 w-4" />{prop.broker.id === currentUserId ? "Imóvel da sua carteira" : "Parceria indisponível"}</button>}
+                      ><Stamp className="w-4 h-4 text-emerald-400" />Agendar visita</button> : prop.broker.id === currentUserId && onEdit ? <button
+                        type="button"
+                        onClick={() => onEdit(prop)}
+                        title="Imóvel seu: fotos, valor e condição de parceria se mudam em Imóveis › Meus imóveis."
+                        className="flex items-center justify-center gap-2 rounded-xl border border-[#083858] bg-[#ffffff] px-3 py-2.5 text-xs font-bold text-[#083858] transition hover:bg-[#eef4fa]"
+                      ><Pencil className="h-4 w-4" />Editar em Meus imóveis</button> : <button type="button" disabled className="flex cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-xs font-semibold text-slate-500" title={prop.broker.id === currentUserId ? "Esta é uma captação sua; escolha um imóvel de outro corretor para iniciar uma parceria." : "Este imóvel não está aceitando parcerias."}><Stamp className="h-4 w-4" />{prop.broker.id === currentUserId ? "Imóvel da sua carteira" : "Parceria indisponível"}</button>}
                     </div>
                   </div>
                 ))}

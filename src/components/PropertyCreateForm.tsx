@@ -13,6 +13,9 @@ import {
 } from "@/lib/property-options";
 import PhotoUploader from "./PhotoUploader";
 import PhotoGrid from "./PhotoGrid";
+import MoneyInput from "./MoneyInput";
+import { avisoDeValorBaixo } from "@/lib/money-input";
+import { askConfirm } from "@/lib/dialogs";
 import { camposQueFaltam } from "@/lib/property-required";
 import { temPrevisaoDeEntrega } from "@/lib/delivery-forecast";
 
@@ -139,6 +142,12 @@ export default function PropertyCreateForm({ broker, blockedReason, onCreated, o
     const block = text("block");
     const floor = text("floor");
     const confidentialAddress = [`${street.trim()}, ${number || "s/n"}`, block && `Bloco ${block}`, floor, `${neighborhood.trim()} · ${city.trim()}/${state}`].filter(Boolean).join(" · ");
+    // Valor baixo demais para a finalidade ("720.000" lido como 720): confirma antes de publicar (14/10/2026).
+    const avisoDoValor = avisoDeValorBaixo(purpose, Number(text("salePrice")));
+    if (avisoDoValor && !(await askConfirm({ title: "Confira o valor antes de publicar", message: avisoDoValor, confirmLabel: "O valor está certo" }))) {
+      document.getElementById("pc-price")?.focus();
+      return;
+    }
     setBusy(true); setError("");
     try {
       const result = unwrap(await createProperty({
@@ -181,9 +190,9 @@ export default function PropertyCreateForm({ broker, blockedReason, onCreated, o
       <h3 className={heading}><DollarSign className="w-4 h-4 text-amber-500" />1. Finalidade, valores e condições</h3>
       <Choices title="Finalidade do imóvel" options={PURPOSES} value={purpose} onChange={setPurpose} columns="grid-cols-3" />
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div><label htmlFor="pc-price" className={label}>Valor {purpose === "venda" ? "de venda" : purpose === "aluguel" ? "do aluguel" : "da diária"} (R$) *</label><input id="pc-price" name="salePrice" required type="number" min="1" step="0.01" placeholder="Ex: 850000" className={input} /></div>
-        <div><label htmlFor="pc-condo" className={label}>Condomínio (R$/mês)</label><input id="pc-condo" name="condoFee" type="number" min="0" step="0.01" placeholder="Ex: 650" className={input} /></div>
-        <div><label htmlFor="pc-iptu" className={label}>IPTU (R$)</label><div className="flex gap-2"><input id="pc-iptu" name="iptu" type="number" min="0" step="0.01" placeholder="Ex: 180" className={input} /><select aria-label="Período do IPTU" value={iptuPeriod} onChange={(e) => setIptuPeriod(e.target.value as "anual" | "mensal")} className="bg-slate-950 border border-slate-800 rounded-xl px-2 py-2 text-xs text-white"><option value="anual">Anual</option><option value="mensal">Mensal</option></select></div></div>
+        <div><label htmlFor="pc-price" className={label}>Valor {purpose === "venda" ? "de venda" : purpose === "aluguel" ? "do aluguel" : "da diária"} (R$) *</label><MoneyInput id="pc-price" name="salePrice" required placeholder="Ex: 850.000" className={input} /></div>
+        <div><label htmlFor="pc-condo" className={label}>Condomínio (R$/mês)</label><MoneyInput id="pc-condo" name="condoFee" placeholder="Ex: 650" className={input} /></div>
+        <div><label htmlFor="pc-iptu" className={label}>IPTU (R$)</label><div className="flex gap-2"><div className="min-w-0 flex-1"><MoneyInput id="pc-iptu" name="iptu" placeholder="Ex: 180" className={input} /></div><select aria-label="Período do IPTU" value={iptuPeriod} onChange={(e) => setIptuPeriod(e.target.value as "anual" | "mensal")} className="bg-slate-950 border border-slate-800 rounded-xl px-2 py-2 text-xs text-white"><option value="anual">Anual</option><option value="mensal">Mensal</option></select></div></div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <Choices title="Aceita financiamento bancário?" required id="pc-financiamento" faltando={faltando} options={[{ id: "sim", label: "Sim, financia" }, { id: "nao", label: "Somente à vista" }]} value={acceptsFinancing === null ? null : acceptsFinancing ? "sim" : "nao"} onChange={(value) => setAcceptsFinancing(value === "sim")} columns="grid-cols-2" />

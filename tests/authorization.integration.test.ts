@@ -189,6 +189,7 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
       confidentialAddress: "Rua protegida, 123", ownerName: "Proprietário privado", ownerPhone: "11933332222",
       acceptsPartnership: true, splitPercentage: "50", photos: [], purpose: "venda" };
     const [property] = await db.insert(properties).values({ ...form, brokerId: otherBroker.id }).returning();
+    const cleanupExtras: string[] = [];
     try {
       const [partnership] = await db.insert(partnerships).values({ propertyId: property.id, captorBrokerId: otherBroker.id, partnerBrokerId: owner.id }).returning();
       const revision = property.updatedAt.toISOString();
@@ -196,6 +197,14 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
       assert.ok(!foreign.items.some(item => item.id === property.id));
       await assert.rejects(asUser(owner.id, () => inventory.updateOwnProperty(property.id, revision, form)), /não encontrado/);
       await assert.rejects(asUser(owner.id, () => inventory.updateOwnPropertyStatus(property.id, revision, "arquivado")), /não encontrado/);
+      // "Editar em Meus imóveis" (Vitrine) abre um imóvel pelo id — só se for da carteira de quem pede. Um imóvel a mais
+      // para cada corretor: sem o filtro, a lista viria com eles (sem isso o teste passava por sorte).
+      const extras = await db.insert(properties).values([{ ...form, title: "Outro do captador", status: "arquivado", brokerId: otherBroker.id },
+        { ...form, title: "Do outro corretor", status: "arquivado", brokerId: owner.id }]).returning();
+      cleanupExtras.push(...extras.map(item => item.id));
+      assert.deepEqual((await asUser(owner.id, () => inventory.getOwnProperties({ id: property.id }))).items, []);
+      assert.deepEqual((await asUser(otherBroker.id, () => inventory.getOwnProperties({ id: property.id }))).items.map(item => item.id), [property.id]);
+      await assert.rejects(asUser(otherBroker.id, () => inventory.getOwnProperties({ id: "nao-e-um-id" })), /Filtros inválidos/);
       const own = await asUser(otherBroker.id, () => inventory.getOwnProperties({ search: "editável" }));
       assert.equal(own.items[0].ownerName, form.ownerName);
       const saved = await asUser(otherBroker.id, () => inventory.updateOwnProperty(property.id, revision,
@@ -228,7 +237,7 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
       await db.update(properties).set({ coverPhoto: null }).where(eq(properties.id, property.id));
       const semCapa = await asUser(admin.id, () => actions.getMarketplaceData({ section: "vitrine", search: "Título atualizado" }));
       assert.equal(semCapa.properties.find(item => item.id === property.id)?.coverPhoto, fotoSala);
-    } finally { await db.delete(properties).where(eq(properties.id, property.id)); }
+    } finally { for (const id of [property.id, ...cleanupExtras]) await db.delete(properties).where(eq(properties.id, id)); }
   });
 
   await t.test("recuperação mantém resposta genérica, envia link sem expor token e limita solicitações", async () => {
