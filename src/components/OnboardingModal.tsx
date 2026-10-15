@@ -1,8 +1,10 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
+import BotaoFechar from "./BotaoFechar";
+import { useVoltarFecha } from "@/lib/use-voltar-fecha";
 import Image from "next/image";
-import { ShieldCheck, CheckCircle2, ArrowRight, Check, Building2, Clock, X, AlertCircle } from "lucide-react";
+import { ShieldCheck, CheckCircle2, ArrowRight, Check, Building2, Clock, AlertCircle } from "lucide-react";
 
 import { validateCreciFormat, registerUserWithPix, loginUser } from "@/lib/actions";
 import { unwrap, type ActionData } from "@/lib/action-result";
@@ -27,6 +29,7 @@ const inputClass = "w-full bg-slate-50 border border-slate-200 rounded-xl px-3 p
 const money = (value: string) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value));
 
 export default function OnboardingModal({ isOpen, onClose, onComplete, initialPlan = "40", initialMode = "register" }: OnboardingModalProps) {
+  const fechar = useVoltarFecha(onClose, isOpen); // X visível, Esc e voltar fecham (15/10/2026)
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [mode, setMode] = useState<"register" | "login" | "recovery">(initialMode);
   const [checkingFormat, setCheckingFormat] = useState(false);
@@ -118,9 +121,7 @@ export default function OnboardingModal({ isOpen, onClose, onComplete, initialPl
               <div id="onboarding-title" className="text-[11px] text-slate-400">{mode === "login" ? "Entrar na sua conta" : mode === "recovery" ? "Recuperar senha" : "Cadastro do corretor"}</div>
             </div>
           </div>
-          <button type="button" onClick={onClose} aria-label="Fechar" className="text-slate-400 hover:text-white p-1 rounded-lg hover:bg-slate-800 transition">
-            <X className="w-5 h-5" />
-          </button>
+          <BotaoFechar onClick={fechar} />
         </div>
 
         {step < 4 && mode === "register" && (

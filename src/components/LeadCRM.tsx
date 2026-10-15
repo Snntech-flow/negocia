@@ -2,6 +2,8 @@
 
 import NegotiationDocumentation from "./NegotiationDocumentation";
 import CpfParcialInput from "./CpfParcialInput";
+import BotaoFechar from "./BotaoFechar";
+import { useVoltarFecha } from "@/lib/use-voltar-fecha";
 import { divisoesPermitidas } from "@/lib/partnership-models";
 import type { NegotiationDocuments } from "@/lib/negotiation-documents";
 import BrokerWeeklyAgenda from "./BrokerWeeklyAgenda";
@@ -11,7 +13,7 @@ import BrokerAssistant from "./BrokerAssistant";
 import BrokerCrmOverview from "./BrokerCrmOverview";
 import BrokerCrmClients from "./BrokerCrmClients";
 import React, { FormEvent, useEffect, useMemo, useState } from "react";
-import { Calculator, Bot, LayoutDashboard, List, KanbanSquare, Building2, CalendarClock, CheckCircle2, Clock3, Download, FileUp, MapPin, Pencil, Phone, Plus, Search, UserRound, X } from "lucide-react";
+import { Calculator, Bot, LayoutDashboard, List, KanbanSquare, Building2, CalendarClock, CheckCircle2, Clock3, Download, FileUp, MapPin, Pencil, Phone, Plus, Search, UserRound } from "lucide-react";
 import { addLeadActivity, completeLeadFollowUp, createDvpCertificate, createLead, importLeadsCsv, updateLead, updateLeadStage } from "@/lib/actions";
 import { cityFilterOptions, loadStateCities } from "@/lib/cities";
 import { BRAZILIAN_STATES } from "@/lib/brazil-states";
@@ -315,6 +317,11 @@ export default function LeadCRM({
   function setSelectedLeadId(id: string | null) { setDocumentationProperty(undefined); setSelectedLeadIdState(id); }
 
   const selectedLead = leads.find((lead) => lead.id === selectedLeadId) || null;
+  // X visível, Esc e a seta de voltar fecham cada janela do CRM, uma de cada vez (15/10/2026).
+  const fecharImportacao = useVoltarFecha(() => setCsvImportOpen(false), csvImportOpen);
+  const fecharLead = useVoltarFecha(() => { setIsCreateOpen(false); setEditingLead(null); }, isCreateOpen || !!editingLead);
+  const fecharVisita = useVoltarFecha(() => setVisitProperty(null), !!(visitProperty && selectedLead));
+  const fecharFichaDoLead = useVoltarFecha(() => setSelectedLeadId(null), !!selectedLead);
   const matchedProperties = useMemo(() => {
     if (!selectedLead || !["comprador", "locatario"].includes(selectedLead.leadType)) return [];
     const city = normalizeMatchText(selectedLead.city || "");
@@ -761,12 +768,12 @@ export default function LeadCRM({
 
       {csvImportOpen && <div className="fixed inset-0 z-[65] flex items-center justify-center bg-black/70 p-4">
         <div className="w-full max-w-lg space-y-4 rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
-          <div className="flex items-start justify-between gap-3"><div><div className="text-xs font-bold uppercase tracking-wide text-amber-400">CRM · Importação</div><h3 className="mt-1 text-lg font-extrabold text-white">Trazer contatos de uma planilha</h3></div><button type="button" onClick={() => setCsvImportOpen(false)} className="rounded-lg p-1 text-slate-400 hover:bg-slate-800" aria-label="Fechar"><X className="h-5 w-5" /></button></div>
+          <div className="flex items-start justify-between gap-3"><div><div className="text-xs font-bold uppercase tracking-wide text-amber-400">CRM · Importação</div><h3 className="mt-1 text-lg font-extrabold text-white">Trazer contatos de uma planilha</h3></div><BotaoFechar onClick={fecharImportacao} /></div>
           <p className="text-xs leading-relaxed text-slate-400">Já tem uma lista de clientes em uma planilha? No Excel ou Google Planilhas, salve ou baixe a lista no formato CSV e selecione o arquivo aqui. CSV é um arquivo de tabela que permite trazer vários contatos de uma vez, sem cadastrar um por um. Use vírgula ou ponto e vírgula como separador. Colunas obrigatórias: <b className="text-slate-200">Nome</b> e <b className="text-slate-200">Telefone</b>. Aceita também e-mail, tipo, origem, tipo de imóvel, cidade, bairros, orçamento, quartos e observações. Até 100 linhas; contatos repetidos pelo telefone serão ignorados.</p>
           <button type="button" onClick={() => { const content = '\uFEFFNome;Telefone;E-mail;Tipo;Origem;Tipo de imóvel;Cidade;Bairros;Orçamento máximo;Quartos mínimos;Observações\r\nMaria Exemplo;(11) 99999-0000;maria@email.com;Comprador;Indicação;Apartamento;São Paulo;Moema|Pinheiros;850000;2;Prefere andar alto'; const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' })); const a = document.createElement('a'); a.href = url; a.download = 'modelo-importacao-negocia-lar.csv'; a.click(); URL.revokeObjectURL(url); }} className="text-xs font-semibold text-emerald-300 hover:text-emerald-200">Baixar modelo CSV</button>
           <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-600 px-4 py-5 text-sm font-bold text-white hover:border-amber-400 hover:bg-slate-800 ${busy ? "pointer-events-none opacity-50" : ""}`}><FileUp className="h-4 w-4" />{busy ? "Importando e validando…" : "Selecionar arquivo .csv"}<input type="file" accept=".csv,text/csv" className="sr-only" disabled={busy} onChange={(event) => { void handleCsvFile(event.target.files?.[0]); event.currentTarget.value = ""; }} /></label>
           {error && <p role="alert" className="rounded-lg border border-rose-500/30 bg-rose-950/40 p-3 text-xs text-rose-200">{error}</p>}
-          <div className="flex justify-end border-t border-slate-800 pt-3"><button type="button" onClick={() => setCsvImportOpen(false)} className="rounded-lg px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800">Fechar</button></div>
+          <div className="flex justify-end border-t border-slate-800 pt-3"><button type="button" onClick={fecharImportacao} className="rounded-lg px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800">Fechar</button></div>
         </div>
       </div>}
 
@@ -854,7 +861,7 @@ export default function LeadCRM({
           <form key={editingLead?.id || "novo-lead"} onSubmit={submitNewLead} className="my-auto w-full max-w-2xl space-y-5 rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl sm:p-7">
             <div className="flex items-start justify-between gap-4">
               <div><div className="text-xs font-bold uppercase tracking-wide text-amber-400">{editingLead ? "Atualizar oportunidade" : "Nova oportunidade"}</div><h3 className="mt-1 text-xl font-extrabold text-white">{editingLead ? "Editar lead" : "Cadastrar lead"}</h3></div>
-              <button type="button" onClick={() => { setIsCreateOpen(false); setEditingLead(null); }} className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white" aria-label="Fechar"><X className="h-5 w-5" /></button>
+              <BotaoFechar onClick={fecharLead} />
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
               <label className="text-xs font-semibold text-slate-300 sm:col-span-2">Nome *<input name="fullName" required maxLength={120} autoFocus defaultValue={editingLead?.fullName || ""} className={`${inputClass} mt-1`} placeholder="Nome da pessoa" /></label>
@@ -873,7 +880,7 @@ export default function LeadCRM({
             </div>
             {error && <p role="alert" className="rounded-lg border border-rose-500/30 bg-rose-950/40 p-3 text-xs text-rose-200">{error}</p>}
             <div className="flex justify-end gap-2 border-t border-slate-800 pt-4">
-              <button type="button" onClick={() => { setIsCreateOpen(false); setEditingLead(null); }} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-800">Cancelar</button>
+              <button type="button" onClick={fecharLead} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-800">Cancelar</button>
               <button disabled={busy} className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold text-slate-950 hover:bg-amber-400 disabled:opacity-50">{busy ? "Salvando..." : editingLead ? "Salvar alterações" : "Salvar lead"}</button>
             </div>
           </form>
@@ -885,14 +892,14 @@ export default function LeadCRM({
           <form onSubmit={submitVisitDvp} className="w-full max-w-md space-y-4 rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
               <div><div className="text-xs font-bold uppercase tracking-wide text-emerald-300">DVP · registro de visita</div><h3 className="mt-1 text-lg font-extrabold text-white">{selectedLead.fullName}</h3><p className="mt-1 text-xs text-slate-400">{visitProperty.title}</p></div>
-              <button type="button" onClick={() => setVisitProperty(null)} className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white" aria-label="Fechar"><X className="h-5 w-5" /></button>
+              <BotaoFechar onClick={fecharVisita} />
             </div>
             <label className="block text-xs font-semibold text-slate-300">Data e horário da visita<input name="visitDate" type="datetime-local" required defaultValue={localDateTimeNow()} className={`${inputClass} mt-1`} /></label>
             <label htmlFor="crm-visita-cpf" className="block text-xs font-semibold text-slate-300">CPF do cliente (fica mascarado — LGPD)<CpfParcialInput id="crm-visita-cpf" name="clientCpfPartial" className={`${inputClass} mt-1 font-mono`} /></label>
             <p className="rounded-lg border border-amber-500/20 bg-amber-950/20 p-3 text-[11px] leading-relaxed text-slate-300">O registro fica como rascunho até ser validado e aceito pelas partes. Ele não equivale a assinatura eletrônica nem substitui orientação jurídica.</p>
             {error && <p role="alert" className="text-xs text-rose-300">{error}</p>}
             <div className="flex justify-end gap-2 border-t border-slate-800 pt-3">
-              <button type="button" onClick={() => setVisitProperty(null)} className="rounded-lg px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800">Cancelar</button>
+              <button type="button" onClick={fecharVisita} className="rounded-lg px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800">Cancelar</button>
               <button disabled={busy || !!blockedReason} title={blockedReason || undefined} className="rounded-lg bg-emerald-500 px-3 py-2 text-xs font-bold text-slate-950 hover:bg-emerald-400 disabled:opacity-50">{busy ? "Registrando..." : "Criar registro de visita"}</button>
             </div>
           </form>
@@ -900,13 +907,13 @@ export default function LeadCRM({
       )}
 
       {selectedLead && (
-        <div className="fixed inset-0 z-50 flex justify-end bg-black/70" onMouseDown={(event) => { if (event.target === event.currentTarget) setSelectedLeadId(null); }}>
+        <div className="fixed inset-0 z-50 flex justify-end bg-black/70" onMouseDown={(event) => { if (event.target === event.currentTarget) fecharFichaDoLead(); }}>
           <aside className="flex h-full w-full max-w-xl flex-col border-l border-slate-700 bg-slate-950 shadow-2xl">
             <div className="flex items-start justify-between border-b border-slate-800 p-5">
               <div className="min-w-0"><div className="text-xs font-bold uppercase tracking-wide text-amber-400">{LEAD_TYPE_LABELS[selectedLead.leadType] || selectedLead.leadType} · {LEAD_SOURCE_LABELS[selectedLead.source] || selectedLead.source}</div><h3 className="mt-1 truncate text-xl font-extrabold text-white">{selectedLead.fullName}</h3><a className="mt-1 inline-flex items-center gap-1.5 text-sm text-slate-300 hover:text-amber-300" href={`tel:${selectedLead.phone}`}><Phone className="h-3.5 w-3.5" />{selectedLead.phone}</a>{selectedLead.email && <div className="mt-1 text-xs text-slate-400">{selectedLead.email}</div>}</div>
               <div className="flex shrink-0 items-center gap-1">
                 <button onClick={() => { setEditingLead(selectedLead); setIsCreateOpen(false); setError(null); }} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-2.5 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white" aria-label="Editar lead"><Pencil className="h-3.5 w-3.5" />Editar</button>
-                <button onClick={() => setSelectedLeadId(null)} className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white" aria-label="Fechar"><X className="h-5 w-5" /></button>
+                <BotaoFechar onClick={fecharFichaDoLead} />
               </div>
             </div>
             <div className="flex-1 space-y-5 overflow-y-auto p-5">

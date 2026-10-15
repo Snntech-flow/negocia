@@ -1,12 +1,15 @@
 "use client";
 import { useEffect, useState } from "react";
 import { getMySubscription, requestSubscriptionRenewal } from "@/lib/actions";
+import BotaoFechar from "./BotaoFechar";
+import { useVoltarFecha } from "@/lib/use-voltar-fecha";
 import { unwrap, type ActionData } from "@/lib/action-result";
 import { isPlanId, planCharge, planName, type BillingCycle } from "@/lib/plans";
 type Subscription = ActionData<Awaited<ReturnType<typeof getMySubscription>>>;
 const PIX_KEY = "b993844f-33d9-4515-a0b4-b3b26b886cf3";
 const STATUS_LABELS: Record<string, string> = { pago: "Confirmado", pendente: "Aguardando confirmação", estornado: "Estornado" };
 export default function SubscriptionPanel({ onClose }: { onClose: () => void }) {
+  const fechar = useVoltarFecha(onClose); // X visível, Esc e voltar fecham (15/10/2026)
   const [data, setData] = useState<Subscription | null>(null);
   const [message, setMessage] = useState("");
   const [busy, setBusy] = useState(false);
@@ -38,7 +41,7 @@ export default function SubscriptionPanel({ onClose }: { onClose: () => void }) 
   async function copy(value: string) { try { await navigator.clipboard.writeText(value); setMessage("Copiado!"); } catch { setMessage("Não foi possível copiar. Selecione e copie o texto exibido."); } }
   return <div className="fixed inset-0 z-[75] flex items-center justify-center bg-black/80 p-4" role="dialog" aria-modal="true" aria-labelledby="subscription-title">
     <section className="max-h-[90vh] w-full max-w-xl space-y-5 overflow-auto rounded-2xl border border-slate-700 bg-slate-900 p-6 text-slate-200">
-      <div className="flex items-center justify-between"><h2 id="subscription-title" className="text-lg font-bold text-white">Minha assinatura</h2><button type="button" onClick={onClose} aria-label="Fechar assinatura" className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800">✕</button></div>
+      <div className="flex items-center justify-between"><h2 id="subscription-title" className="text-lg font-bold text-white">Minha assinatura</h2><BotaoFechar onClick={fechar} rotulo="Fechar assinatura" /></div>
       {!data && !message && <p>Consultando sua assinatura…</p>}
       {data && <>
         {data.user.exemptAt ? <div className="rounded-xl bg-slate-800 p-4 text-sm"><p className="font-bold">Plano {planName(data.user.plan)}</p><p className="mt-2">Conta sem cobrança. O acesso não tem vencimento.</p></div> : <>

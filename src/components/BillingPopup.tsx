@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { AlertTriangle, CreditCard } from "lucide-react";
+import BotaoFechar from "./BotaoFechar";
 import { requestSubscriptionRenewal } from "@/lib/actions";
 import { unwrap } from "@/lib/action-result";
 import { isPlanId, planCharge, type BillingCycle } from "@/lib/plans";
@@ -61,6 +62,7 @@ export default function BillingPopup({ userId, notice, pendingPix, now, plan, ha
   return <div className="fixed inset-0 z-[80] flex items-center justify-center bg-slate-950/70 p-4" role="dialog" aria-modal="true" aria-labelledby="billing-popup-title">
     <section className={`w-full max-w-md space-y-4 rounded-2xl border-2 bg-slate-900 p-6 shadow-2xl ${expired ? "border-red-500/60" : "border-amber-500/60"}`}>
       <div className="flex items-start gap-3">
+        <BotaoFechar onClick={remindLater} rotulo="Fechar e lembrar depois" className="order-last ml-auto" />
         <span className={`rounded-xl p-2 ${expired ? "bg-red-500/15 text-red-400" : "bg-amber-500/15 text-amber-400"}`}>{expired ? <AlertTriangle className="h-5 w-5" aria-hidden="true" /> : <CreditCard className="h-5 w-5" aria-hidden="true" />}</span>
         <div>
           <h2 id="billing-popup-title" className="text-lg font-bold text-white">{notice.title}</h2>

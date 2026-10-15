@@ -2,6 +2,9 @@
 
 import dynamic from "next/dynamic";
 import CpfParcialInput from "./CpfParcialInput";
+import { abasGuardadas, abrirAba, fecharAba } from "@/lib/abas";
+import BotaoFechar from "./BotaoFechar";
+import { useVoltarFecha } from "@/lib/use-voltar-fecha";
 import { divisoesPermitidas, rotuloDaCondicao } from "@/lib/partnership-models";
 import { PROPERTY_PAGE_SIZE } from "@/lib/marketplace-query";
 import RadarMatches from "./RadarMatches";
@@ -46,6 +49,7 @@ import {
   Info,
   MessageSquarePlus,
   FileText,
+  X,
 } from "lucide-react";
 import OnboardingModal from "@/components/OnboardingModal";
 const LeadCRM = dynamic(() => import("./LeadCRM"));
@@ -243,28 +247,61 @@ export default function NegociaLarApp({
   const [currentView, setCurrentView] = useState<"app" | "landing">(initialCurrentUser ? "app" : "landing");
   type WorkspaceTab = "vitrine" | "crm" | "radar" | "atendimento" | "cadastrar" | "termo" | "dvp" | "financeiro" | "admin";
   const [activeTab, setActiveTabState] = useState<WorkspaceTab>("vitrine");
+  // Abas abertas, como no Flow (15/10/2026): cada tela aberta vira uma aba com X; a Vitrine é a fixa.
+  const TAB_LABELS: Record<WorkspaceTab, string> = { vitrine: "Vitrine", crm: "Minha carteira", radar: "Radar de Compradores",
+    atendimento: "Funil de atendimento", cadastrar: "Meus imóveis", termo: "Termo de Parceria", dvp: "Registro de Visita",
+    financeiro: "Receitas e despesas", admin: "Corretores e pagamentos" };
+  const ABAS_PERMITIDAS: WorkspaceTab[] = ["vitrine", "crm", "radar", "atendimento", "cadastrar", "termo", "dvp", "financeiro", ...(initialCurrentUser?.role === "admin" ? ["admin" as const] : [])];
+  const [abasAbertas, setAbasAbertas] = useState<WorkspaceTab[]>(["vitrine"]);
   const setActiveTab = (tab: WorkspaceTab) => {
     document.querySelectorAll<HTMLDetailsElement>(".workspace-navigation details[open]").forEach(menu => { menu.open = false; });
     setActiveTabState(tab);
+    setAbasAbertas((abertas) => abrirAba(abertas, tab));
+    // A seta de voltar do navegador volta para a aba anterior, em vez de sair do aplicativo.
+    if (window.history.state?.negocialarAba !== tab) window.history.pushState({ negocialarAba: tab }, "");
     if (currentUser) {
       try { sessionStorage.setItem(`negocialar-tab:${currentUser.id}`, tab); } catch {}
     }
   };
+  const fecharAbaDaTela = (aba: WorkspaceTab) => {
+    const resultado = fecharAba(abasAbertas, aba, activeTab, "vitrine");
+    setAbasAbertas(resultado.abertas);
+    if (resultado.ativa !== activeTab) setActiveTab(resultado.ativa);
+  };
   useEffect(() => {
     if (!initialCurrentUser) return;
     let saved: string | null = null;
-    try { saved = sessionStorage.getItem(`negocialar-tab:${initialCurrentUser.id}`); } catch {}
-    const allowed = ["vitrine", "crm", "radar", "atendimento", "cadastrar", "termo", "dvp", "financeiro", ...(initialCurrentUser.role === "admin" ? ["admin"] : [])];
-    if (!saved || !allowed.includes(saved)) return;
-    const tab = saved as WorkspaceTab;
-    const frame = requestAnimationFrame(() => setActiveTabState(tab));
+    let abasSalvas: unknown = null;
+    try {
+      saved = sessionStorage.getItem(`negocialar-tab:${initialCurrentUser.id}`);
+      abasSalvas = JSON.parse(sessionStorage.getItem(`negocialar-abas:${initialCurrentUser.id}`) || "null");
+    } catch {}
+    const allowed: string[] = ["vitrine", "crm", "radar", "atendimento", "cadastrar", "termo", "dvp", "financeiro", ...(initialCurrentUser.role === "admin" ? ["admin"] : [])];
+    const tab = (saved && allowed.includes(saved) ? saved : "vitrine") as WorkspaceTab;
+    const abas = abrirAba(abasGuardadas<WorkspaceTab>(abasSalvas, allowed as WorkspaceTab[], "vitrine"), tab);
+    window.history.replaceState({ ...(window.history.state ?? {}), negocialarAba: tab }, "");
+    const frame = requestAnimationFrame(() => { setActiveTabState(tab); setAbasAbertas(abas); });
     return () => cancelAnimationFrame(frame);
   }, [initialCurrentUser]);
+  useEffect(() => {
+    const aoVoltar = (event: PopStateEvent) => {
+      const aba = event.state?.negocialarAba as WorkspaceTab | undefined;
+      if (!aba || !ABAS_PERMITIDAS.includes(aba)) return;
+      setActiveTabState(aba);
+      setAbasAbertas((abertas) => abrirAba(abertas, aba));
+    };
+    window.addEventListener("popstate", aoVoltar);
+    return () => window.removeEventListener("popstate", aoVoltar);
+  });
   const [userList, setUserList] = useState<UserItem[]>(initialUsers);
   const [transactionList, setTransactionList] = useState<TransactionItem[]>(initialTransactions);
   const [currentUser, setCurrentUser] = useState<WorkspaceSessionUser | null>(
     initialCurrentUser || null
   );
+  useEffect(() => {
+    if (!currentUser) return;
+    try { sessionStorage.setItem(`negocialar-abas:${currentUser.id}`, JSON.stringify(abasAbertas)); } catch {}
+  }, [abasAbertas, currentUser]);
   const [propertyList, setPropertyList] = useState<Property[]>(initialProperties);
   const [propertyTotal, setPropertyTotal] = useState(initialPropertyTotal);
   const [propertyPage, setPropertyPage] = useState(1);
@@ -285,6 +322,7 @@ export default function NegociaLarApp({
   const [isUserSwitcherOpen, setIsUserSwitcherOpen] = useState(false);
   const [isOnboardingModalOpen, setIsOnboardingModalOpen] = useState(false);
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
+  const fecharSugestao = useVoltarFecha(() => setIsFeedbackOpen(false), isFeedbackOpen); // X visível, Esc e voltar (15/10/2026)
   const [isSubscriptionOpen, setIsSubscriptionOpen] = useState(false);
   const [defaultVisitDate, setDefaultVisitDate] = useState("");
   // Celular: a aba ativa rola para dentro da faixa de abas.
@@ -793,6 +831,14 @@ export default function NegociaLarApp({
             </details>
           ))}
         </div>
+        {/* Abas abertas (15/10/2026), como no Flow: a tela de cada aba e um X para fechar; a Vitrine é a fixa. */}
+        <div role="tablist" aria-label="Telas abertas" className="max-w-7xl mx-auto flex items-center gap-1 overflow-x-auto px-4 pb-2 sm:px-6 lg:px-8 [scrollbar-width:none]">
+          {abasAbertas.map((aba) => <div key={aba} className={`flex h-8 shrink-0 items-center rounded-md text-xs font-semibold ${aba === activeTab ? "bg-[#ffffff] text-[#083858]" : "bg-[#ffffff]/10 text-[#ffffff] hover:bg-[#ffffff]/20"}`}>
+            <button type="button" role="tab" aria-selected={aba === activeTab} onClick={() => setActiveTab(aba)} className={`h-full ${aba === "vitrine" ? "px-3" : "pl-3 pr-1"}`}>{TAB_LABELS[aba]}</button>
+            {aba !== "vitrine" && <button type="button" aria-label={`Fechar a aba ${TAB_LABELS[aba]}`} title="Fechar aba" onClick={() => fecharAbaDaTela(aba)}
+              className="mr-1 flex h-6 w-6 items-center justify-center rounded hover:bg-[#083858]/15"><X className="h-3.5 w-3.5" aria-hidden="true" /></button>}
+          </div>)}
+        </div>
       </header>
 
       {/* Main Content Area */}
@@ -1265,7 +1311,7 @@ export default function NegociaLarApp({
         plan={currentUser.plan} hasPaid={!!currentUser.hasPaid} billingCycle={currentUser.billingCycle}
         onRegistered={() => setCurrentUser((user) => user && { ...user, pendingPix: true })} onOpenSubscription={() => setIsSubscriptionOpen(true)} onMessage={(text) => showToast(text)} />}
       <DialogHost />
-      {isFeedbackOpen && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 p-4" role="dialog" aria-modal="true" aria-labelledby="pilot-feedback-title"><form onSubmit={(event) => void handlePilotFeedbackSubmit(event)} className="w-full max-w-lg space-y-4 rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl"><div className="flex items-start justify-between gap-4"><div><h2 id="pilot-feedback-title" className="text-lg font-bold text-white">Ajuda e fale conosco</h2><p className="mt-1 text-xs text-slate-400">Envie uma dúvida, relate um problema ou sugira uma melhoria. Sua mensagem e a tela atual ficam disponíveis para a equipe no painel administrativo.</p></div><button type="button" aria-label="Fechar" onClick={() => setIsFeedbackOpen(false)} className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-800 hover:text-white">✕</button></div><label className="block text-xs font-semibold text-slate-300">Tipo<select name="category" required className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white"><option value="duvida">Dúvida</option><option value="erro">Encontrei um erro</option><option value="ideia">Sugestão de melhoria</option></select></label><label className="block text-xs font-semibold text-slate-300">O que aconteceu ou o que você sugere?<textarea name="message" required minLength={10} maxLength={2000} rows={5} placeholder="Descreva o que tentou fazer e o que ficou confuso…" className="mt-1 w-full resize-y rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white placeholder:text-slate-500" /></label><div className="flex justify-end gap-2"><button type="button" onClick={() => setIsFeedbackOpen(false)} className="rounded-lg px-3 py-2 text-xs text-slate-300 hover:bg-slate-800">Cancelar</button><button disabled={feedbackBusy} className="rounded-lg bg-amber-500 px-4 py-2 text-xs font-bold text-slate-950 disabled:opacity-50">{feedbackBusy ? "Enviando…" : "Enviar feedback"}</button></div></form></div>}
+      {isFeedbackOpen && <div className="fixed inset-0 z-[70] flex items-center justify-center bg-slate-950/80 p-4" role="dialog" aria-modal="true" aria-labelledby="pilot-feedback-title"><form onSubmit={(event) => void handlePilotFeedbackSubmit(event)} className="w-full max-w-lg space-y-4 rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl"><div className="flex items-start justify-between gap-4"><div><h2 id="pilot-feedback-title" className="text-lg font-bold text-white">Ajuda e fale conosco</h2><p className="mt-1 text-xs text-slate-400">Envie uma dúvida, relate um problema ou sugira uma melhoria. Sua mensagem e a tela atual ficam disponíveis para a equipe no painel administrativo.</p></div><BotaoFechar onClick={fecharSugestao} /></div><label className="block text-xs font-semibold text-slate-300">Tipo<select name="category" required className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white"><option value="duvida">Dúvida</option><option value="erro">Encontrei um erro</option><option value="ideia">Sugestão de melhoria</option></select></label><label className="block text-xs font-semibold text-slate-300">O que aconteceu ou o que você sugere?<textarea name="message" required minLength={10} maxLength={2000} rows={5} placeholder="Descreva o que tentou fazer e o que ficou confuso…" className="mt-1 w-full resize-y rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm text-white placeholder:text-slate-500" /></label><div className="flex justify-end gap-2"><button type="button" onClick={() => setIsFeedbackOpen(false)} className="rounded-lg px-3 py-2 text-xs text-slate-300 hover:bg-slate-800">Cancelar</button><button disabled={feedbackBusy} className="rounded-lg bg-amber-500 px-4 py-2 text-xs font-bold text-slate-950 disabled:opacity-50">{feedbackBusy ? "Enviando…" : "Enviar feedback"}</button></div></form></div>}
       {isOnboardingModalOpen && <OnboardingModal
         isOpen={isOnboardingModalOpen}
         onClose={() => setIsOnboardingModalOpen(false)}

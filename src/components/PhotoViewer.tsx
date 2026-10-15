@@ -3,6 +3,7 @@
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
+import { useVoltarFecha } from "@/lib/use-voltar-fecha";
 
 // Fotos do imóvel em tela cheia, a partir da Vitrine (pedido da corretora piloto, 14/10/2026: "quando clicamos em fotos,
 // não conseguimos abrir… assim o corretor sabe se é interessante ou não"). Setas, teclado (← → Esc) e deslizar no celular.
@@ -44,16 +45,17 @@ export function GaleriaDeFotos({ fotos, indice, titulo, onIndice, onFechar }: {
 
 export default function PhotoViewer(props: { fotos: string[]; indice: number; titulo: string; onIndice: (indice: number) => void; onFechar: () => void }) {
   const { fotos, indice, onIndice, onFechar } = props;
+  // Esc e a seta de voltar do navegador fecham a galeria (15/10/2026) — voltar não sai mais do aplicativo.
+  const fechar = useVoltarFecha(onFechar);
   useEffect(() => {
     const tecla = (event: KeyboardEvent) => {
-      if (event.key === "Escape") onFechar();
-      else if (event.key === "ArrowRight") onIndice(fotoVizinha(indice, fotos.length, 1));
+      if (event.key === "ArrowRight") onIndice(fotoVizinha(indice, fotos.length, 1));
       else if (event.key === "ArrowLeft") onIndice(fotoVizinha(indice, fotos.length, -1));
     };
     const rolagem = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     window.addEventListener("keydown", tecla);
     return () => { window.removeEventListener("keydown", tecla); document.body.style.overflow = rolagem; };
-  }, [fotos.length, indice, onIndice, onFechar]);
-  return createPortal(<GaleriaDeFotos {...props} />, document.body);
+  }, [fotos.length, indice, onIndice]);
+  return createPortal(<GaleriaDeFotos {...props} onFechar={fechar} />, document.body);
 }

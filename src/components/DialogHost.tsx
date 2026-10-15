@@ -2,6 +2,7 @@
 
 import { type FormEvent, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { AlertTriangle, HelpCircle } from "lucide-react";
+import BotaoFechar from "./BotaoFechar";
 import { answerDialog, currentDialog, subscribeDialogs, textDialogError, type DialogRequest } from "@/lib/dialogs";
 
 // Mostra os pedidos de askConfirm/askText, um de cada vez, na frente da tela (ver src/lib/dialogs.ts).
@@ -42,10 +43,12 @@ function DialogWindow({ request }: { request: DialogRequest }) {
   }
 
   const field = "mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-sm font-normal text-white";
-  return <div className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/70 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) cancel(); }}>
+  // data-dialog-host: as janelas por baixo (useVoltarFecha) deixam o Esc para esta confirmação.
+  return <div data-dialog-host="" className="fixed inset-0 z-[90] flex items-center justify-center bg-slate-950/70 p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) cancel(); }}>
     <form role="dialog" aria-modal="true" aria-labelledby={titleId} aria-describedby={request.message ? messageId : undefined} onSubmit={submit}
       className={`w-full max-w-md space-y-4 rounded-2xl border-2 bg-slate-900 p-6 shadow-2xl ${danger ? "border-red-500/60" : "border-amber-500/60"}`}>
       <div className="flex items-start gap-3">
+        <BotaoFechar onClick={cancel} rotulo="Fechar sem confirmar" className="order-last ml-auto" />
         <span className={`rounded-xl p-2 ${danger ? "bg-red-500/15 text-red-400" : "bg-amber-500/15 text-amber-400"}`}>{danger ? <AlertTriangle className="h-5 w-5" aria-hidden="true" /> : <HelpCircle className="h-5 w-5" aria-hidden="true" />}</span>
         <div>
           <h2 id={titleId} className="text-lg font-bold text-white">{request.title}</h2>
