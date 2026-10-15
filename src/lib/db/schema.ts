@@ -353,3 +353,22 @@ export const partnershipTermAcceptances = pgTable("partnership_term_acceptances"
   uniqueAcceptance: uniqueIndex("partnership_term_acceptances_unique")
     .on(table.partnershipId, table.userId, table.textHash),
 }));
+
+// Repasses dos sócios (15/10/2026, migration 20261015140000): % de cada sócio e da empresa sobre o faturamento das
+// assinaturas; cada versão vale a partir de um mês. Soma 100%, mês passado imutável e retroativo só antes da primeira
+// versão — garantidos por gatilhos no banco.
+export const revenueSplitVersions = pgTable("revenue_split_versions", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  validFromMonth: date("valid_from_month", { mode: "string" }).notNull(),
+  createdBy: uuid("created_by").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
+  createdAt: timestamp("created_at").defaultNow().notNull(),
+});
+
+export const revenueSplitShares = pgTable("revenue_split_shares", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  versionId: uuid("version_id").references(() => revenueSplitVersions.id, { onDelete: "cascade" }).notNull(),
+  position: integer("position").notNull(),
+  name: text("name").notNull(),
+  kind: text("kind").notNull(),
+  percent: numeric("percent", { precision: 5, scale: 2 }).notNull(),
+});

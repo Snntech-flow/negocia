@@ -95,7 +95,7 @@ export async function verifyPassword(password: string, stored: string | null) {
 export async function requireCurrentUser() {
   const id = await getCurrentUserId();
   if (!id) throw new ActionError("Faça login para continuar.");
-  const [user] = await db.select({ id: users.id, role: users.role, plan: users.plan, verificationStatus: users.verificationStatus, subscriptionStatus: users.subscriptionStatus, nextBillingDate: users.nextBillingDate }).from(users).where(eq(users.id, id)).limit(1);
+  const [user] = await db.select({ id: users.id, role: users.role, adminViewAccess: users.adminViewAccess, plan: users.plan, verificationStatus: users.verificationStatus, subscriptionStatus: users.subscriptionStatus, nextBillingDate: users.nextBillingDate }).from(users).where(eq(users.id, id)).limit(1);
   if (!user || user.verificationStatus === "suspenso") throw new ActionError("A conta não está autorizada.");
   return user;
 }

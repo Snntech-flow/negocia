@@ -11,6 +11,7 @@ import { planName } from "@/lib/plans";
 import type { WorkspaceFeedback, WorkspaceTransaction, WorkspaceUser } from "@/lib/workspace-types";
 import Avatar from "./Avatar";
 import { MonthlyChart, monthShort, type MonthRow } from "./FinanceCharts";
+import RepassesDosSocios from "./RepassesDosSocios";
 import { addMonthsKeepingDay, brasiliaToday } from "@/lib/finance";
 import { descricaoDoVencimento, diaDeBrasilia, faturamentoPorAno, faturamentoPorMes } from "@/lib/admin-receita";
 
@@ -43,6 +44,8 @@ export default function AdminPanel({ users, transactions, feedback, currentUserI
   const totalFaturado = faixas.reduce((total, faixa) => total + faixa.pago, 0);
   const totalAReceber = faixas.reduce((total, faixa) => total + faixa.aReceber, 0);
   const centavosEmReais = (cents: number) => money(cents / 100);
+  // Repasses dos sócios usam os meses do período (por ano, os 12 meses de cada ano — o % pode mudar no meio do ano).
+  const faixasDoRepasse = modo === "mes" ? faixas : faturamentoPorMes(users, transactions, `${primeiroAno}-01`, `${anoAtual + 1}-12`);
   const [busy, setBusy] = useState<string | null>(null);
   const nameOf = (id: string | null) => users.find((user) => user.id === id)?.name || "equipe";
   // Recorrência: só quem paga (conta sem cobrança e mensalidade zero não entram).
@@ -147,6 +150,8 @@ export default function AdminPanel({ users, transactions, feedback, currentUserI
         labels={{ titulo: modo === "mes" ? "Faturado × a receber por mês" : "Faturado × a receber por ano", periodo: modo === "mes" ? "Mês" : "Ano", a: "Faturado", b: "A receber",
           diferenca: null, realizadoA: null, realizadoB: null, vazio: "Nada faturado nem a receber de {de} a {ate}." }} />
     </section>
+
+    <RepassesDosSocios faixasMensais={faixasDoRepasse} modo={modo} somenteLeitura={somenteLeitura} onMessage={onMessage} />
 
     <section className="bg-slate-900 rounded-2xl border border-slate-800 shadow-xl space-y-4 p-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">

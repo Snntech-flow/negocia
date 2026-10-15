@@ -279,6 +279,51 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
     }
   });
 
+  await t.test("repasses dos sócios: só o administrador grava; quem visualiza a Administração lê; soma 100%, mês passado imutável e retroativo só antes da primeira regra — na ação e no banco", async () => {
+    const { revenueSplitVersions, revenueSplitShares } = await import("../src/lib/db");
+    const { sql } = await import("drizzle-orm");
+    const repasse = strict(await import("../src/lib/actions/revenue-split"));
+    const { brasiliaToday, addMonthsKeepingDay } = await import("../src/lib/finance");
+    const mes = (deslocamento: number) => addMonthsKeepingDay(`${brasiliaToday().slice(0, 7)}-01`, deslocamento).slice(0, 7);
+    const quatro = (a: string, b: string, c: string, d: string) => [{ name: "Sócio 1", kind: "socio", percent: a }, { name: "Sócio 2", kind: "socio", percent: b }, { name: "Sócio 3", kind: "socio", percent: c }, { name: "Empresa", kind: "empresa", percent: d }];
+    // limpeza que passa por cima dos gatilhos (mês passado é imutável — só o teste apaga)
+    const limpar = () => db.transaction(async (tx) => { await tx.execute(sql`set local session_replication_role = replica`); await tx.delete(revenueSplitShares); await tx.delete(revenueSplitVersions); });
+    await limpar();
+    try {
+      // só o administrador grava; quem visualiza lê; o corretor comum nem lê
+      await assert.rejects(asUser(owner.id, () => repasse.saveRevenueSplit(mes(0), quatro("30", "30", "20", "20"))), /restrita à administração/);
+      await assert.rejects(asUser(owner.id, () => repasse.getRevenueSplits()), /restrita à administração/);
+      await asUser(admin.id, () => actions.setAdminViewAccess(owner.id, true));
+      assert.deepEqual(await asUser(owner.id, () => repasse.getRevenueSplits()), []);
+      await assert.rejects(asUser(owner.id, () => repasse.saveRevenueSplit(mes(0), quatro("30", "30", "20", "20"))), /restrita à administração/);
+      // soma diferente de 100: a ação recusa com a frase certa
+      await assert.rejects(asUser(admin.id, () => repasse.saveRevenueSplit(mes(0), quatro("30", "30", "20", "10"))), /somar 100%/);
+      // regra do mês atual; depois preencher o começo (mês passado, antes da primeira) é permitido
+      await asUser(admin.id, () => repasse.saveRevenueSplit(mes(0), quatro("30", "30", "20", "20")));
+      await asUser(admin.id, () => repasse.saveRevenueSplit(mes(-2), quatro("25", "25", "25", "25")));
+      // 🔴 mês passado já coberto (mes(-1) fica depois de mes(-2)): recusado
+      await assert.rejects(asUser(admin.id, () => repasse.saveRevenueSplit(mes(-1), quatro("40", "20", "20", "20"))), /a regra nova vale a partir do mês atual/);
+      // trocar a regra do mês atual: permitido (substitui)
+      await asUser(admin.id, () => repasse.saveRevenueSplit(mes(0), quatro("35", "25", "20", "20")));
+      const lidas = await asUser(owner.id, () => repasse.getRevenueSplits());
+      assert.deepEqual(lidas.map((v) => [v.validFromMonth, v.shares.map((p) => Number(p.percent))]), [[mes(-2), [25, 25, 25, 25]], [mes(0), [35, 25, 20, 20]]]);
+      // 🔴 no banco, por fora da ação: mudar % de mês passado, apagar mês passado e gravar soma ≠ 100 — recusados
+      const passada = (await db.select().from(revenueSplitVersions)).find((v) => v.validFromMonth.startsWith(mes(-2)))!;
+      const doBanco = async (promessa: Promise<unknown>, frase: RegExp) => {
+        try { await promessa; assert.fail("o banco aceitou"); } catch (e) { assert.match(String((e as { cause?: Error }).cause?.message ?? (e as Error).message), frase); }
+      };
+      await doBanco(db.update(revenueSplitShares).set({ percent: "50.00" }).where(eq(revenueSplitShares.versionId, passada.id)), /mês que já passou não muda/);
+      await doBanco(db.delete(revenueSplitVersions).where(eq(revenueSplitVersions.id, passada.id)), /mês que já passou não muda/);
+      await doBanco(db.transaction(async (tx) => {
+        const [v] = await tx.insert(revenueSplitVersions).values({ validFromMonth: `${mes(3)}-01` }).returning();
+        await tx.insert(revenueSplitShares).values({ versionId: v.id, position: 1, name: "Só um", kind: "socio", percent: "90.00" });
+      }), /somar 100%/);
+    } finally {
+      await limpar();
+      await db.update(users).set({ adminViewAccess: false, adminViewAccessBy: null, adminViewAccessAt: null }).where(eq(users.id, owner.id));
+    }
+  });
+
   await t.test("recuperação mantém resposta genérica, envia link sem expor token e limita solicitações", async () => {
     const recovery = await import("../src/lib/actions/password-recovery");
     const { passwordResetTokens } = await import("../src/lib/db");
