@@ -35,6 +35,7 @@ export async function getMarketplaceData(input: MarketplaceQuery = {}) {
           successfulDeals: users.successfulDeals, bypassReports: users.bypassReports,
           verificationReviewedAt: users.verificationReviewedAt, verificationReviewedBy: users.verificationReviewedBy,
           billingExemptAt: users.billingExemptAt,
+          adminViewAccess: users.adminViewAccess,
           // Para o aviso da mensalidade no sino: primeira cobrança (escolhe mensal ou anual) e Pix aguardando conferência.
           // "users.id" escrito por extenso: o Drizzle põe só "id" no select de uma tabela, e na subconsulta isso viraria t.id.
           hasPaid: sql<boolean>`exists (select 1 from transactions t where t.user_id = users.id and t.status = 'pago' and t.type like 'mensalidade\\_%')`,
@@ -47,6 +48,9 @@ export async function getMarketplaceData(input: MarketplaceQuery = {}) {
       notifications: [], dvpList: [], partnerships: [], partnershipActivities: [], leads: [], leadActivities: [], pilotFeedback: [],
     };
     const isAdmin = currentUser.role === "admin";
+    // Visualização da Administração (15/10/2026): só os dados da aba Corretores e pagamentos — não amplia a Vitrine,
+    // os registros de visita nem as parcerias, que continuam com o escopo do corretor.
+    const veAdministracao = isAdmin || currentUser.adminViewAccess === true;
     const paginated = section === "vitrine";
     const pattern = `%${search.replace(/[\\%_]/g, character => `\\${character}`)}%`;
     const emptySessionId = "00000000-0000-0000-0000-000000000000";
@@ -183,14 +187,15 @@ export async function getMarketplaceData(input: MarketplaceQuery = {}) {
         role: users.role, trustScore: users.trustScore,
         verificationReviewedAt: users.verificationReviewedAt, verificationReviewedBy: users.verificationReviewedBy,
         billingExemptAt: users.billingExemptAt, billingExemptBy: users.billingExemptBy,
+        adminViewAccess: users.adminViewAccess, adminViewAccessBy: users.adminViewAccessBy, adminViewAccessAt: users.adminViewAccessAt,
         successfulDeals: users.successfulDeals, bypassReports: users.bypassReports,
         createdAt: users.createdAt,
       })
       .from(users)
-      .where(isAdmin && includes("admin") ? undefined : currentUser ? eq(users.id, currentUser.id) : eq(users.id, "00000000-0000-0000-0000-000000000000"))
+      .where(veAdministracao && includes("admin") ? undefined : currentUser ? eq(users.id, currentUser.id) : eq(users.id, "00000000-0000-0000-0000-000000000000"))
       .orderBy(desc(users.createdAt));
 
-    const allTransactionsQuery = isAdmin && includes("admin") ? db
+    const allTransactionsQuery = veAdministracao && includes("admin") ? db
       .select({
         id: transactions.id,
         userId: transactions.userId,
@@ -341,7 +346,7 @@ export async function getMarketplaceData(input: MarketplaceQuery = {}) {
       .limit(500)
       : [];
 
-    const pilotFeedbackQuery = isAdmin && includes("admin") ? db
+    const pilotFeedbackQuery = veAdministracao && includes("admin") ? db
       .select({
         id: pilotFeedback.id,
         userId: pilotFeedback.userId,

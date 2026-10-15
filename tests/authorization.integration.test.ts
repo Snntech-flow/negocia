@@ -240,6 +240,45 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
     } finally { for (const id of [property.id, ...cleanupExtras]) await db.delete(properties).where(eq(properties.id, id)); }
   });
 
+  await t.test("visualização da Administração: vê corretores, pagamentos e feedback em modo leitura — as ações seguem só do administrador e a Vitrine não se amplia", async () => {
+    // Imóvel só de carteira do otherBroker: o administrador vê; quem só visualiza a Administração, não.
+    const [carteira] = await db.insert(properties).values({ title: "Só na carteira (teste)", propertyType: "Apartamento", salePrice: "300000", city: "São Paulo",
+      neighborhood: "Centro", bedrooms: 1, suites: 0, bathrooms: 1, parkingSpots: 0, areaM2: "40", description: "Carteira", confidentialAddress: "Rua X, 1",
+      ownerName: "Dono", ownerPhone: "11900000000", acceptsPartnership: false, splitPercentage: "50", photos: [], purpose: "venda", brokerId: otherBroker.id }).returning();
+    try {
+      // sem o acesso: a aba não traz ninguém além da própria pessoa
+      const antes = await asUser(owner.id, () => actions.getMarketplaceData({ section: "admin" }));
+      assert.deepEqual(antes.users.map((u) => u.id), [owner.id]);
+      assert.deepEqual(antes.transactions, []);
+      // só o administrador libera — nem a própria pessoa, nem outro corretor
+      await assert.rejects(asUser(owner.id, () => actions.setAdminViewAccess(owner.id, true)), /restrita à administração/);
+      await assert.rejects(asUser(otherBroker.id, () => actions.setAdminViewAccess(owner.id, true)), /restrita à administração/);
+      await assert.rejects(asUser(admin.id, () => actions.setAdminViewAccess(admin.id, true)), /já é administrador/);
+      const liberado = await asUser(admin.id, () => actions.setAdminViewAccess(owner.id, true));
+      assert.equal(liberado.adminViewAccess, true);
+      assert.equal(liberado.adminViewAccessBy, admin.id);
+      // com o acesso: vê os corretores (e os pagamentos) da plataforma
+      const depois = await asUser(owner.id, () => actions.getMarketplaceData({ section: "admin" }));
+      assert.ok(depois.users.some((u) => u.id === admin.id) && depois.users.some((u) => u.id === otherBroker.id));
+      assert.equal(depois.currentUser?.adminViewAccess, true);
+      // 🔴 mas não age: aprovar, suspender, isentar, confirmar, estornar e liberar continuam recusados
+      await assert.rejects(asUser(owner.id, () => actions.updateUserStatus(otherBroker.id, "suspenso")), /restrita à administração/);
+      await assert.rejects(asUser(owner.id, () => actions.exemptUserFromBilling(otherBroker.id)), /restrita à administração/);
+      await assert.rejects(asUser(owner.id, () => actions.setAdminViewAccess(otherBroker.id, true)), /restrita à administração/);
+      // 🔴 e a Vitrine não se amplia: o imóvel só de carteira do outro corretor não aparece (para o administrador, sim)
+      const vitrine = await asUser(owner.id, () => actions.getMarketplaceData({ section: "vitrine", search: "Só na carteira" }));
+      assert.ok(!vitrine.properties.some((item) => item.id === carteira.id));
+      const vitrineAdmin = await asUser(admin.id, () => actions.getMarketplaceData({ section: "vitrine", search: "Só na carteira" }));
+      assert.ok(vitrineAdmin.properties.some((item) => item.id === carteira.id));
+      // tirar o acesso volta ao escopo do corretor
+      await asUser(admin.id, () => actions.setAdminViewAccess(owner.id, false));
+      assert.deepEqual((await asUser(owner.id, () => actions.getMarketplaceData({ section: "admin" }))).users.map((u) => u.id), [owner.id]);
+    } finally {
+      await db.update(users).set({ adminViewAccess: false, adminViewAccessBy: null, adminViewAccessAt: null }).where(eq(users.id, owner.id));
+      await db.delete(properties).where(eq(properties.id, carteira.id));
+    }
+  });
+
   await t.test("recuperação mantém resposta genérica, envia link sem expor token e limita solicitações", async () => {
     const recovery = await import("../src/lib/actions/password-recovery");
     const { passwordResetTokens } = await import("../src/lib/db");

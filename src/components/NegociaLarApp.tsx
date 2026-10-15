@@ -251,7 +251,7 @@ export default function NegociaLarApp({
   const TAB_LABELS: Record<WorkspaceTab, string> = { vitrine: "Vitrine", crm: "Minha carteira", radar: "Radar de Compradores",
     atendimento: "Funil de atendimento", cadastrar: "Meus imóveis", termo: "Termo de Parceria", dvp: "Registro de Visita",
     financeiro: "Receitas e despesas", admin: "Corretores e pagamentos" };
-  const ABAS_PERMITIDAS: WorkspaceTab[] = ["vitrine", "crm", "radar", "atendimento", "cadastrar", "termo", "dvp", "financeiro", ...(initialCurrentUser?.role === "admin" ? ["admin" as const] : [])];
+  const ABAS_PERMITIDAS: WorkspaceTab[] = ["vitrine", "crm", "radar", "atendimento", "cadastrar", "termo", "dvp", "financeiro", ...(initialCurrentUser?.role === "admin" || initialCurrentUser?.adminViewAccess ? ["admin" as const] : [])];
   const [abasAbertas, setAbasAbertas] = useState<WorkspaceTab[]>(["vitrine"]);
   const setActiveTab = (tab: WorkspaceTab) => {
     document.querySelectorAll<HTMLDetailsElement>(".workspace-navigation details[open]").forEach(menu => { menu.open = false; });
@@ -276,7 +276,7 @@ export default function NegociaLarApp({
       saved = sessionStorage.getItem(`negocialar-tab:${initialCurrentUser.id}`);
       abasSalvas = JSON.parse(sessionStorage.getItem(`negocialar-abas:${initialCurrentUser.id}`) || "null");
     } catch {}
-    const allowed: string[] = ["vitrine", "crm", "radar", "atendimento", "cadastrar", "termo", "dvp", "financeiro", ...(initialCurrentUser.role === "admin" ? ["admin"] : [])];
+    const allowed: string[] = ["vitrine", "crm", "radar", "atendimento", "cadastrar", "termo", "dvp", "financeiro", ...(initialCurrentUser.role === "admin" || initialCurrentUser.adminViewAccess ? ["admin"] : [])];
     const tab = (saved && allowed.includes(saved) ? saved : "vitrine") as WorkspaceTab;
     const abas = abrirAba(abasGuardadas<WorkspaceTab>(abasSalvas, allowed as WorkspaceTab[], "vitrine"), tab);
     window.history.replaceState({ ...(window.history.state ?? {}), negocialarAba: tab }, "");
@@ -816,7 +816,7 @@ export default function NegociaLarApp({
             { title: "Documentos", active: ["termo", "dvp"], items: [{ id: "termo", label: "Termo de Parceria", icon: FileText }, { id: "dvp", label: "Registro de Visita", icon: Stamp }] },
             { title: "Imóveis", active: ["cadastrar"], items: [{ id: "cadastrar", label: "Meus imóveis", icon: PlusCircle }] },
             { title: "Financeiro", active: ["financeiro"], items: [{ id: "financeiro", label: "Receitas e despesas", icon: Wallet }] },
-            ...(currentUser?.role === "admin" ? [{ title: "Administração", active: ["admin"], items: [{ id: "admin", label: "Corretores e pagamentos", icon: UserCheck }] }] : []),
+            ...(currentUser?.role === "admin" || currentUser?.adminViewAccess ? [{ title: "Administração", active: ["admin"], items: [{ id: "admin", label: "Corretores e pagamentos", icon: UserCheck }] }] : []),
           ].map((menu, index) => (
             <details key={menu.title} name="workspace-navigation-menu" data-ativa={menu.active.includes(activeTab) ? "" : undefined} className="group relative shrink-0">
               <summary className={`flex h-9 cursor-pointer list-none items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-semibold transition [&::-webkit-details-marker]:hidden ${menu.active.includes(activeTab) ? "bg-amber-500 text-slate-950" : "text-slate-400 hover:bg-slate-800 hover:text-white"}`}>
@@ -882,8 +882,9 @@ export default function NegociaLarApp({
             }}
           />
         )}
-        {workspaceReady && activeTab === "admin" && currentUser?.role === "admin" && (
+        {workspaceReady && activeTab === "admin" && (currentUser?.role === "admin" || currentUser?.adminViewAccess) && (
           <AdminPanel users={userList} transactions={transactionList} feedback={pilotFeedbackList} currentUserId={currentUser.id}
+            somenteLeitura={currentUser.role !== "admin"}
             onUsersChange={setUserList} onTransactionsChange={setTransactionList} onFeedbackChange={setPilotFeedbackList} onMessage={(text) => showToast(text)} />
         )}
 

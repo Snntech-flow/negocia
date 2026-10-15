@@ -77,6 +77,24 @@ async function updateUserStatusImpl(userId: string, newStatus: string) {
   return { success: true, reviewedBy: actor.id, reviewedAt };
 }
 
+// Visualização da Administração (15/10/2026): a pessoa vê a aba Corretores e pagamentos em modo leitura; aprovar,
+// suspender, isentar, confirmar e estornar continuam só do administrador. Só o administrador liga ou desliga — nunca
+// para si mesmo nem para outro administrador. Grava quem mudou e quando.
+async function setAdminViewAccessImpl(userId: string, ativo: boolean) {
+  const actor = await requireCurrentUser();
+  if (actor.role !== "admin") throw new ActionError("Ação restrita à administração.");
+  if (typeof userId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)) throw new ActionError("Corretor inválido.");
+  if (typeof ativo !== "boolean") throw new ActionError("Escolha liberar ou tirar a visualização.");
+  if (userId === actor.id) throw new ActionError("Você já é administrador.");
+  const [alvo] = await db.select({ role: users.role }).from(users).where(eq(users.id, userId)).limit(1);
+  if (!alvo) throw new ActionError("Corretor não encontrado.");
+  if (alvo.role === "admin") throw new ActionError("Administrador já vê a Administração inteira.");
+  const [salvo] = await db.update(users).set({ adminViewAccess: ativo, adminViewAccessBy: actor.id, adminViewAccessAt: new Date() })
+    .where(eq(users.id, userId))
+    .returning({ adminViewAccess: users.adminViewAccess, adminViewAccessBy: users.adminViewAccessBy, adminViewAccessAt: users.adminViewAccessAt });
+  return salvo;
+}
+
 // Conta sem cobrança (sócios, cortesia): ativa, sem vencimento e sem mensalidade; grava quem isentou e quando.
 async function exemptUserFromBillingImpl(userId: string) {
   const actor = await requireCurrentUser();
@@ -1118,6 +1136,7 @@ export async function completeLeadFollowUp(...args: Parameters<typeof completeLe
 export async function updateUserStatus(...args: Parameters<typeof updateUserStatusImpl>) { return runAction(() => updateUserStatusImpl(...args)); }
 export async function confirmPixSubscriptionPayment(...args: Parameters<typeof confirmPixSubscriptionPaymentImpl>) { return runAction(() => confirmPixSubscriptionPaymentImpl(...args)); }
 export async function exemptUserFromBilling(...args: Parameters<typeof exemptUserFromBillingImpl>) { return runAction(() => exemptUserFromBillingImpl(...args)); }
+export async function setAdminViewAccess(...args: Parameters<typeof setAdminViewAccessImpl>) { return runAction(() => setAdminViewAccessImpl(...args)); }
 export async function refundPixSubscriptionPayment(...args: Parameters<typeof refundPixSubscriptionPaymentImpl>) { return runAction(() => refundPixSubscriptionPaymentImpl(...args)); }
 export async function createProperty(...args: Parameters<typeof createPropertyImpl>) { return runAction(() => createPropertyImpl(...args)); }
 export async function createBuyerProfile(...args: Parameters<typeof createBuyerProfileImpl>) { return runAction(() => createBuyerProfileImpl(...args)); }

@@ -1,0 +1,35 @@
+import assert from "node:assert/strict";
+import test from "node:test";
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import AdminPanel from "../src/components/AdminPanel";
+
+const agora = new Date("2026-10-15T12:00:00Z");
+const corretor = { id: "11111111-1111-4111-8111-111111111111", name: "Corretora Teste", email: "teste@exemplo.test", creci: "12345", whatsapp: "11900000000",
+  avatarUrl: null, city: "Cidade", state: "BA", isVerified: false, verificationStatus: "pendente", plan: "10", subscriptionStatus: "teste", monthlyFee: "0.00",
+  nextBillingDate: null, billingCycle: "mensal", role: "corretor", trustScore: 0, verificationReviewedAt: null, verificationReviewedBy: null,
+  billingExemptAt: null, billingExemptBy: null, adminViewAccess: false, adminViewAccessBy: null, adminViewAccessAt: null, successfulDeals: 0, bypassReports: 0, createdAt: agora };
+const pix = (id: string, status: string) => ({ id, userId: corretor.id, amount: "150.00", type: "mensalidade_pro", paymentMethod: "pix", status, description: "Mensalidade",
+  createdAt: agora, confirmedAt: status === "pago" ? agora : null, confirmedBy: null, refundedAt: null, refundReason: null, userName: corretor.name, userCreci: corretor.creci });
+const feedback = [{ id: "f1", userId: corretor.id, userName: corretor.name, category: "ideia", message: "Ideia de teste", status: "novo", createdAt: agora }];
+const tela = (somenteLeitura: boolean) => renderToStaticMarkup(createElement(AdminPanel as never, {
+  users: [corretor], transactions: [pix("t1", "pendente"), pix("t2", "pago")], feedback, currentUserId: "99999999-9999-4999-8999-999999999999",
+  somenteLeitura, onUsersChange: () => undefined, onTransactionsChange: () => undefined, onFeedbackChange: () => undefined, onMessage: () => undefined }));
+
+test("🔴 modo visualização: vê corretores, pagamentos e feedback, sem nenhum botão de ação", () => {
+  const html = tela(true);
+  assert.match(html, /Modo visualização/);
+  assert.match(html, /Corretora Teste/);
+  for (const acao of [/> ?Aprovar<\/button>/, /Isentar de cobrança/, /> ?Suspender<\/button>/, /Confirmar recebimento/, />Estornar<\/button>/, /Liberar visualização/]) {
+    assert.doesNotMatch(html, acao, `apareceu no modo visualização: ${acao}`);
+  }
+  assert.match(html, /<select aria-label="Status do feedback"[^>]*disabled=""/);
+});
+
+test("administrador: as ações continuam e cada corretor ganha o botão de liberar a visualização", () => {
+  const html = tela(false);
+  assert.doesNotMatch(html, /Modo visualização/);
+  for (const acao of [/> ?Aprovar<\/button>/, /Isentar de cobrança/, /> ?Suspender<\/button>/, /Confirmar recebimento/, />Estornar<\/button>/, /Liberar visualização da Administração/]) {
+    assert.match(html, acao, `sumiu para o administrador: ${acao}`);
+  }
+});

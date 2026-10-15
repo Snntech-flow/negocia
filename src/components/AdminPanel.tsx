@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Ban, Check, CheckCircle2, CreditCard, DollarSign, ExternalLink, Gift, MessageSquarePlus, RotateCcw, Search, ShieldCheck, TrendingUp, Users } from "lucide-react";
-import { confirmPixSubscriptionPayment, exemptUserFromBilling, refundPixSubscriptionPayment, updatePilotFeedbackStatus, updateUserStatus } from "@/lib/actions";
+import { confirmPixSubscriptionPayment, exemptUserFromBilling, refundPixSubscriptionPayment, setAdminViewAccess, updatePilotFeedbackStatus, updateUserStatus } from "@/lib/actions";
 import { unwrap } from "@/lib/action-result";
 import { askConfirm, askText } from "@/lib/dialogs";
 import { creciConsultaUrl, creciDigits } from "@/lib/creci-consulta";
@@ -16,8 +16,10 @@ const when = (value: Date | string | null) => value ? new Date(value).toLocaleSt
 const TRANSACTION_LABELS: Record<string, string> = { pago: "Confirmado", pendente: "Pendente", estornado: "Estornado" };
 const VERIFICATION_LABELS: Record<string, string> = { aprovado: "Aprovado", pendente: "Aguardando CRECI", suspenso: "Suspenso" };
 
-export default function AdminPanel({ users, transactions, feedback, currentUserId, onUsersChange, onTransactionsChange, onFeedbackChange, onMessage }: {
-  users: WorkspaceUser[]; transactions: WorkspaceTransaction[]; feedback: WorkspaceFeedback[]; currentUserId: string;
+// somenteLeitura (15/10/2026): visualização da Administração — vê tudo, sem nenhum botão de ação (o servidor também
+// recusa: as ações exigem role = 'admin').
+export default function AdminPanel({ users, transactions, feedback, currentUserId, somenteLeitura = false, onUsersChange, onTransactionsChange, onFeedbackChange, onMessage }: {
+  users: WorkspaceUser[]; transactions: WorkspaceTransaction[]; feedback: WorkspaceFeedback[]; currentUserId: string; somenteLeitura?: boolean;
   onUsersChange: (update: (users: WorkspaceUser[]) => WorkspaceUser[]) => void;
   onTransactionsChange: (update: (items: WorkspaceTransaction[]) => WorkspaceTransaction[]) => void;
   onFeedbackChange: (update: (items: WorkspaceFeedback[]) => WorkspaceFeedback[]) => void;
@@ -79,6 +81,11 @@ export default function AdminPanel({ users, transactions, feedback, currentUserI
       onMessage(`Busque o número ${digits} no site do CRECI-${user.state} e confira se aparece ${user.name}.`);
     }
   }
+  async function viewAccess(user: WorkspaceUser, ativo: boolean) {
+    if (ativo && !(await askConfirm({ title: `Liberar a visualização da Administração para ${user.name}?`, message: "A pessoa passa a ver os corretores, os pagamentos e o feedback do piloto (com e-mail e WhatsApp). Não consegue aprovar, suspender, isentar nem estornar.", confirmLabel: "Liberar visualização" }))) return;
+    const result = await run(`user:${user.id}`, async () => unwrap(await setAdminViewAccess(user.id, ativo)), ativo ? `${user.name} agora vê a Administração (só visualização).` : `${user.name} não vê mais a Administração.`);
+    if (result) onUsersChange((items) => items.map((item) => item.id === user.id ? { ...item, adminViewAccess: result.adminViewAccess, adminViewAccessBy: result.adminViewAccessBy, adminViewAccessAt: result.adminViewAccessAt } : item));
+  }
   async function feedbackStatus(item: WorkspaceFeedback, status: string) {
     const result = await run(`fb:${item.id}`, async () => unwrap(await updatePilotFeedbackStatus(item.id, status)), "Feedback atualizado.");
     if (result) onFeedbackChange((items) => items.map((row) => row.id === item.id ? { ...row, status: result.feedback.status } : row));
@@ -89,8 +96,9 @@ export default function AdminPanel({ users, transactions, feedback, currentUserI
     <div>
       <div className="flex items-center gap-2 text-xs font-semibold text-amber-400 uppercase tracking-wider mb-1"><ShieldCheck className="w-4 h-4" /> Administração</div>
       <h1 className="text-2xl font-bold text-white">Corretores e pagamentos</h1>
-      <p className="text-sm text-slate-400">Aprove CRECIs, confirme ou estorne Pix e acompanhe o feedback do piloto. O pagamento é conferido manualmente no banco.</p>
+      <p className="text-sm text-slate-400">{somenteLeitura ? "Corretores, pagamentos e feedback do piloto." : "Aprove CRECIs, confirme ou estorne Pix e acompanhe o feedback do piloto. O pagamento é conferido manualmente no banco."}</p>
     </div>
+    {somenteLeitura && <p role="note" className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900"><strong>Modo visualização.</strong> Você vê os corretores, os pagamentos e o feedback do piloto; aprovar, suspender, isentar, confirmar e estornar ficam com a administração.</p>}
 
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
       <div className={card}><div className="flex items-center justify-between text-xs text-slate-400"><span>Recorrência mensal (assinaturas ativas)</span><TrendingUp className="w-4 h-4 text-amber-400" /></div><div className="text-2xl font-black text-white mt-2">{money(active.reduce((total, user) => total + Number(user.monthlyFee || 0), 0))}</div><div className="text-[11px] text-slate-400 mt-1">{active.length} {active.length === 1 ? "assinatura ativa" : "assinaturas ativas"}</div></div>
@@ -109,7 +117,7 @@ export default function AdminPanel({ users, transactions, feedback, currentUserI
           <thead className="bg-slate-950/60 text-slate-400 uppercase tracking-wider border-b border-slate-800"><tr><th className="py-3 px-4">Corretor</th><th className="py-3 px-4">CRECI e cidade</th><th className="py-3 px-4">Plano</th><th className="py-3 px-4">Situação</th><th className="py-3 px-4 text-right">Ações</th></tr></thead>
           <tbody className="divide-y divide-slate-800/60 text-slate-300">
             {filtered.map((user) => <tr key={user.id}>
-              <td className="py-3.5 px-4"><div className="flex items-center gap-3"><Avatar name={user.name} url={user.avatarUrl} size={36} /><div><div className="font-bold text-white flex items-center gap-1.5">{user.name}{user.isVerified && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" aria-label="CRECI aprovado" />}</div><div className="text-[11px] text-slate-400">{user.email}</div></div></div></td>
+              <td className="py-3.5 px-4"><div className="flex items-center gap-3"><Avatar name={user.name} url={user.avatarUrl} size={36} /><div><div className="font-bold text-white flex items-center gap-1.5">{user.name}{user.adminViewAccess && <span className="rounded-full border border-sky-300 bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-900">vê a Administração</span>}{user.isVerified && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" aria-label="CRECI aprovado" />}</div><div className="text-[11px] text-slate-400">{user.email}</div></div></div></td>
               <td className="py-3.5 px-4"><div className="font-semibold">CRECI {user.creci}</div><div className="text-[11px] text-slate-400">{user.city}/{user.state}</div>
                 {creciConsultaUrl(user.state) && <a href={creciConsultaUrl(user.state)!} target="_blank" rel="noopener noreferrer" onClick={() => void copyCreci(user)} title={`Abre a busca do CRECI-${user.state} e copia o número`} className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-sky-300 hover:underline"><ExternalLink className="h-3 w-3" aria-hidden="true" />Conferir no CRECI-{user.state}</a>}</td>
               <td className="py-3.5 px-4"><div className="font-semibold text-white">{planName(user.plan)}</div>{user.billingExemptAt
@@ -118,9 +126,12 @@ export default function AdminPanel({ users, transactions, feedback, currentUserI
               <td className="py-3.5 px-4"><span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border ${user.verificationStatus === "aprovado" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : user.verificationStatus === "suspenso" ? "bg-red-500/10 text-red-400 border-red-500/20" : "bg-amber-500/10 text-amber-400 border-amber-500/20"}`}>{VERIFICATION_LABELS[user.verificationStatus] || user.verificationStatus}</span>
                 {user.verificationReviewedAt && <div className="mt-1 text-[10px] text-slate-500">por {nameOf(user.verificationReviewedBy)} em {when(user.verificationReviewedAt)}</div>}</td>
               <td className="py-3.5 px-4 text-right"><div className="flex items-center justify-end gap-2">
+                {somenteLeitura ? <span className="text-[11px] text-slate-500">Só visualização</span> : <>
                 {user.id !== currentUserId && user.verificationStatus !== "aprovado" && <button type="button" disabled={busy === `user:${user.id}`} onClick={() => void moderate(user, "aprovado")} className="bg-emerald-700 hover:bg-emerald-800 text-white px-2.5 py-1.5 rounded-lg text-[11px] font-semibold flex items-center gap-1 disabled:opacity-50"><Check className="w-3.5 h-3.5" /> Aprovar</button>}
                 {!user.billingExemptAt && <button type="button" disabled={busy === `user:${user.id}`} onClick={() => void exempt(user)} className="border border-sky-500/30 text-sky-300 hover:bg-sky-500/10 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold flex items-center gap-1 disabled:opacity-50"><Gift className="w-3.5 h-3.5" /> Isentar de cobrança</button>}
                 {user.id !== currentUserId && user.verificationStatus !== "suspenso" && <button type="button" disabled={busy === `user:${user.id}`} onClick={() => void moderate(user, "suspenso")} className="bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold flex items-center gap-1 disabled:opacity-50"><Ban className="w-3.5 h-3.5" /> Suspender</button>}
+                {user.id !== currentUserId && user.role !== "admin" && <button type="button" disabled={busy === `user:${user.id}`} onClick={() => void viewAccess(user, !user.adminViewAccess)} title="Visualização da Administração: vê os corretores, os pagamentos e o feedback, sem poder aprovar, suspender, isentar nem estornar" className="border border-slate-600 text-slate-300 hover:bg-slate-800 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold">{user.adminViewAccess ? "Tirar visualização da Administração" : "Liberar visualização da Administração"}</button>}
+              </>}
               </div></td>
             </tr>)}
           </tbody>
@@ -141,8 +152,8 @@ export default function AdminPanel({ users, transactions, feedback, currentUserI
               <td className="py-3.5 px-4 font-bold text-emerald-400 text-sm">{money(item.amount)}</td>
               <td className="py-3.5 px-4"><div className="flex flex-wrap items-center gap-2">
                 <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${item.status === "pago" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : item.status === "estornado" ? "bg-red-500/10 text-red-400 border-red-500/20" : "bg-amber-500/10 text-amber-400 border-amber-500/20"}`}>{TRANSACTION_LABELS[item.status] || item.status}</span>
-                {item.status === "pendente" && item.paymentMethod === "pix" && item.type.startsWith("mensalidade_") && !exemptIds.has(item.userId) && <button type="button" disabled={busy === `tx:${item.id}`} onClick={() => void confirmPix(item)} className="rounded-lg bg-emerald-700 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-emerald-800 disabled:opacity-50">Confirmar recebimento</button>}
-                {item.status === "pago" && (item.confirmedAt || exemptIds.has(item.userId)) && <button type="button" disabled={busy === `tx:${item.id}`} onClick={() => void refund(item)} className="inline-flex items-center gap-1 rounded-lg border border-red-500/40 px-2.5 py-1.5 text-[10px] font-semibold text-red-400 hover:bg-red-500/10 disabled:opacity-50"><RotateCcw className="w-3 h-3" />Estornar</button>}
+                {!somenteLeitura && item.status === "pendente" && item.paymentMethod === "pix" && item.type.startsWith("mensalidade_") && !exemptIds.has(item.userId) && <button type="button" disabled={busy === `tx:${item.id}`} onClick={() => void confirmPix(item)} className="rounded-lg bg-emerald-700 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-emerald-800 disabled:opacity-50">Confirmar recebimento</button>}
+                {!somenteLeitura && item.status === "pago" && (item.confirmedAt || exemptIds.has(item.userId)) && <button type="button" disabled={busy === `tx:${item.id}`} onClick={() => void refund(item)} className="inline-flex items-center gap-1 rounded-lg border border-red-500/40 px-2.5 py-1.5 text-[10px] font-semibold text-red-400 hover:bg-red-500/10 disabled:opacity-50"><RotateCcw className="w-3 h-3" />Estornar</button>}
               </div>
                 {item.confirmedAt && <div className="mt-1 text-[10px] text-slate-500">Confirmado por {nameOf(item.confirmedBy)} em {when(item.confirmedAt)}</div>}
                 {item.refundedAt && <div className="text-[10px] text-slate-500">Estornado em {when(item.refundedAt)}{item.refundReason ? ` · ${item.refundReason}` : ""}</div>}
@@ -156,7 +167,7 @@ export default function AdminPanel({ users, transactions, feedback, currentUserI
 
     <section className="bg-slate-900 rounded-2xl border border-slate-800 p-6 shadow-xl space-y-4">
       <div className="flex items-center justify-between border-b border-slate-800 pb-3"><div><h3 className="text-lg font-bold text-white">Feedback do piloto ({feedback.length})</h3><p className="text-xs text-slate-400">Dúvidas, erros e sugestões enviados pelos corretores.</p></div><MessageSquarePlus className="h-5 w-5 text-amber-400" /></div>
-      {feedback.length === 0 ? <p className="rounded-lg border border-dashed border-slate-700 px-4 py-6 text-center text-xs text-slate-400">Nenhum feedback recebido ainda.</p> : <div className="space-y-3">{feedback.map((item) => <article key={item.id} className="rounded-xl border border-slate-800 bg-slate-950 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold text-white">{item.userName} · CRECI {item.userCreci}</p><p className="mt-1 text-[10px] text-slate-500">{item.screen} · {item.category === "erro" ? "Erro" : item.category === "ideia" ? "Ideia" : "Dúvida"} · {when(item.createdAt)}</p></div><select aria-label="Status do feedback" value={item.status} disabled={busy === `fb:${item.id}`} onChange={(event) => void feedbackStatus(item, event.target.value)} className="rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-[11px] text-white"><option value="novo">Novo</option><option value="em_analise">Em análise</option><option value="concluido">Concluído</option></select></div><p className="mt-3 whitespace-pre-wrap text-xs leading-relaxed text-slate-300">{item.message}</p></article>)}</div>}
+      {feedback.length === 0 ? <p className="rounded-lg border border-dashed border-slate-700 px-4 py-6 text-center text-xs text-slate-400">Nenhum feedback recebido ainda.</p> : <div className="space-y-3">{feedback.map((item) => <article key={item.id} className="rounded-xl border border-slate-800 bg-slate-950 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold text-white">{item.userName} · CRECI {item.userCreci}</p><p className="mt-1 text-[10px] text-slate-500">{item.screen} · {item.category === "erro" ? "Erro" : item.category === "ideia" ? "Ideia" : "Dúvida"} · {when(item.createdAt)}</p></div><select aria-label="Status do feedback" value={item.status} disabled={somenteLeitura || busy === `fb:${item.id}`} onChange={(event) => void feedbackStatus(item, event.target.value)} className="rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-[11px] text-white"><option value="novo">Novo</option><option value="em_analise">Em análise</option><option value="concluido">Concluído</option></select></div><p className="mt-3 whitespace-pre-wrap text-xs leading-relaxed text-slate-300">{item.message}</p></article>)}</div>}
     </section>
   </div>;
 }

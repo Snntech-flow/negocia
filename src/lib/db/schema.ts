@@ -32,6 +32,10 @@ export const users = pgTable("users", {
   // Conta sem cobrança (sócios, cortesia): quem da equipe isentou e quando. Isenta = ativa, sem vencimento e sem mensalidade.
   billingExemptBy: uuid("billing_exempt_by").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
   billingExemptAt: timestamp("billing_exempt_at"),
+  // Visualização da Administração (15/10/2026): vê a aba em modo leitura; as ações seguem só do administrador.
+  adminViewAccess: boolean("admin_view_access").default(false).notNull(),
+  adminViewAccessBy: uuid("admin_view_access_by").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
+  adminViewAccessAt: timestamp("admin_view_access_at"),
   
   // Reputação Ética (Anti-Laranja Podre)
   trustScore: integer("trust_score").default(100).notNull(), // 0 a 100
