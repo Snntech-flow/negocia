@@ -1,6 +1,7 @@
 "use client";
 
 import dynamic from "next/dynamic";
+import CpfParcialInput from "./CpfParcialInput";
 import { divisoesPermitidas, rotuloDaCondicao } from "@/lib/partnership-models";
 import { PROPERTY_PAGE_SIZE } from "@/lib/marketplace-query";
 import RadarMatches from "./RadarMatches";
@@ -428,7 +429,11 @@ export default function NegociaLarApp({
         setNotifications((prev) => prev.map((n) => (n.id === notif.id ? { ...n, read: true } : n)));
       } catch (error) { showToast(error instanceof Error ? error.message : "Não foi possível marcar como lida."); }
     }
-    if (notif.propertyId) {
+    if (notif.type === "dvp") {
+      // Registro de visita (14/10/2026): a notificação leva ao quadro onde se confirma a divisão, não à ficha do imóvel.
+      setActiveTab("dvp");
+      window.setTimeout(() => document.getElementById("acompanhamento-parcerias")?.scrollIntoView({ behavior: "smooth", block: "start" }), 400);
+    } else if (notif.propertyId) {
       const prop = propertyList.find((p) => p.id === notif.propertyId);
       if (prop) setSelectedPropertyForWhiteLabel(prop);
       else {
@@ -1081,14 +1086,9 @@ export default function NegociaLarApp({
                     />
                   </div>
                   <div>
-                    <label className="block text-xs font-medium text-slate-300 mb-1">CPF (Parcial para Proteção LGPD)</label>
-                    <input
-                      name="clientCpf"
-                      required
-                      placeholder="***.382.910-**"
-                      defaultValue=""
-                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500"
-                    />
+                    <label htmlFor="dvp-cpf" className="block text-xs font-medium text-slate-300 mb-1">CPF do cliente (fica mascarado — LGPD)</label>
+                    <CpfParcialInput id="dvp-cpf" name="clientCpf"
+                      className="w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 text-xs text-white focus:outline-none focus:border-emerald-500" />
                   </div>
                   <div>
                     <label className="block text-xs font-medium text-slate-300 mb-1">WhatsApp do Cliente</label>
@@ -1167,7 +1167,7 @@ export default function NegociaLarApp({
               )}
             </div>
 
-            <div className="bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
+            <div id="acompanhamento-parcerias" className="scroll-mt-28 bg-slate-900 border border-slate-800 rounded-2xl p-5 shadow-xl space-y-4">
               <div className="flex items-center justify-between gap-3 border-b border-slate-800 pb-3">
                 <div><h3 className="text-sm font-bold uppercase tracking-wider text-white">Acompanhamento das parcerias ({partnershipList.length})</h3><p className="mt-1 text-xs text-slate-400">Veja em que etapa está cada visita compartilhada.</p></div>
                 <ArrowRight className="h-4 w-4 shrink-0 text-sky-300" />

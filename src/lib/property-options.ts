@@ -76,23 +76,23 @@ export const CONDO_AMENITIES_GROUPS = [
   {
     category: "Lazer & Convivência",
     items: [
-      "Piscina adulto", "Piscina infantil", "Piscina aquecida / coberta", "Deck molhado", "Sauna", "Spa / Hidromassagem",
+      "Piscina adulto", "Piscina infantil", "Piscina aquecida / coberta", "Deck molhado", "Piscina com deck no rooftop", "Sky lounge", "Sauna", "Spa / Hidromassagem",
       "Espaço gourmet", "Salão de festas", "Churrasqueira coletiva", "Salão de jogos", "Cinema / Home theater",
-      "Espaço kids / Brinquedoteca", "Playground", "Coworking / Sala de reunião", "Pista de cooper / caminhada",
+      "Espaço kids / Brinquedoteca", "Playground", "Parque infantil", "Coworking / Sala de reunião", "Pista de cooper / caminhada",
       "Área verde / Bosque preservado", "Pet place / Pet care", "Haras / Hípica", "Heliponto", "Parque aquático",
       "Lavanderia compartilhada", "Bar / Restaurante",
     ],
   },
   {
     category: "Esportes & Saúde",
-    items: ["Academia completa (Fitness)", "Quadra poliesportiva", "Quadra de tênis", "Quadra de beach tennis", "Campo de futebol"],
+    items: ["Academia completa (Fitness)", "Academia ao ar livre", "Quadra poliesportiva", "Quadra de tênis", "Quadra de beach tennis", "Campo de futebol"],
   },
   {
     category: "Segurança, Tecnologia & Infraestrutura",
     items: [
       "Portaria 24 horas", "Portaria remota / virtual", "Portaria blindada", "Reconhecimento facial / Biometria",
       "Câmeras CFTV 24h", "Gerador de energia", "Elevador social e de serviço", "Mini-mercado 24h",
-      "Carregador para carro elétrico",
+      "Carregador para carro elétrico", "Garagem com vagas rotativas",
     ],
   },
 ];

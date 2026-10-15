@@ -30,12 +30,19 @@ const EXTENSO = ["", "um", "dois", "três", "quatro", "cinco", "seis", "sete", "
   "quatorze", "quinze", "dezesseis", "dezessete", "dezoito", "dezenove", "vinte"];
 const MESES = ["janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto", "setembro", "outubro", "novembro", "dezembro"];
 
-/** Percentual da comissão: inteiro de 1 a 20 (o modelo escreve por extenso). */
-export const percentualValido = (n: number) => Number.isInteger(n) && n >= 1 && n <= 20;
+/** Percentual da comissão: de 1 a 20, com até uma casa decimal — 2,5% e 3% (corretora piloto, 14/10/2026). */
+export const percentualValido = (n: number) => Number.isFinite(n) && n >= 1 && n <= 20 && Math.abs(n * 10 - Math.round(n * 10)) < 1e-9;
 
+/** "2,5" ou "2.5" → 2.5; o que não for número vira NaN. */
+export const percentualDigitado = (texto: string) => (/^\s*\d{1,2}([.,]\d)?\s*$/.test(texto) ? Number(texto.trim().replace(",", ".")) : Number.NaN);
+
+/** 6 → "6% (seis por cento)"; 2,5 → "2,5% (dois vírgula cinco por cento)". */
 export function percentualPorExtenso(n: number): string {
-  if (!percentualValido(n)) throw new Error("Informe um percentual inteiro de 1 a 20.");
-  return `${n}% (${EXTENSO[n]} por cento)`;
+  if (!percentualValido(n)) throw new Error("Informe um percentual de 1 a 20, com até uma casa decimal.");
+  const decimos = Math.round(n * 10);
+  const inteiro = Math.floor(decimos / 10);
+  const decimal = decimos % 10;
+  return decimal === 0 ? `${inteiro}% (${EXTENSO[inteiro]} por cento)` : `${inteiro},${decimal}% (${EXTENSO[inteiro]} vírgula ${EXTENSO[decimal]} por cento)`;
 }
 
 export function dataPorExtenso(iso: string): string {

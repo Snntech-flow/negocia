@@ -1,6 +1,7 @@
 "use client";
 
 import NegotiationDocumentation from "./NegotiationDocumentation";
+import CpfParcialInput from "./CpfParcialInput";
 import { divisoesPermitidas } from "@/lib/partnership-models";
 import type { NegotiationDocuments } from "@/lib/negotiation-documents";
 import BrokerWeeklyAgenda from "./BrokerWeeklyAgenda";
@@ -887,7 +888,7 @@ export default function LeadCRM({
               <button type="button" onClick={() => setVisitProperty(null)} className="rounded-lg p-1 text-slate-400 hover:bg-slate-800 hover:text-white" aria-label="Fechar"><X className="h-5 w-5" /></button>
             </div>
             <label className="block text-xs font-semibold text-slate-300">Data e horário da visita<input name="visitDate" type="datetime-local" required defaultValue={localDateTimeNow()} className={`${inputClass} mt-1`} /></label>
-            <label className="block text-xs font-semibold text-slate-300">CPF parcial do cliente<input name="clientCpfPartial" type="text" required pattern="\*{3}\.\d{3}\.\d{3}-\*{2}" maxLength={14} placeholder="***.123.456-**" className={`${inputClass} mt-1 font-mono`} /></label>
+            <label htmlFor="crm-visita-cpf" className="block text-xs font-semibold text-slate-300">CPF do cliente (fica mascarado — LGPD)<CpfParcialInput id="crm-visita-cpf" name="clientCpfPartial" className={`${inputClass} mt-1 font-mono`} /></label>
             <p className="rounded-lg border border-amber-500/20 bg-amber-950/20 p-3 text-[11px] leading-relaxed text-slate-300">O registro fica como rascunho até ser validado e aceito pelas partes. Ele não equivale a assinatura eletrônica nem substitui orientação jurídica.</p>
             {error && <p role="alert" className="text-xs text-rose-300">{error}</p>}
             <div className="flex justify-end gap-2 border-t border-slate-800 pt-3">

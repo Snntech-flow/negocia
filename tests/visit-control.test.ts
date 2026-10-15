@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { dataPorExtenso, percentualPorExtenso, percentualValido, textoDoControle, valorEmReais, type DadosDoControle } from "../src/lib/visit-control";
+import { dataPorExtenso, percentualDigitado, percentualPorExtenso, percentualValido, textoDoControle, valorEmReais, type DadosDoControle } from "../src/lib/visit-control";
 
 const dados = (mudar: Partial<DadosDoControle> = {}): DadosDoControle => ({
   numero: "A1B2C3D4E5F60718",
@@ -39,13 +39,23 @@ test("controle de visita: o cliente preenche à mão o que o sistema não guarda
   assert.match(c.declaracao[1], /8% \(oito por cento\)/);
 });
 
-test("controle de visita: sem UF não inventa região do CRECI; percentual inteiro de 1 a 20; data e valor", () => {
+test("controle de visita: sem UF não inventa região do CRECI; percentual de 1 a 20 com uma casa decimal; data e valor", () => {
   const c = textoDoControle(dados({ corretor: { nome: "Corretor", creci: "999", uf: null } }), 6);
   assert.match(c.declaracao[0], /inscrito no CRECI n\.º 999, e que/);
   assert.match(c.declaracao[1], /tabela de honorários do CRECI, conforme/);
   assert.equal(percentualPorExtenso(20), "20% (vinte por cento)");
-  assert.equal(percentualValido(6.5), false);
+  // 🔴 com uma casa decimal (corretora piloto, 14/10/2026: "tenho imóveis que são 2,5%, outros 3,0%")
+  assert.equal(percentualValido(2.5), true);
+  assert.equal(percentualValido(1.1), true);
+  assert.equal(percentualValido(2.55), false);
   assert.equal(percentualValido(0), false);
+  assert.equal(percentualPorExtenso(2.5), "2,5% (dois vírgula cinco por cento)");
+  assert.equal(percentualPorExtenso(3), "3% (três por cento)");
+  assert.equal(percentualDigitado("2,5"), 2.5);
+  assert.equal(percentualDigitado("3,0"), 3);
+  assert.equal(percentualDigitado("3.0"), 3);
+  assert.ok(Number.isNaN(percentualDigitado("2,55")) && Number.isNaN(percentualDigitado("abc")));
+  assert.match(textoDoControle(dados({}), 2.5).declaracao[1], /2,5% \(dois vírgula cinco por cento\) sobre o valor do bem/);
   assert.throws(() => percentualPorExtenso(21), /1 a 20/);
   assert.equal(dataPorExtenso("2026-01-05"), "5 de janeiro de 2026");
   assert.equal(dataPorExtenso("lixo"), "____ de ______________ de ______");

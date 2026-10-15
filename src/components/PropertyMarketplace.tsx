@@ -6,6 +6,9 @@ import { PROPERTY_PAGE_SIZE } from "@/lib/marketplace-query";
 import type { Property } from "@/lib/property-types";
 import { optionLabel, CONDITIONS, PURPOSES } from "@/lib/property-options";
 import Avatar from "./Avatar";
+import PhotoViewer from "./PhotoViewer";
+import { fotosComCapaNaFrente } from "@/lib/photo-order";
+import { useCallback, useState } from "react";
 import { previsaoParaTela } from "@/lib/delivery-forecast";
 
 export default function PropertyMarketplace({ properties, propertyTotal, propertyPage, loading, currentUserId, propertyTypes,
@@ -17,6 +20,14 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
   setPropertyPage: (value: number) => void; onCreate: () => void; blockedReason?: string | null; onShare: (property: Property) => void; onSchedule: (property: Property) => void;
   onEdit?: (property: Property) => void;
 }) {
+  // Fotos em tela cheia (14/10/2026): a foto do cartão e o selo "N fotos" abrem a galeria.
+  const [galeria, setGaleria] = useState<{ fotos: string[]; indice: number; titulo: string } | null>(null);
+  const fecharGaleria = useCallback(() => setGaleria(null), []);
+  const mudarFoto = useCallback((indice: number) => setGaleria((atual) => (atual ? { ...atual, indice } : atual)), []);
+  const abrirFotos = (prop: Property) => {
+    const fotos = fotosComCapaNaFrente(prop.photos || [], prop.coverPhoto);
+    if (fotos.length) setGaleria({ fotos, indice: 0, titulo: prop.title });
+  };
   const formatBRL = (value: string) => Number(value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
   const area = (value: string) => Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
   return (
@@ -141,12 +152,12 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
                     <div>
                       {/* Imagem principal com badges */}
                       <div className="relative h-64 w-full bg-slate-950 overflow-hidden">
-                        {prop.coverPhoto || prop.photos[0] ? <img
+                        {prop.coverPhoto || prop.photos[0] ? <button type="button" onClick={() => abrirFotos(prop)} aria-label={`Ver as fotos de ${prop.title}`} className="block h-full w-full cursor-zoom-in"><img
                           src={prop.coverPhoto || prop.photos[0]}
                           loading="lazy"
                           alt={prop.title}
                           className="w-full h-full object-cover"
-                        /> : <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-slate-400"><ImageIcon className="h-10 w-10" /><span className="text-xs">Sem fotos cadastradas</span></div>}
+                        /></button> : <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-slate-400"><ImageIcon className="h-10 w-10" /><span className="text-xs">Sem fotos cadastradas</span></div>}
                         <div className="absolute top-3 left-3 flex flex-wrap gap-1.5 max-w-[85%]">
                           <span className="bg-amber-500 text-slate-950 text-xs font-black px-2.5 py-1 rounded-md shadow-lg flex items-center gap-1">
                             {prop.acceptsPartnership ? rotuloDaCondicao(prop.partnershipModels) : "Só na sua carteira"}
@@ -177,11 +188,11 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
                           Endereço só com o captador
                         </div>
 
-                        {prop.photos && prop.photos.length > 1 && (
-                          <div className="absolute bottom-3 right-3 bg-slate-950/80 backdrop-blur px-2.5 py-1 rounded-lg border border-slate-800 text-[11px] text-slate-300 flex items-center gap-1 font-mono">
+                        {prop.photos && prop.photos.length > 0 && (
+                          <button type="button" onClick={() => abrirFotos(prop)} className="absolute bottom-3 right-3 bg-slate-950/80 backdrop-blur px-2.5 py-1 rounded-lg border border-slate-800 text-[11px] font-semibold text-slate-300 flex items-center gap-1 hover:border-amber-500">
                             <ImageIcon className="w-3 h-3 text-orange-700" />
-                            {prop.photos.length} fotos
-                          </div>
+                            Ver {prop.photos.length === 1 ? "a foto" : `${prop.photos.length} fotos`}
+                          </button>
                         )}
                       </div>
 
@@ -294,6 +305,7 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
               <span className="text-sm">Página {propertyPage} de {Math.ceil(propertyTotal / PROPERTY_PAGE_SIZE)} · {propertyTotal} imóveis</span>
               <button type="button" disabled={loading || propertyPage * PROPERTY_PAGE_SIZE >= propertyTotal} onClick={() => setPropertyPage(propertyPage + 1)} className="rounded-lg border border-slate-700 px-4 py-2 text-sm disabled:opacity-40">Próxima</button>
             </nav>}
+            {galeria && <PhotoViewer fotos={galeria.fotos} indice={galeria.indice} titulo={galeria.titulo} onIndice={mudarFoto} onFechar={fecharGaleria} />}
           </div>
   );
 }

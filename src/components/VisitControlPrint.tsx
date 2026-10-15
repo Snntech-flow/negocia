@@ -6,7 +6,7 @@ import { useState } from "react";
 import { Printer } from "lucide-react";
 import { getVisitControl } from "@/lib/actions/visit-control";
 import { unwrap } from "@/lib/action-result";
-import { PERCENTUAL_PADRAO, percentualValido, textoDoControle, type ControleDeVisita } from "@/lib/visit-control";
+import { PERCENTUAL_PADRAO, percentualDigitado, percentualValido, textoDoControle, type ControleDeVisita } from "@/lib/visit-control";
 
 const CHAVE = "negocialar-controle-percentual";
 function lerPercentual() {
@@ -63,12 +63,14 @@ function imprimir(c: ControleDeVisita) {
 
 export default function VisitControlPrint({ dvpId }: { dvpId: string }) {
   const [aberto, setAberto] = useState(false);
-  const [percentual, setPercentual] = useState(PERCENTUAL_PADRAO);
+  // Texto digitado ("2,5"): aceita vírgula ou ponto, com uma casa decimal (14/10/2026).
+  const [digitado, setDigitado] = useState(String(PERCENTUAL_PADRAO));
+  const percentual = percentualDigitado(digitado);
   const [ocupado, setOcupado] = useState(false);
   const [mensagem, setMensagem] = useState("");
 
   async function gerar() {
-    if (!percentualValido(percentual)) { setMensagem("Informe a comissão em número inteiro, de 1 a 20%."); return; }
+    if (!percentualValido(percentual)) { setMensagem("Informe a comissão de 1 a 20%, com até uma casa decimal (ex.: 2,5 ou 3)."); return; }
     setOcupado(true); setMensagem("");
     try {
       const dados = unwrap(await getVisitControl(dvpId));
@@ -81,7 +83,7 @@ export default function VisitControlPrint({ dvpId }: { dvpId: string }) {
 
   if (!aberto) {
     return (
-      <button type="button" onClick={() => { setPercentual(lerPercentual()); setAberto(true); }}
+      <button type="button" onClick={() => { setDigitado(String(lerPercentual()).replace(".", ",")); setAberto(true); }}
         className="inline-flex items-center gap-1.5 rounded-lg border border-slate-600 px-3 py-1.5 text-[11px] font-semibold text-slate-300">
         <Printer className="h-3.5 w-3.5" />Controle de visita para o cliente assinar
       </button>
@@ -92,7 +94,7 @@ export default function VisitControlPrint({ dvpId }: { dvpId: string }) {
       <p className="text-[11px] text-slate-400">Sai preenchido com você, seu CRECI, o imóvel (bairro, cidade e código — o endereço protegido não sai), o nome do cliente e a data da visita. O cliente completa CPF, endereços e assina no papel.</p>
       <div className="flex flex-wrap items-end gap-2">
         <label className="text-[11px] text-slate-300">Comissão se comprar por fora (%)
-          <input type="number" min={1} max={20} step={1} value={percentual} onChange={(e) => setPercentual(Number(e.target.value))}
+          <input type="text" inputMode="decimal" value={digitado} onChange={(e) => { setDigitado(e.target.value); setMensagem(""); }} placeholder="Ex.: 2,5"
             className="mt-1 block w-24 rounded-lg border border-slate-700 bg-slate-900 p-1.5 text-sm text-white" />
         </label>
         <button type="button" disabled={ocupado} onClick={() => void gerar()} className="rounded-lg bg-amber-500 px-3 py-2 text-xs font-bold text-slate-950 disabled:opacity-50">

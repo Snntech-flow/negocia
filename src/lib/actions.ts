@@ -550,8 +550,8 @@ async function createDvpCertificateImpl(data: {
       userId: data.captorBrokerId,
       title: "Novo registro de visita em rascunho",
       message: commissionModel === "three_party_referral_40_40_20"
-        ? `Foi criado o registro ${certificate.certificateHash} para ${property.title}. Confira a divisão 40/40/20 e responda na tela de acompanhamento.`
-        : `Foi criado o registro ${certificate.certificateHash} para ${property.title}. O rascunho ainda não tem assinatura eletrônica.`,
+        ? `Foi criado o registro ${certificate.certificateHash} para ${property.title}. Confira a divisão 40/40/20 e responda em Documentos › Registro de Visita, no quadro "Acompanhamento das parcerias" — clique aqui para abrir.`
+        : `Foi criado o registro ${certificate.certificateHash} para ${property.title}. Acompanhe em Documentos › Registro de Visita — clique aqui para abrir. O rascunho ainda não tem assinatura eletrônica.`,
       type: "dvp",
       propertyId: data.propertyId,
       read: false,
