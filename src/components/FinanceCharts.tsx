@@ -44,7 +44,13 @@ function niceMax(maxCents: number) {
   return { top: step * 4, step };
 }
 
-export function MonthlyChart({ rows, from, to }: { rows: MonthRow[]; from: string; to: string }) {
+// Rótulos do gráfico: o padrão é o do Financeiro do corretor; a Administração usa "Faturado × a receber" e anos
+// (15/10/2026). Sem `diferenca`/`realizado`, essas colunas e linhas não aparecem.
+export type ChartLabels = { titulo: string; periodo: string; a: string; b: string; diferenca: string | null; realizadoA: string | null; realizadoB: string | null; vazio: string };
+const FINANCE_LABELS: ChartLabels = { titulo: "Receitas × despesas por mês", periodo: "Mês", a: "Receitas", b: "Despesas", diferenca: "Receitas − despesas",
+  realizadoA: "Recebido", realizadoB: "Pago", vazio: "Sem lançamentos de {de} a {ate} para comparar." };
+
+export function MonthlyChart({ rows, from, to, labels = FINANCE_LABELS, xLabel = monthShort }: { rows: MonthRow[]; from: string; to: string; labels?: ChartLabels; xLabel?: (key: string) => string }) {
   const [ref, width] = useWidth<HTMLDivElement>();
   const [hover, setHover] = useState<number | null>(null);
   const [table, setTable] = useState(false);
@@ -61,23 +67,23 @@ export function MonthlyChart({ rows, from, to }: { rows: MonthRow[]; from: strin
 
   return <figure className="finance-viz space-y-3" aria-labelledby="finance-monthly-title">
     <div className="flex flex-wrap items-center justify-between gap-2">
-      <figcaption id="finance-monthly-title" className="font-bold text-white">Receitas × despesas por mês</figcaption>
+      <figcaption id="finance-monthly-title" className="font-bold text-white">{labels.titulo}</figcaption>
       <div className="flex items-center gap-4 text-xs text-slate-400">
-        <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: "var(--fin-receita)" }} />Receitas</span>
-        <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: "var(--fin-despesa)" }} />Despesas</span>
+        <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: "var(--fin-receita)" }} />{labels.a}</span>
+        <span className="flex items-center gap-1.5"><span className="inline-block h-2.5 w-2.5 rounded-sm" style={{ background: "var(--fin-despesa)" }} />{labels.b}</span>
         <button type="button" aria-pressed={table} onClick={() => setTable(!table)} className="rounded-lg border border-slate-700 px-2 py-1 font-semibold text-slate-300 hover:bg-slate-800">{table ? "Ver gráfico" : "Ver tabela"}</button>
       </div>
     </div>
     {table ? <div className="overflow-x-auto"><table className="w-full text-left text-xs">
-      <thead className="text-slate-400"><tr><th className="py-2 pr-3">Mês</th><th className="py-2 pr-3 text-right">Receitas</th><th className="py-2 pr-3 text-right">Despesas</th><th className="py-2 pr-3 text-right">Receitas − despesas</th><th className="py-2 pr-3 text-right">Recebido</th><th className="py-2 text-right">Pago</th></tr></thead>
+      <thead className="text-slate-400"><tr><th className="py-2 pr-3">{labels.periodo}</th><th className="py-2 pr-3 text-right">{labels.a}</th><th className="py-2 pr-3 text-right">{labels.b}</th>{labels.diferenca && <th className="py-2 pr-3 text-right">{labels.diferenca}</th>}{labels.realizadoA && <th className="py-2 pr-3 text-right">{labels.realizadoA}</th>}{labels.realizadoB && <th className="py-2 text-right">{labels.realizadoB}</th>}</tr></thead>
       <tbody className="divide-y divide-slate-800 text-slate-300 [font-variant-numeric:tabular-nums]">{rows.map((row) => <tr key={row.month} className={inPeriod(row.month) ? "" : "opacity-60"}>
-        <td className="py-2 pr-3 font-semibold">{monthShort(row.month)}</td><td className="py-2 pr-3 text-right">{brl(row.receita)}</td><td className="py-2 pr-3 text-right">{brl(row.despesa)}</td>
-        <td className="py-2 pr-3 text-right font-semibold">{brl(row.receita - row.despesa)}</td><td className="py-2 pr-3 text-right">{brl(row.receitaRealizada)}</td><td className="py-2 text-right">{brl(row.despesaRealizada)}</td></tr>)}</tbody>
+        <td className="py-2 pr-3 font-semibold">{xLabel(row.month)}</td><td className="py-2 pr-3 text-right">{brl(row.receita)}</td><td className="py-2 pr-3 text-right">{brl(row.despesa)}</td>
+        {labels.diferenca && <td className="py-2 pr-3 text-right font-semibold">{brl(row.receita - row.despesa)}</td>}{labels.realizadoA && <td className="py-2 pr-3 text-right">{brl(row.receitaRealizada)}</td>}{labels.realizadoB && <td className="py-2 text-right">{brl(row.despesaRealizada)}</td>}</tr>)}</tbody>
     </table></div>
     : rows.every((row) => !row.receita && !row.despesa)
-      ? <p className="rounded-lg border border-dashed border-slate-700 px-3 py-8 text-center text-xs text-slate-400">Sem lançamentos de {monthShort(rows[0]?.month ?? from)} a {monthShort(to)} para comparar.</p>
+      ? <p className="rounded-lg border border-dashed border-slate-700 px-3 py-8 text-center text-xs text-slate-400">{labels.vazio.replace("{de}", xLabel(rows[0]?.month ?? from)).replace("{ate}", xLabel(to))}</p>
     : <div ref={ref} className="relative" style={{ height: top + plotHeight + axisBand }} onPointerLeave={() => setHover(null)}>
-      {width > 0 && <svg width={width} height={top + plotHeight + axisBand} role="img" aria-label="Receitas e despesas por mês; use Ver tabela para os valores">
+      {width > 0 && <svg width={width} height={top + plotHeight + axisBand} role="img" aria-label={`${labels.titulo}; use Ver tabela para os valores`}>
         {ticks.map((tick) => <g key={tick}>
           <line x1={left} x2={width - right} y1={y(tick)} y2={y(tick)} stroke="var(--fin-grid)" strokeWidth={1} />
           <text x={left - 8} y={y(tick)} dy="0.32em" textAnchor="end" fontSize={11} fill="var(--fin-muted)" style={{ fontVariantNumeric: "tabular-nums" }}>{brlCompact(tick)}</text>
@@ -92,24 +98,24 @@ export function MonthlyChart({ rows, from, to }: { rows: MonthRow[]; from: strin
               <path d={columnPath(xReceita, y(row.receita), barWidth, top + plotHeight - y(row.receita))} fill="var(--fin-receita)" />
               <path d={columnPath(xDespesa, y(row.despesa), barWidth, top + plotHeight - y(row.despesa))} fill="var(--fin-despesa)" />
             </g>
-            <text x={center} y={top + plotHeight + 18} textAnchor="middle" fontSize={11} fill="var(--fin-muted)" fontWeight={index === last ? 700 : 400}>{monthShort(row.month)}</text>
+            <text x={center} y={top + plotHeight + 18} textAnchor="middle" fontSize={11} fill="var(--fin-muted)" fontWeight={index === last ? 700 : 400}>{xLabel(row.month)}</text>
           </g>;
         })}
         {/* Faixa do mês inteira é o alvo do mouse e do teclado (maior que a coluna). */}
         {rows.map((row, index) => <rect key={`hit-${row.month}`} x={left + band * index} y={top} width={band} height={plotHeight + axisBand - 4} fill="transparent"
-          tabIndex={0} aria-label={`${monthShort(row.month)}: receitas ${brl(row.receita)}, despesas ${brl(row.despesa)}, saldo ${brl(row.receita - row.despesa)}`}
+          tabIndex={0} aria-label={`${xLabel(row.month)}: ${labels.a.toLowerCase()} ${brl(row.receita)}, ${labels.b.toLowerCase()} ${brl(row.despesa)}${labels.diferenca ? `, saldo ${brl(row.receita - row.despesa)}` : ""}`}
           onPointerMove={() => setHover(index)} onFocus={() => setHover(index)} onBlur={() => setHover(null)} style={{ outline: "none" }} />)}
         {hover !== null && <rect x={left + band * hover} y={top} width={band} height={plotHeight} fill="var(--fin-hover)" pointerEvents="none" />}
       </svg>}
       {hovered && <div role="status" className="pointer-events-none absolute z-10 min-w-44 rounded-xl border border-slate-700 bg-slate-950 p-3 text-xs shadow-xl"
         style={{ left: Math.min(Math.max(0, left + band * hover! + band / 2 - 88), Math.max(0, width - 176)), top: 0 }}>
-        <p className="mb-1.5 font-bold text-white">{monthShort(hovered.month)}</p>
-        {([["Receitas", hovered.receita, "var(--fin-receita)"], ["Despesas", hovered.despesa, "var(--fin-despesa)"]] as const).map(([label, value, color]) =>
+        <p className="mb-1.5 font-bold text-white">{xLabel(hovered.month)}</p>
+        {([[labels.a, hovered.receita, "var(--fin-receita)"], [labels.b, hovered.despesa, "var(--fin-despesa)"]] as const).map(([label, value, color]) =>
           <p key={label} className="flex items-center justify-between gap-3"><span className="flex items-center gap-1.5 text-slate-400"><span className="inline-block h-0.5 w-3" style={{ background: color }} />{label}</span><strong className="text-white">{brl(value)}</strong></p>)}
-        <p className="mt-1 flex justify-between gap-3 border-t border-slate-800 pt-1"><span className="text-slate-400">Receitas − despesas</span><strong className="text-white">{brl(hovered.receita - hovered.despesa)}</strong></p>
+        {labels.diferenca && <p className="mt-1 flex justify-between gap-3 border-t border-slate-800 pt-1"><span className="text-slate-400">{labels.diferenca}</span><strong className="text-white">{brl(hovered.receita - hovered.despesa)}</strong></p>}
       </div>}
     </div>}
-    {!table && rows.some((row) => row.receita || row.despesa) && rows.some((row) => !inPeriod(row.month)) && <p className="text-[11px] text-slate-400">Meses fora do período escolhido aparecem mais claros, só para comparar.</p>}
+    {!table && rows.some((row) => row.receita || row.despesa) && rows.some((row) => !inPeriod(row.month)) && <p className="text-[11px] text-slate-400">O que fica fora do período escolhido aparece mais claro, só para comparar.</p>}
   </figure>;
 }
 

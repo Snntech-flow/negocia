@@ -10,6 +10,9 @@ import { hasSubscriptionAccess } from "@/lib/subscription";
 import { planName } from "@/lib/plans";
 import type { WorkspaceFeedback, WorkspaceTransaction, WorkspaceUser } from "@/lib/workspace-types";
 import Avatar from "./Avatar";
+import { MonthlyChart, monthShort, type MonthRow } from "./FinanceCharts";
+import { addMonthsKeepingDay, brasiliaToday } from "@/lib/finance";
+import { descricaoDoVencimento, diaDeBrasilia, faturamentoPorAno, faturamentoPorMes } from "@/lib/admin-receita";
 
 const money = (value: string | number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value));
 const when = (value: Date | string | null) => value ? new Date(value).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "";
@@ -26,6 +29,20 @@ export default function AdminPanel({ users, transactions, feedback, currentUserI
   onMessage: (text: string) => void;
 }) {
   const [search, setSearch] = useState("");
+  // Faturamento da plataforma (15/10/2026): faturado (Pix confirmado) × a receber (mensalidades pelo vencimento).
+  const hoje = brasiliaToday();
+  const mesAtual = hoje.slice(0, 7);
+  const anoAtual = Number(mesAtual.slice(0, 4));
+  const [modo, setModo] = useState<"mes" | "ano">("mes");
+  const [deMes, setDeMes] = useState(addMonthsKeepingDay(`${mesAtual}-01`, -5).slice(0, 7));
+  const [ateMes, setAteMes] = useState(addMonthsKeepingDay(`${mesAtual}-01`, 6).slice(0, 7));
+  const [inicio, fim] = deMes <= ateMes ? [deMes, ateMes] : [ateMes, deMes];
+  const primeiroAno = Math.min(anoAtual, ...transactions.map((item) => Number(diaDeBrasilia(item.confirmedAt ?? item.createdAt).slice(0, 4))));
+  const faixas = modo === "mes" ? faturamentoPorMes(users, transactions, inicio, fim) : faturamentoPorAno(users, transactions, primeiroAno, anoAtual + 1);
+  const linhas: MonthRow[] = faixas.map((faixa) => ({ month: faixa.chave, receita: faixa.pago, despesa: faixa.aReceber, receitaRealizada: 0, despesaRealizada: 0 }));
+  const totalFaturado = faixas.reduce((total, faixa) => total + faixa.pago, 0);
+  const totalAReceber = faixas.reduce((total, faixa) => total + faixa.aReceber, 0);
+  const centavosEmReais = (cents: number) => money(cents / 100);
   const [busy, setBusy] = useState<string | null>(null);
   const nameOf = (id: string | null) => users.find((user) => user.id === id)?.name || "equipe";
   // Recorrência: só quem paga (conta sem cobrança e mensalidade zero não entram).
@@ -107,6 +124,30 @@ export default function AdminPanel({ users, transactions, feedback, currentUserI
       <div className={card}><div className="flex items-center justify-between text-xs text-slate-400"><span>Pix aguardando confirmação</span><CreditCard className="w-4 h-4 text-purple-400" /></div><div className="text-2xl font-black text-white mt-2">{pendingPix}</div><div className="text-[11px] text-slate-400 mt-1">Confira no extrato antes de confirmar</div></div>
     </div>
 
+    <section className="bg-slate-900 rounded-2xl border border-slate-800 shadow-xl space-y-4 p-6" aria-labelledby="faturamento-titulo">
+      <div className="flex flex-col gap-3 border-b border-slate-800 pb-4">
+        <div><h3 id="faturamento-titulo" className="text-lg font-bold text-white flex items-center gap-2"><TrendingUp className="w-5 h-5 text-amber-500" />Faturamento da plataforma</h3>
+          <p className="text-xs text-slate-400">Faturado: Pix confirmado, na data da confirmação. A receber: mensalidades pelo vencimento de cada corretor (mensal ou anual), inclusive as vencidas e não pagas; isentos e suspensos ficam fora.</p></div>
+        <div className="flex flex-wrap items-end gap-2">
+          <div role="group" aria-label="Agrupar por" className="flex rounded-lg border border-slate-700 p-0.5 text-xs font-semibold">
+            {(["mes", "ano"] as const).map((opcao) => <button key={opcao} type="button" aria-pressed={modo === opcao} onClick={() => setModo(opcao)} className={`rounded-md px-3 py-1.5 ${modo === opcao ? "bg-[#083858] text-[#ffffff]" : "text-slate-300"}`}>{opcao === "mes" ? "Por mês" : "Por ano"}</button>)}
+          </div>
+          {modo === "mes" && <>
+            <label className="text-[11px] text-slate-400">De<input type="month" value={deMes} onChange={(event) => event.target.value && setDeMes(event.target.value)} className="mt-1 block rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white" /></label>
+            <label className="text-[11px] text-slate-400">Até<input type="month" value={ateMes} onChange={(event) => event.target.value && setAteMes(event.target.value)} className="mt-1 block rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white" /></label>
+          </>}
+        </div>
+      </div>
+      <div className="grid gap-3 sm:grid-cols-2">
+        <div className="rounded-xl border border-slate-800 p-4"><p className="text-xs text-slate-400">Faturado {modo === "mes" ? `de ${monthShort(inicio)} a ${monthShort(fim)}` : `de ${primeiroAno} a ${anoAtual + 1}`}</p><p className="mt-1 text-2xl font-black text-emerald-400">{centavosEmReais(totalFaturado)}</p></div>
+        <div className="rounded-xl border border-slate-800 p-4"><p className="text-xs text-slate-400">A receber {modo === "mes" ? `de ${monthShort(inicio)} a ${monthShort(fim)}` : `de ${primeiroAno} a ${anoAtual + 1}`}</p><p className="mt-1 text-2xl font-black text-white">{centavosEmReais(totalAReceber)}</p></div>
+      </div>
+      <MonthlyChart rows={linhas} from={modo === "mes" ? inicio : String(primeiroAno)} to={modo === "mes" ? fim : String(anoAtual + 1)}
+        xLabel={modo === "mes" ? monthShort : (chave) => chave}
+        labels={{ titulo: modo === "mes" ? "Faturado × a receber por mês" : "Faturado × a receber por ano", periodo: modo === "mes" ? "Mês" : "Ano", a: "Faturado", b: "A receber",
+          diferenca: null, realizadoA: null, realizadoB: null, vazio: "Nada faturado nem a receber de {de} a {ate}." }} />
+    </section>
+
     <section className="bg-slate-900 rounded-2xl border border-slate-800 shadow-xl space-y-4 p-6">
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
         <div><h3 className="text-lg font-bold text-white flex items-center gap-2"><Users className="w-5 h-5 text-amber-500" />Corretores</h3><p className="text-xs text-slate-400">Confira o CRECI no conselho antes de aprovar.</p></div>
@@ -122,7 +163,8 @@ export default function AdminPanel({ users, transactions, feedback, currentUserI
                 {creciConsultaUrl(user.state) && <a href={creciConsultaUrl(user.state)!} target="_blank" rel="noopener noreferrer" onClick={() => void copyCreci(user)} title={`Abre a busca do CRECI-${user.state} e copia o número`} className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-sky-300 hover:underline"><ExternalLink className="h-3 w-3" aria-hidden="true" />Conferir no CRECI-{user.state}</a>}</td>
               <td className="py-3.5 px-4"><div className="font-semibold text-white">{planName(user.plan)}</div>{user.billingExemptAt
                 ? <><div className="text-[11px] font-semibold text-emerald-400">Sem cobrança</div><div className="text-[10px] text-slate-500">por {nameOf(user.billingExemptBy)} em {when(user.billingExemptAt)}</div></>
-                : <div className="text-[11px] text-slate-400">{money(user.monthlyFee)}/mês · {user.subscriptionStatus === "teste" ? "período grátis" : user.subscriptionStatus}</div>}</td>
+                : <div className="text-[11px] text-slate-400">{money(user.monthlyFee)}/mês · {user.subscriptionStatus === "teste" ? "período grátis" : user.subscriptionStatus}</div>}
+                {(() => { const vencimento = descricaoDoVencimento(user, hoje); return vencimento && <div className={`text-[11px] ${vencimento.vencido ? "font-semibold text-red-400" : "text-slate-400"}`}>{vencimento.texto}</div>; })()}</td>
               <td className="py-3.5 px-4"><span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border ${user.verificationStatus === "aprovado" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : user.verificationStatus === "suspenso" ? "bg-red-500/10 text-red-400 border-red-500/20" : "bg-amber-500/10 text-amber-400 border-amber-500/20"}`}>{VERIFICATION_LABELS[user.verificationStatus] || user.verificationStatus}</span>
                 {user.verificationReviewedAt && <div className="mt-1 text-[10px] text-slate-500">por {nameOf(user.verificationReviewedBy)} em {when(user.verificationReviewedAt)}</div>}</td>
               <td className="py-3.5 px-4 text-right"><div className="flex items-center justify-end gap-2">
