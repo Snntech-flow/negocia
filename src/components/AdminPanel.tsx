@@ -22,14 +22,21 @@ const VERIFICATION_LABELS: Record<string, string> = { aprovado: "Aprovado", pend
 
 // somenteLeitura (15/10/2026): visualização da Administração — vê tudo, sem nenhum botão de ação (o servidor também
 // recusa: as ações exigem role = 'admin').
-export default function AdminPanel({ users, transactions, feedback, currentUserId, somenteLeitura = false, onUsersChange, onTransactionsChange, onFeedbackChange, onMessage }: {
+export default function AdminPanel({ users, transactions, feedback, currentUserId, somenteLeitura = false, abaInicial, onUsersChange, onTransactionsChange, onFeedbackChange, onMessage }: {
   users: WorkspaceUser[]; transactions: WorkspaceTransaction[]; feedback: WorkspaceFeedback[]; currentUserId: string; somenteLeitura?: boolean;
+  /** Aba que abre (testes); sem ela, a última escolhida nesta sessão do navegador, ou Clientes. */
+  abaInicial?: "clientes" | "faturamento";
   onUsersChange: (update: (users: WorkspaceUser[]) => WorkspaceUser[]) => void;
   onTransactionsChange: (update: (items: WorkspaceTransaction[]) => WorkspaceTransaction[]) => void;
   onFeedbackChange: (update: (items: WorkspaceFeedback[]) => WorkspaceFeedback[]) => void;
   onMessage: (text: string) => void;
 }) {
   const [search, setSearch] = useState("");
+  const [aba, setAba] = useState<"clientes" | "faturamento">(() => {
+    if (abaInicial) return abaInicial;
+    try { return typeof window !== "undefined" && sessionStorage.getItem("negocialar-admin-aba") === "faturamento" ? "faturamento" : "clientes"; } catch { return "clientes"; }
+  });
+  const trocarAba = (nova: "clientes" | "faturamento") => { setAba(nova); try { sessionStorage.setItem("negocialar-admin-aba", nova); } catch {} };
   // Faturamento da plataforma (15/10/2026): faturado (Pix confirmado) × a receber (mensalidades pelo vencimento).
   const hoje = brasiliaToday();
   const mesAtual = hoje.slice(0, 7);
@@ -127,94 +134,107 @@ export default function AdminPanel({ users, transactions, feedback, currentUserI
       <div className={card}><div className="flex items-center justify-between text-xs text-slate-400"><span>Pix aguardando confirmação</span><CreditCard className="w-4 h-4 text-purple-400" /></div><div className="text-2xl font-black text-white mt-2">{pendingPix}</div><div className="text-[11px] text-slate-400 mt-1">Confira no extrato antes de confirmar</div></div>
     </div>
 
-    <section className="bg-slate-900 rounded-2xl border border-slate-800 shadow-xl space-y-4 p-6" aria-labelledby="faturamento-titulo">
-      <div className="flex flex-col gap-3 border-b border-slate-800 pb-4">
-        <div><h3 id="faturamento-titulo" className="text-lg font-bold text-white flex items-center gap-2"><TrendingUp className="w-5 h-5 text-amber-500" />Faturamento da plataforma</h3>
-          <p className="text-xs text-slate-400">Faturado: Pix confirmado, na data da confirmação. A receber: mensalidades pelo vencimento de cada corretor (mensal ou anual), inclusive as vencidas e não pagas; isentos e suspensos ficam fora.</p></div>
-        <div className="flex flex-wrap items-end gap-2">
-          <div role="group" aria-label="Agrupar por" className="flex rounded-lg border border-slate-700 p-0.5 text-xs font-semibold">
-            {(["mes", "ano"] as const).map((opcao) => <button key={opcao} type="button" aria-pressed={modo === opcao} onClick={() => setModo(opcao)} className={`rounded-md px-3 py-1.5 ${modo === opcao ? "bg-[#083858] text-[#ffffff]" : "text-slate-300"}`}>{opcao === "mes" ? "Por mês" : "Por ano"}</button>)}
-          </div>
-          {modo === "mes" && <>
-            <label className="text-[11px] text-slate-400">De<input type="month" value={deMes} onChange={(event) => event.target.value && setDeMes(event.target.value)} className="mt-1 block rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white" /></label>
-            <label className="text-[11px] text-slate-400">Até<input type="month" value={ateMes} onChange={(event) => event.target.value && setAteMes(event.target.value)} className="mt-1 block rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white" /></label>
-          </>}
+    {/* Abas da Administração (15/10/2026): Clientes × Faturamento e repasses; os números do topo valem para as duas. */}
+    <div role="tablist" aria-label="Administração" className="flex flex-wrap gap-1 border-b border-slate-800">
+      {([["clientes", "Clientes", users.length], ["faturamento", "Faturamento e repasses", pendingPix]] as const).map(([id, rotulo, contagem]) =>
+        <button key={id} type="button" role="tab" id={`admin-aba-${id}`} aria-selected={aba === id} aria-controls={`admin-painel-${id}`} onClick={() => trocarAba(id)}
+          className={`-mb-px flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-bold ${aba === id ? "border-[#eb6834] text-[#083858]" : "border-transparent text-slate-400 hover:text-slate-200"}`}>
+          {rotulo}{contagem > 0 && <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${id === "faturamento" ? "bg-[#eb6834] text-[#ffffff]" : "bg-[#e2e8f0] text-[#083858]"}`} title={id === "faturamento" ? "Pix aguardando confirmação" : "Corretores cadastrados"}>{contagem}</span>}
+        </button>)}
+    </div>
+
+    {aba === "clientes" && <div role="tabpanel" id="admin-painel-clientes" aria-labelledby="admin-aba-clientes" className="space-y-8">
+      <section className="bg-slate-900 rounded-2xl border border-slate-800 shadow-xl space-y-4 p-6">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
+          <div><h3 className="text-lg font-bold text-white flex items-center gap-2"><Users className="w-5 h-5 text-amber-500" />Corretores</h3><p className="text-xs text-slate-400">Confira o CRECI no conselho antes de aprovar.</p></div>
+          <label className="relative w-full sm:w-64"><span className="sr-only">Buscar corretor</span><Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" /><input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nome, CRECI, cidade ou e-mail" className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white" /></label>
         </div>
-      </div>
-      <div className="grid gap-3 sm:grid-cols-2">
-        <div className="rounded-xl border border-slate-800 p-4"><p className="text-xs text-slate-400">Faturado {modo === "mes" ? `de ${monthShort(inicio)} a ${monthShort(fim)}` : `de ${primeiroAno} a ${anoAtual + 1}`}</p><p className="mt-1 text-2xl font-black text-emerald-400">{centavosEmReais(totalFaturado)}</p></div>
-        <div className="rounded-xl border border-slate-800 p-4"><p className="text-xs text-slate-400">A receber {modo === "mes" ? `de ${monthShort(inicio)} a ${monthShort(fim)}` : `de ${primeiroAno} a ${anoAtual + 1}`}</p><p className="mt-1 text-2xl font-black text-white">{centavosEmReais(totalAReceber)}</p></div>
-      </div>
-      <MonthlyChart rows={linhas} from={modo === "mes" ? inicio : String(primeiroAno)} to={modo === "mes" ? fim : String(anoAtual + 1)}
-        xLabel={modo === "mes" ? monthShort : (chave) => chave}
-        labels={{ titulo: modo === "mes" ? "Faturado × a receber por mês" : "Faturado × a receber por ano", periodo: modo === "mes" ? "Mês" : "Ano", a: "Faturado", b: "A receber",
-          diferenca: null, realizadoA: null, realizadoB: null, vazio: "Nada faturado nem a receber de {de} a {ate}." }} />
-    </section>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-950/60 text-slate-400 uppercase tracking-wider border-b border-slate-800"><tr><th className="py-3 px-4">Corretor</th><th className="py-3 px-4">CRECI e cidade</th><th className="py-3 px-4">Plano</th><th className="py-3 px-4">Situação</th><th className="py-3 px-4 text-right">Ações</th></tr></thead>
+            <tbody className="divide-y divide-slate-800/60 text-slate-300">
+              {filtered.map((user) => <tr key={user.id}>
+                <td className="py-3.5 px-4"><div className="flex items-center gap-3"><Avatar name={user.name} url={user.avatarUrl} size={36} /><div><div className="font-bold text-white flex items-center gap-1.5">{user.name}{user.adminViewAccess && <span className="rounded-full border border-sky-300 bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-900">vê a Administração</span>}{user.isVerified && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" aria-label="CRECI aprovado" />}</div><div className="text-[11px] text-slate-400">{user.email}</div></div></div></td>
+                <td className="py-3.5 px-4"><div className="font-semibold">CRECI {user.creci}</div><div className="text-[11px] text-slate-400">{user.city}/{user.state}</div>
+                  {creciConsultaUrl(user.state) && <a href={creciConsultaUrl(user.state)!} target="_blank" rel="noopener noreferrer" onClick={() => void copyCreci(user)} title={`Abre a busca do CRECI-${user.state} e copia o número`} className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-sky-300 hover:underline"><ExternalLink className="h-3 w-3" aria-hidden="true" />Conferir no CRECI-{user.state}</a>}</td>
+                <td className="py-3.5 px-4"><div className="font-semibold text-white">{planName(user.plan)}</div>{user.billingExemptAt
+                  ? <><div className="text-[11px] font-semibold text-emerald-400">Sem cobrança</div><div className="text-[10px] text-slate-500">por {nameOf(user.billingExemptBy)} em {when(user.billingExemptAt)}</div></>
+                  : <div className="text-[11px] text-slate-400">{money(user.monthlyFee)}/mês · {user.subscriptionStatus === "teste" ? "período grátis" : user.subscriptionStatus}</div>}
+                  {(() => { const vencimento = descricaoDoVencimento(user, hoje); return vencimento && <div className={`text-[11px] ${vencimento.vencido ? "font-semibold text-red-400" : "text-slate-400"}`}>{vencimento.texto}</div>; })()}</td>
+                <td className="py-3.5 px-4"><span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border ${user.verificationStatus === "aprovado" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : user.verificationStatus === "suspenso" ? "bg-red-500/10 text-red-400 border-red-500/20" : "bg-amber-500/10 text-amber-400 border-amber-500/20"}`}>{VERIFICATION_LABELS[user.verificationStatus] || user.verificationStatus}</span>
+                  {user.verificationReviewedAt && <div className="mt-1 text-[10px] text-slate-500">por {nameOf(user.verificationReviewedBy)} em {when(user.verificationReviewedAt)}</div>}</td>
+                <td className="py-3.5 px-4 text-right"><div className="flex items-center justify-end gap-2">
+                  {somenteLeitura ? <span className="text-[11px] text-slate-500">Só visualização</span> : <>
+                  {user.id !== currentUserId && user.verificationStatus !== "aprovado" && <button type="button" disabled={busy === `user:${user.id}`} onClick={() => void moderate(user, "aprovado")} className="bg-emerald-700 hover:bg-emerald-800 text-white px-2.5 py-1.5 rounded-lg text-[11px] font-semibold flex items-center gap-1 disabled:opacity-50"><Check className="w-3.5 h-3.5" /> Aprovar</button>}
+                  {!user.billingExemptAt && <button type="button" disabled={busy === `user:${user.id}`} onClick={() => void exempt(user)} className="border border-sky-500/30 text-sky-300 hover:bg-sky-500/10 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold flex items-center gap-1 disabled:opacity-50"><Gift className="w-3.5 h-3.5" /> Isentar de cobrança</button>}
+                  {user.id !== currentUserId && user.verificationStatus !== "suspenso" && <button type="button" disabled={busy === `user:${user.id}`} onClick={() => void moderate(user, "suspenso")} className="bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold flex items-center gap-1 disabled:opacity-50"><Ban className="w-3.5 h-3.5" /> Suspender</button>}
+                  {user.id !== currentUserId && user.role !== "admin" && <button type="button" disabled={busy === `user:${user.id}`} onClick={() => void viewAccess(user, !user.adminViewAccess)} title="Visualização da Administração: vê os corretores, os pagamentos e o feedback, sem poder aprovar, suspender, isentar nem estornar" className="border border-slate-600 text-slate-300 hover:bg-slate-800 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold">{user.adminViewAccess ? "Tirar visualização da Administração" : "Liberar visualização da Administração"}</button>}
+                </>}
+                </div></td>
+              </tr>)}
+            </tbody>
+          </table>
+          {!filtered.length && <p className="py-6 text-center text-xs text-slate-400">Nenhum corretor encontrado.</p>}
+        </div>
+      </section>
 
-    <RepassesDosSocios faixasMensais={faixasDoRepasse} modo={modo} somenteLeitura={somenteLeitura} onMessage={onMessage} />
+      <section className="bg-slate-900 rounded-2xl border border-slate-800 p-6 shadow-xl space-y-4">
+        <div className="flex items-center justify-between border-b border-slate-800 pb-3"><div><h3 className="text-lg font-bold text-white">Feedback do piloto ({feedback.length})</h3><p className="text-xs text-slate-400">Dúvidas, erros e sugestões enviados pelos corretores.</p></div><MessageSquarePlus className="h-5 w-5 text-amber-400" /></div>
+        {feedback.length === 0 ? <p className="rounded-lg border border-dashed border-slate-700 px-4 py-6 text-center text-xs text-slate-400">Nenhum feedback recebido ainda.</p> : <div className="space-y-3">{feedback.map((item) => <article key={item.id} className="rounded-xl border border-slate-800 bg-slate-950 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold text-white">{item.userName} · CRECI {item.userCreci}</p><p className="mt-1 text-[10px] text-slate-500">{item.screen} · {item.category === "erro" ? "Erro" : item.category === "ideia" ? "Ideia" : "Dúvida"} · {when(item.createdAt)}</p></div><select aria-label="Status do feedback" value={item.status} disabled={somenteLeitura || busy === `fb:${item.id}`} onChange={(event) => void feedbackStatus(item, event.target.value)} className="rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-[11px] text-white"><option value="novo">Novo</option><option value="em_analise">Em análise</option><option value="concluido">Concluído</option></select></div><p className="mt-3 whitespace-pre-wrap text-xs leading-relaxed text-slate-300">{item.message}</p></article>)}</div>}
+      </section>
+    </div>}
 
-    <section className="bg-slate-900 rounded-2xl border border-slate-800 shadow-xl space-y-4 p-6">
-      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-4 border-b border-slate-800">
-        <div><h3 className="text-lg font-bold text-white flex items-center gap-2"><Users className="w-5 h-5 text-amber-500" />Corretores</h3><p className="text-xs text-slate-400">Confira o CRECI no conselho antes de aprovar.</p></div>
-        <label className="relative w-full sm:w-64"><span className="sr-only">Buscar corretor</span><Search className="w-4 h-4 text-slate-400 absolute left-3 top-2.5" /><input type="search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Nome, CRECI, cidade ou e-mail" className="w-full bg-slate-950 border border-slate-800 rounded-xl pl-9 pr-3 py-1.5 text-xs text-white" /></label>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs">
-          <thead className="bg-slate-950/60 text-slate-400 uppercase tracking-wider border-b border-slate-800"><tr><th className="py-3 px-4">Corretor</th><th className="py-3 px-4">CRECI e cidade</th><th className="py-3 px-4">Plano</th><th className="py-3 px-4">Situação</th><th className="py-3 px-4 text-right">Ações</th></tr></thead>
-          <tbody className="divide-y divide-slate-800/60 text-slate-300">
-            {filtered.map((user) => <tr key={user.id}>
-              <td className="py-3.5 px-4"><div className="flex items-center gap-3"><Avatar name={user.name} url={user.avatarUrl} size={36} /><div><div className="font-bold text-white flex items-center gap-1.5">{user.name}{user.adminViewAccess && <span className="rounded-full border border-sky-300 bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-900">vê a Administração</span>}{user.isVerified && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" aria-label="CRECI aprovado" />}</div><div className="text-[11px] text-slate-400">{user.email}</div></div></div></td>
-              <td className="py-3.5 px-4"><div className="font-semibold">CRECI {user.creci}</div><div className="text-[11px] text-slate-400">{user.city}/{user.state}</div>
-                {creciConsultaUrl(user.state) && <a href={creciConsultaUrl(user.state)!} target="_blank" rel="noopener noreferrer" onClick={() => void copyCreci(user)} title={`Abre a busca do CRECI-${user.state} e copia o número`} className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-sky-300 hover:underline"><ExternalLink className="h-3 w-3" aria-hidden="true" />Conferir no CRECI-{user.state}</a>}</td>
-              <td className="py-3.5 px-4"><div className="font-semibold text-white">{planName(user.plan)}</div>{user.billingExemptAt
-                ? <><div className="text-[11px] font-semibold text-emerald-400">Sem cobrança</div><div className="text-[10px] text-slate-500">por {nameOf(user.billingExemptBy)} em {when(user.billingExemptAt)}</div></>
-                : <div className="text-[11px] text-slate-400">{money(user.monthlyFee)}/mês · {user.subscriptionStatus === "teste" ? "período grátis" : user.subscriptionStatus}</div>}
-                {(() => { const vencimento = descricaoDoVencimento(user, hoje); return vencimento && <div className={`text-[11px] ${vencimento.vencido ? "font-semibold text-red-400" : "text-slate-400"}`}>{vencimento.texto}</div>; })()}</td>
-              <td className="py-3.5 px-4"><span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border ${user.verificationStatus === "aprovado" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : user.verificationStatus === "suspenso" ? "bg-red-500/10 text-red-400 border-red-500/20" : "bg-amber-500/10 text-amber-400 border-amber-500/20"}`}>{VERIFICATION_LABELS[user.verificationStatus] || user.verificationStatus}</span>
-                {user.verificationReviewedAt && <div className="mt-1 text-[10px] text-slate-500">por {nameOf(user.verificationReviewedBy)} em {when(user.verificationReviewedAt)}</div>}</td>
-              <td className="py-3.5 px-4 text-right"><div className="flex items-center justify-end gap-2">
-                {somenteLeitura ? <span className="text-[11px] text-slate-500">Só visualização</span> : <>
-                {user.id !== currentUserId && user.verificationStatus !== "aprovado" && <button type="button" disabled={busy === `user:${user.id}`} onClick={() => void moderate(user, "aprovado")} className="bg-emerald-700 hover:bg-emerald-800 text-white px-2.5 py-1.5 rounded-lg text-[11px] font-semibold flex items-center gap-1 disabled:opacity-50"><Check className="w-3.5 h-3.5" /> Aprovar</button>}
-                {!user.billingExemptAt && <button type="button" disabled={busy === `user:${user.id}`} onClick={() => void exempt(user)} className="border border-sky-500/30 text-sky-300 hover:bg-sky-500/10 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold flex items-center gap-1 disabled:opacity-50"><Gift className="w-3.5 h-3.5" /> Isentar de cobrança</button>}
-                {user.id !== currentUserId && user.verificationStatus !== "suspenso" && <button type="button" disabled={busy === `user:${user.id}`} onClick={() => void moderate(user, "suspenso")} className="bg-red-600/20 hover:bg-red-600/30 text-red-400 border border-red-500/30 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold flex items-center gap-1 disabled:opacity-50"><Ban className="w-3.5 h-3.5" /> Suspender</button>}
-                {user.id !== currentUserId && user.role !== "admin" && <button type="button" disabled={busy === `user:${user.id}`} onClick={() => void viewAccess(user, !user.adminViewAccess)} title="Visualização da Administração: vê os corretores, os pagamentos e o feedback, sem poder aprovar, suspender, isentar nem estornar" className="border border-slate-600 text-slate-300 hover:bg-slate-800 px-2.5 py-1.5 rounded-lg text-[11px] font-semibold">{user.adminViewAccess ? "Tirar visualização da Administração" : "Liberar visualização da Administração"}</button>}
-              </>}
-              </div></td>
-            </tr>)}
-          </tbody>
-        </table>
-        {!filtered.length && <p className="py-6 text-center text-xs text-slate-400">Nenhum corretor encontrado.</p>}
-      </div>
-    </section>
+    {aba === "faturamento" && <div role="tabpanel" id="admin-painel-faturamento" aria-labelledby="admin-aba-faturamento" className="space-y-8">
+      <section className="bg-slate-900 rounded-2xl border border-slate-800 shadow-xl space-y-4 p-6" aria-labelledby="faturamento-titulo">
+        <div className="flex flex-col gap-3 border-b border-slate-800 pb-4">
+          <div><h3 id="faturamento-titulo" className="text-lg font-bold text-white flex items-center gap-2"><TrendingUp className="w-5 h-5 text-amber-500" />Faturamento da plataforma</h3>
+            <p className="text-xs text-slate-400">Faturado: Pix confirmado, na data da confirmação. A receber: mensalidades pelo vencimento de cada corretor (mensal ou anual), inclusive as vencidas e não pagas; isentos e suspensos ficam fora.</p></div>
+          <div className="flex flex-wrap items-end gap-2">
+            <div role="group" aria-label="Agrupar por" className="flex rounded-lg border border-slate-700 p-0.5 text-xs font-semibold">
+              {(["mes", "ano"] as const).map((opcao) => <button key={opcao} type="button" aria-pressed={modo === opcao} onClick={() => setModo(opcao)} className={`rounded-md px-3 py-1.5 ${modo === opcao ? "bg-[#083858] text-[#ffffff]" : "text-slate-300"}`}>{opcao === "mes" ? "Por mês" : "Por ano"}</button>)}
+            </div>
+            {modo === "mes" && <>
+              <label className="text-[11px] text-slate-400">De<input type="month" value={deMes} onChange={(event) => event.target.value && setDeMes(event.target.value)} className="mt-1 block rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white" /></label>
+              <label className="text-[11px] text-slate-400">Até<input type="month" value={ateMes} onChange={(event) => event.target.value && setAteMes(event.target.value)} className="mt-1 block rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white" /></label>
+            </>}
+          </div>
+        </div>
+        <div className="grid gap-3 sm:grid-cols-2">
+          <div className="rounded-xl border border-slate-800 p-4"><p className="text-xs text-slate-400">Faturado {modo === "mes" ? `de ${monthShort(inicio)} a ${monthShort(fim)}` : `de ${primeiroAno} a ${anoAtual + 1}`}</p><p className="mt-1 text-2xl font-black text-emerald-400">{centavosEmReais(totalFaturado)}</p></div>
+          <div className="rounded-xl border border-slate-800 p-4"><p className="text-xs text-slate-400">A receber {modo === "mes" ? `de ${monthShort(inicio)} a ${monthShort(fim)}` : `de ${primeiroAno} a ${anoAtual + 1}`}</p><p className="mt-1 text-2xl font-black text-white">{centavosEmReais(totalAReceber)}</p></div>
+        </div>
+        <MonthlyChart rows={linhas} from={modo === "mes" ? inicio : String(primeiroAno)} to={modo === "mes" ? fim : String(anoAtual + 1)}
+          xLabel={modo === "mes" ? monthShort : (chave) => chave}
+          labels={{ titulo: modo === "mes" ? "Faturado × a receber por mês" : "Faturado × a receber por ano", periodo: modo === "mes" ? "Mês" : "Ano", a: "Faturado", b: "A receber",
+            diferenca: null, realizadoA: null, realizadoB: null, vazio: "Nada faturado nem a receber de {de} a {ate}." }} />
+      </section>
 
-    <section className="bg-slate-900 rounded-2xl border border-slate-800 shadow-xl p-6 space-y-4">
-      <div className="pb-4 border-b border-slate-800"><h3 className="text-lg font-bold text-white flex items-center gap-2"><CreditCard className="w-5 h-5 text-emerald-400" />Pagamentos via Pix</h3><p className="text-xs text-slate-400">Confirme só depois de ver o valor no extrato. O estorno desfaz o período e o bônus de indicação daquele pagamento.</p></div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-left text-xs">
-          <thead className="bg-slate-950/60 text-slate-400 uppercase tracking-wider border-b border-slate-800"><tr><th className="py-3 px-4">Cobrança</th><th className="py-3 px-4">Corretor</th><th className="py-3 px-4">Valor</th><th className="py-3 px-4">Situação</th></tr></thead>
-          <tbody className="divide-y divide-slate-800/60 text-slate-300">
-            {transactions.map((item) => <tr key={item.id}>
-              <td className="py-3.5 px-4 font-medium text-white">{item.description}<div className="text-[10px] text-slate-500 font-normal">{when(item.createdAt)}</div></td>
-              <td className="py-3.5 px-4"><div className="font-semibold text-slate-200">{item.userName}</div><div className="text-[11px] text-slate-400">CRECI {item.userCreci}</div></td>
-              <td className="py-3.5 px-4 font-bold text-emerald-400 text-sm">{money(item.amount)}</td>
-              <td className="py-3.5 px-4"><div className="flex flex-wrap items-center gap-2">
-                <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${item.status === "pago" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : item.status === "estornado" ? "bg-red-500/10 text-red-400 border-red-500/20" : "bg-amber-500/10 text-amber-400 border-amber-500/20"}`}>{TRANSACTION_LABELS[item.status] || item.status}</span>
-                {!somenteLeitura && item.status === "pendente" && item.paymentMethod === "pix" && item.type.startsWith("mensalidade_") && !exemptIds.has(item.userId) && <button type="button" disabled={busy === `tx:${item.id}`} onClick={() => void confirmPix(item)} className="rounded-lg bg-emerald-700 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-emerald-800 disabled:opacity-50">Confirmar recebimento</button>}
-                {!somenteLeitura && item.status === "pago" && (item.confirmedAt || exemptIds.has(item.userId)) && <button type="button" disabled={busy === `tx:${item.id}`} onClick={() => void refund(item)} className="inline-flex items-center gap-1 rounded-lg border border-red-500/40 px-2.5 py-1.5 text-[10px] font-semibold text-red-400 hover:bg-red-500/10 disabled:opacity-50"><RotateCcw className="w-3 h-3" />Estornar</button>}
-              </div>
-                {item.confirmedAt && <div className="mt-1 text-[10px] text-slate-500">Confirmado por {nameOf(item.confirmedBy)} em {when(item.confirmedAt)}</div>}
-                {item.refundedAt && <div className="text-[10px] text-slate-500">Estornado em {when(item.refundedAt)}{item.refundReason ? ` · ${item.refundReason}` : ""}</div>}
-              </td>
-            </tr>)}
-          </tbody>
-        </table>
-        {!transactions.length && <p className="py-6 text-center text-xs text-slate-400">Nenhum pagamento registrado.</p>}
-      </div>
-    </section>
+      <RepassesDosSocios faixasMensais={faixasDoRepasse} modo={modo} somenteLeitura={somenteLeitura} onMessage={onMessage} />
 
-    <section className="bg-slate-900 rounded-2xl border border-slate-800 p-6 shadow-xl space-y-4">
-      <div className="flex items-center justify-between border-b border-slate-800 pb-3"><div><h3 className="text-lg font-bold text-white">Feedback do piloto ({feedback.length})</h3><p className="text-xs text-slate-400">Dúvidas, erros e sugestões enviados pelos corretores.</p></div><MessageSquarePlus className="h-5 w-5 text-amber-400" /></div>
-      {feedback.length === 0 ? <p className="rounded-lg border border-dashed border-slate-700 px-4 py-6 text-center text-xs text-slate-400">Nenhum feedback recebido ainda.</p> : <div className="space-y-3">{feedback.map((item) => <article key={item.id} className="rounded-xl border border-slate-800 bg-slate-950 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold text-white">{item.userName} · CRECI {item.userCreci}</p><p className="mt-1 text-[10px] text-slate-500">{item.screen} · {item.category === "erro" ? "Erro" : item.category === "ideia" ? "Ideia" : "Dúvida"} · {when(item.createdAt)}</p></div><select aria-label="Status do feedback" value={item.status} disabled={somenteLeitura || busy === `fb:${item.id}`} onChange={(event) => void feedbackStatus(item, event.target.value)} className="rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-[11px] text-white"><option value="novo">Novo</option><option value="em_analise">Em análise</option><option value="concluido">Concluído</option></select></div><p className="mt-3 whitespace-pre-wrap text-xs leading-relaxed text-slate-300">{item.message}</p></article>)}</div>}
-    </section>
+      <section className="bg-slate-900 rounded-2xl border border-slate-800 shadow-xl p-6 space-y-4">
+        <div className="pb-4 border-b border-slate-800"><h3 className="text-lg font-bold text-white flex items-center gap-2"><CreditCard className="w-5 h-5 text-emerald-400" />Pagamentos via Pix</h3><p className="text-xs text-slate-400">Confirme só depois de ver o valor no extrato. O estorno desfaz o período e o bônus de indicação daquele pagamento.</p></div>
+        <div className="overflow-x-auto">
+          <table className="w-full text-left text-xs">
+            <thead className="bg-slate-950/60 text-slate-400 uppercase tracking-wider border-b border-slate-800"><tr><th className="py-3 px-4">Cobrança</th><th className="py-3 px-4">Corretor</th><th className="py-3 px-4">Valor</th><th className="py-3 px-4">Situação</th></tr></thead>
+            <tbody className="divide-y divide-slate-800/60 text-slate-300">
+              {transactions.map((item) => <tr key={item.id}>
+                <td className="py-3.5 px-4 font-medium text-white">{item.description}<div className="text-[10px] text-slate-500 font-normal">{when(item.createdAt)}</div></td>
+                <td className="py-3.5 px-4"><div className="font-semibold text-slate-200">{item.userName}</div><div className="text-[11px] text-slate-400">CRECI {item.userCreci}</div></td>
+                <td className="py-3.5 px-4 font-bold text-emerald-400 text-sm">{money(item.amount)}</td>
+                <td className="py-3.5 px-4"><div className="flex flex-wrap items-center gap-2">
+                  <span className={`px-2 py-0.5 rounded-full text-[10px] font-bold uppercase border ${item.status === "pago" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : item.status === "estornado" ? "bg-red-500/10 text-red-400 border-red-500/20" : "bg-amber-500/10 text-amber-400 border-amber-500/20"}`}>{TRANSACTION_LABELS[item.status] || item.status}</span>
+                  {!somenteLeitura && item.status === "pendente" && item.paymentMethod === "pix" && item.type.startsWith("mensalidade_") && !exemptIds.has(item.userId) && <button type="button" disabled={busy === `tx:${item.id}`} onClick={() => void confirmPix(item)} className="rounded-lg bg-emerald-700 px-2.5 py-1.5 text-[10px] font-semibold text-white hover:bg-emerald-800 disabled:opacity-50">Confirmar recebimento</button>}
+                  {!somenteLeitura && item.status === "pago" && (item.confirmedAt || exemptIds.has(item.userId)) && <button type="button" disabled={busy === `tx:${item.id}`} onClick={() => void refund(item)} className="inline-flex items-center gap-1 rounded-lg border border-red-500/40 px-2.5 py-1.5 text-[10px] font-semibold text-red-400 hover:bg-red-500/10 disabled:opacity-50"><RotateCcw className="w-3 h-3" />Estornar</button>}
+                </div>
+                  {item.confirmedAt && <div className="mt-1 text-[10px] text-slate-500">Confirmado por {nameOf(item.confirmedBy)} em {when(item.confirmedAt)}</div>}
+                  {item.refundedAt && <div className="text-[10px] text-slate-500">Estornado em {when(item.refundedAt)}{item.refundReason ? ` · ${item.refundReason}` : ""}</div>}
+                </td>
+              </tr>)}
+            </tbody>
+          </table>
+          {!transactions.length && <p className="py-6 text-center text-xs text-slate-400">Nenhum pagamento registrado.</p>}
+        </div>
+      </section>
+    </div>}
   </div>;
 }

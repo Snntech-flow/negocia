@@ -12,9 +12,11 @@ const corretor = { id: "11111111-1111-4111-8111-111111111111", name: "Corretora 
 const pix = (id: string, status: string) => ({ id, userId: corretor.id, amount: "150.00", type: "mensalidade_pro", paymentMethod: "pix", status, description: "Mensalidade",
   createdAt: agora, confirmedAt: status === "pago" ? agora : null, confirmedBy: null, refundedAt: null, refundReason: null, userName: corretor.name, userCreci: corretor.creci });
 const feedback = [{ id: "f1", userId: corretor.id, userName: corretor.name, category: "ideia", message: "Ideia de teste", status: "novo", createdAt: agora }];
-const tela = (somenteLeitura: boolean) => renderToStaticMarkup(createElement(AdminPanel as never, {
+const aba = (somenteLeitura: boolean, abaInicial: "clientes" | "faturamento") => renderToStaticMarkup(createElement(AdminPanel as never, {
   users: [corretor], transactions: [pix("t1", "pendente"), pix("t2", "pago")], feedback, currentUserId: "99999999-9999-4999-8999-999999999999",
-  somenteLeitura, onUsersChange: () => undefined, onTransactionsChange: () => undefined, onFeedbackChange: () => undefined, onMessage: () => undefined }));
+  somenteLeitura, abaInicial, onUsersChange: () => undefined, onTransactionsChange: () => undefined, onFeedbackChange: () => undefined, onMessage: () => undefined }));
+// As duas abas da Administração juntas: os botões de ação ficam espalhados entre elas.
+const tela = (somenteLeitura: boolean) => aba(somenteLeitura, "clientes") + aba(somenteLeitura, "faturamento");
 
 test("🔴 modo visualização: vê corretores, pagamentos e feedback, sem nenhum botão de ação", () => {
   const html = tela(true);
@@ -32,4 +34,21 @@ test("administrador: as ações continuam e cada corretor ganha o botão de libe
   for (const acao of [/> ?Aprovar<\/button>/, /Isentar de cobrança/, /> ?Suspender<\/button>/, /Confirmar recebimento/, />Estornar<\/button>/, /Liberar visualização da Administração/]) {
     assert.match(html, acao, `sumiu para o administrador: ${acao}`);
   }
+});
+
+test("🔴 a Administração tem duas abas: Clientes (corretores e feedback) e Faturamento e repasses (faturamento, repasses e Pix)", () => {
+  const clientes = aba(false, "clientes"), faturamento = aba(false, "faturamento");
+  for (const html of [clientes, faturamento]) {
+    assert.match(html, /role="tablist" aria-label="Administração"/);
+    assert.match(html, />Clientes</);
+    assert.match(html, />Faturamento e repasses</);
+    assert.match(html, /Receita confirmada/); // os números do topo valem para as duas
+  }
+  assert.match(clientes, /id="admin-aba-clientes"[^>]*aria-selected="true"/);
+  assert.match(clientes, /Corretora Teste/);
+  assert.match(clientes, /Feedback do piloto/);
+  assert.doesNotMatch(clientes, /Faturamento da plataforma|Repasses aos sócios|Pagamentos via Pix/);
+  assert.match(faturamento, /id="admin-aba-faturamento"[^>]*aria-selected="true"/);
+  for (const secao of [/Faturamento da plataforma/, /Repasses aos sócios/, /Pagamentos via Pix/]) assert.match(faturamento, secao);
+  assert.doesNotMatch(faturamento, /Feedback do piloto/);
 });
