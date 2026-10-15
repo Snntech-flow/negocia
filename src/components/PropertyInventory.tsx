@@ -8,6 +8,7 @@ import { PROPERTY_STATUS_LABELS, PROPERTY_STATUSES, type PropertyInput, type Pro
 import { CONDITIONS, CONDO_AMENITIES_GROUPS, DOCUMENTATION_STATUSES, GARAGE_TYPES, IPTU_PERIODS, PRIVATE_AMENITIES_LIST, PURPOSES, SOLAR_POSITIONS, VIEW_TYPES } from "@/lib/property-options";
 import PhotoUploader from "./PhotoUploader";
 import PhotoGrid from "./PhotoGrid";
+import { fotosComCapaNaFrente } from "@/lib/photo-order";
 import { OPCOES_DE_CONDICAO, rotuloDaCondicao } from "@/lib/partnership-models";
 
 type OwnedProperty = ActionData<Awaited<ReturnType<typeof getOwnProperties>>>["items"][number];
@@ -63,7 +64,8 @@ const groups: { title: string; fields: Field[] }[] = [
     { key: "documentationStatus", label: "Documentação", options: DOCUMENTATION_STATUSES, allowEmpty: true },
   ] },
   { title: "Fotos e mídias", fields: [
-    { key: "coverPhoto", label: "URL HTTPS da capa (se vazio, usa a primeira foto)" }, { key: "videoUrl", label: "URL HTTPS do vídeo" },
+    // Sem campo de URL da capa (14/10/2026): a capa é a primeira foto da grade (setas, "Capa", arrastar).
+    { key: "videoUrl", label: "URL HTTPS do vídeo" },
     { key: "photos", label: "Fotos (até 40)", kind: "photos", max: 40 },
     { key: "floorPlanPhotos", label: "Plantas (até 10)", kind: "photos", max: 10 },
   ] },
@@ -172,7 +174,10 @@ export default function PropertyInventory({ reloadKey, onChanged }: { reloadKey:
             const value = editing[field.key as keyof OwnedProperty];
             const id = `edit-${field.key}`;
             if (field.kind === "boolean") return <label key={field.key} className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" name={field.key} defaultChecked={Boolean(value)} />{field.label}</label>;
-            if (field.kind === "photos") return <PhotoListField key={field.key} field={field} initial={Array.isArray(value) ? value.map(String) : []} />;
+            if (field.kind === "photos") {
+              const lista = Array.isArray(value) ? value.map(String) : [];
+              return <PhotoListField key={field.key} field={field} initial={field.key === "photos" ? fotosComCapaNaFrente(lista, editing.coverPhoto, field.max) : lista} />;
+            }
             if (field.kind === "checklist") {
               const selected = Array.isArray(value) ? value.map(String) : [];
               // Itens antigos fora da lista continuam marcados para não sumirem ao salvar.

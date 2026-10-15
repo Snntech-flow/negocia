@@ -1,8 +1,9 @@
 import assert from "node:assert/strict";
+import { readFileSync } from "node:fs";
 import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { capaDasFotos, moverFoto } from "../src/lib/photo-order";
+import { capaDasFotos, fotosComCapaNaFrente, moverFoto } from "../src/lib/photo-order";
 import PhotoGrid from "../src/components/PhotoGrid";
 
 const [a, b, c] = ["https://fotos.exemplo.test/a.jpg", "https://fotos.exemplo.test/b.jpg", "https://fotos.exemplo.test/c.jpg"];
@@ -42,4 +43,17 @@ test("🔴 a grade marca a 1ª como capa, oferece “Capa” nas outras e trava 
   const plantas = renderToStaticMarkup(createElement(PhotoGrid, { fotos: [a, b], onChange: () => undefined, nome: "Planta", capa: false }));
   assert.doesNotMatch(plantas, /Capa/);
   assert.match(plantas, /aria-label="Mover planta 2 para trás"/);
+});
+
+test("🔴 a edição abre com a capa gravada na frente — ninguém perde a capa que já tinha", () => {
+  assert.deepEqual(fotosComCapaNaFrente([a, b, c], c), [c, a, b]);
+  assert.deepEqual(fotosComCapaNaFrente([a, b], "https://fotos.exemplo.test/capa-avulsa.jpg"), ["https://fotos.exemplo.test/capa-avulsa.jpg", a, b]);
+  assert.deepEqual(fotosComCapaNaFrente([a, b], null), [a, b]);
+  assert.equal(fotosComCapaNaFrente(Array.from({ length: 40 }, (_, i) => `https://fotos.exemplo.test/${i}.jpg`), c).length, 40);
+});
+
+test("🔴 a edição não tem mais campo de URL da capa (ele seria ignorado: a capa é a primeira foto)", () => {
+  const fonte = readFileSync(new URL("../src/components/PropertyInventory.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(fonte, /key: "coverPhoto"/);
+  assert.match(fonte, /fotosComCapaNaFrente\(lista, editing\.coverPhoto/);
 });
