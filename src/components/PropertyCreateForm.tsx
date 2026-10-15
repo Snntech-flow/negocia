@@ -13,6 +13,7 @@ import {
 } from "@/lib/property-options";
 import PhotoUploader from "./PhotoUploader";
 import PhotoGrid from "./PhotoGrid";
+import { camposQueFaltam } from "@/lib/property-required";
 import { temPrevisaoDeEntrega } from "@/lib/delivery-forecast";
 
 export type CreatedProperty = ActionData<Awaited<ReturnType<typeof createProperty>>>["property"];
@@ -23,10 +24,13 @@ const input = "w-full bg-slate-950 border border-slate-800 rounded-xl px-3 py-2 
 const label = "block text-xs font-medium text-slate-300 mb-1";
 const safeHttps = (value: string) => { try { const url = new URL(value); return url.protocol === "https:"; } catch { return false; } };
 
-function Choices<T extends string | number>({ title, options, value, onChange, columns = "grid-cols-2 sm:grid-cols-4", icon, required }: {
+function Choices<T extends string | number>({ title, options, value, onChange, columns = "grid-cols-2 sm:grid-cols-4", icon, required, id, faltando }: {
   title: string; options: readonly { id: T; label: string }[]; value: T | null; onChange: (value: T) => void; columns?: string; icon?: ReactNode; required?: boolean;
+  id?: string; faltando?: readonly string[];
 }) {
-  return <div role="group" aria-label={title}>
+  // Obrigatório que ficou sem escolha no "Publicar": contorno vermelho até escolher (14/10/2026).
+  const falta = !!id && !!faltando?.includes(id) && value === null;
+  return <div id={id} role="group" aria-label={title} aria-describedby={falta ? `${id}-falta` : undefined} className={falta ? "rounded-xl p-2 ring-2 ring-red-400" : undefined}>
     <p className={`${label} flex items-center gap-1.5`}>{icon}{title}{required && " *"}</p>
     <div className={`grid gap-1.5 ${columns}`}>
       {options.map((option) => (
@@ -36,6 +40,7 @@ function Choices<T extends string | number>({ title, options, value, onChange, c
         </button>
       ))}
     </div>
+    {falta && <p id={`${id}-falta`} className="mt-1 text-[11px] font-bold text-red-700">Escolha uma opção.</p>}
   </div>;
 }
 
@@ -65,6 +70,7 @@ export default function PropertyCreateForm({ broker, blockedReason, onCreated, o
   // Condição de parceria (14/10/2026): o corretor escolhe — nada vem marcado — e confirma que o imóvel aceita parceria.
   const [partnershipModels, setPartnershipModels] = useState<PartnershipModels | null>(null);
   const [confirmaParceria, setConfirmaParceria] = useState(false);
+  const [faltando, setFaltando] = useState<string[]>([]);
   const [privateAmenities, setPrivateAmenities] = useState<string[]>([]);
   const [condoAmenities, setCondoAmenities] = useState<string[]>([]);
   const [cep, setCep] = useState("");
@@ -121,12 +127,14 @@ export default function PropertyCreateForm({ broker, blockedReason, onCreated, o
     const form = event.currentTarget;
     const fd = new FormData(form);
     const text = (name: string) => String(fd.get(name) || "").trim();
-    const missing = [
-      !propertyType && "tipo do imóvel", !condition && "condição", bedrooms === null && "quartos", suites === null && "suítes",
-      bathrooms === null && "banheiros", parkingSpots === null && "vagas", acceptsFinancing === null && "se aceita financiamento",
-      !text("usefulAreaM2") && !text("totalAreaM2") && "área (útil ou total)", !state && "UF",
-    ].filter(Boolean);
-    if (missing.length) { setError(`Falta informar: ${missing.join(", ")}.`); form.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+    const missing = camposQueFaltam({ propertyType, condition, bedrooms, suites, bathrooms, parkingSpots, acceptsFinancing,
+      usefulAreaM2: text("usefulAreaM2"), totalAreaM2: text("totalAreaM2"), state });
+    setFaltando(missing.map((item) => item.campo));
+    if (missing.length) {
+      setError(`Falta informar: ${missing.map((item) => item.rotulo).join(", ")}.`);
+      document.getElementById(missing[0].campo)?.scrollIntoView({ behavior: "smooth", block: "center" });
+      return;
+    }
     const number = text("streetNumber");
     const block = text("block");
     const floor = text("floor");
@@ -178,7 +186,7 @@ export default function PropertyCreateForm({ broker, blockedReason, onCreated, o
         <div><label htmlFor="pc-iptu" className={label}>IPTU (R$)</label><div className="flex gap-2"><input id="pc-iptu" name="iptu" type="number" min="0" step="0.01" placeholder="Ex: 180" className={input} /><select aria-label="Período do IPTU" value={iptuPeriod} onChange={(e) => setIptuPeriod(e.target.value as "anual" | "mensal")} className="bg-slate-950 border border-slate-800 rounded-xl px-2 py-2 text-xs text-white"><option value="anual">Anual</option><option value="mensal">Mensal</option></select></div></div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-        <Choices title="Aceita financiamento bancário?" required options={[{ id: "sim", label: "Sim, financia" }, { id: "nao", label: "Somente à vista" }]} value={acceptsFinancing === null ? null : acceptsFinancing ? "sim" : "nao"} onChange={(value) => setAcceptsFinancing(value === "sim")} columns="grid-cols-2" />
+        <Choices title="Aceita financiamento bancário?" required id="pc-financiamento" faltando={faltando} options={[{ id: "sim", label: "Sim, financia" }, { id: "nao", label: "Somente à vista" }]} value={acceptsFinancing === null ? null : acceptsFinancing ? "sim" : "nao"} onChange={(value) => setAcceptsFinancing(value === "sim")} columns="grid-cols-2" />
         <div><label htmlFor="pc-doc" className={label}>Situação da documentação</label><select id="pc-doc" value={documentationStatus} onChange={(e) => setDocumentationStatus(e.target.value as DocumentationStatus | "")} className={input}><option value="">Não informada</option>{DOCUMENTATION_STATUSES.map((option) => <option key={option.id} value={option.id}>{option.label}</option>)}</select></div>
       </div>
       <div className="bg-slate-950/60 p-4 rounded-xl border border-slate-800 space-y-3">
@@ -189,18 +197,18 @@ export default function PropertyCreateForm({ broker, blockedReason, onCreated, o
 
     <div className={section}>
       <h3 className={heading}><Building2 className="w-4 h-4 text-amber-500" />2. Tipo do imóvel e estrutura</h3>
-      <Choices title="Tipo de imóvel" required options={PROPERTY_TYPES.map((type) => ({ id: type, label: type }))} value={propertyType} onChange={setPropertyType} columns="grid-cols-2 sm:grid-cols-4 md:grid-cols-7" />
+      <Choices title="Tipo de imóvel" required id="pc-tipo" faltando={faltando} options={PROPERTY_TYPES.map((type) => ({ id: type, label: type }))} value={propertyType} onChange={setPropertyType} columns="grid-cols-2 sm:grid-cols-4 md:grid-cols-7" />
       {(propertyType === "Hotel" || propertyType === "Pousada") && <div><label htmlFor="pc-rooms" className={label}>Número de quartos/suítes do {propertyType}</label><input id="pc-rooms" name="hotelRoomsCount" type="number" min="0" placeholder="Ex: 24" className={input} /></div>}
-      <Choices title="Condição do imóvel" required options={CONDITIONS} value={condition} onChange={setCondition} />
+      <Choices title="Condição do imóvel" required id="pc-condicao" faltando={faltando} options={CONDITIONS} value={condition} onChange={setCondition} />
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
-        <Choices title="Quartos" required options={counts(5)} value={bedrooms} onChange={setBedrooms} columns="grid-cols-6" />
-        <Choices title="Suítes" required options={counts(4)} value={suites} onChange={setSuites} columns="grid-cols-5" />
-        <Choices title="Banheiros" required options={counts(5)} value={bathrooms} onChange={setBathrooms} columns="grid-cols-6" />
-        <Choices title="Vagas de garagem" required options={counts(4)} value={parkingSpots} onChange={setParkingSpots} columns="grid-cols-5" />
+        <Choices title="Quartos" required id="pc-quartos" faltando={faltando} options={counts(5)} value={bedrooms} onChange={setBedrooms} columns="grid-cols-6" />
+        <Choices title="Suítes" required id="pc-suites" faltando={faltando} options={counts(4)} value={suites} onChange={setSuites} columns="grid-cols-5" />
+        <Choices title="Banheiros" required id="pc-banheiros" faltando={faltando} options={counts(5)} value={bathrooms} onChange={setBathrooms} columns="grid-cols-6" />
+        <Choices title="Vagas de garagem" required id="pc-vagas" faltando={faltando} options={counts(4)} value={parkingSpots} onChange={setParkingSpots} columns="grid-cols-5" />
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
         {!!parkingSpots && <Choices title="Tipo de vaga" options={GARAGE_TYPES} value={garageType} onChange={setGarageType} columns="grid-cols-2" />}
-        <div><label htmlFor="pc-useful" className={label}>Área útil privativa (m²)</label><input id="pc-useful" name="usefulAreaM2" type="number" min="0.01" step="0.01" placeholder="Ex: 85" className={input} /></div>
+        <div><label htmlFor="pc-useful" className={label}>Área útil privativa (m²)</label><input id="pc-useful" name="usefulAreaM2" type="number" min="0.01" step="0.01" placeholder="Ex: 85" className={`${input}${faltando.includes("pc-useful") ? " ring-2 ring-red-400" : ""}`} /></div>
         <div><label htmlFor="pc-total" className={label}>Área total / terreno (m²)</label><input id="pc-total" name="totalAreaM2" type="number" min="0.01" step="0.01" placeholder="Ex: 120" className={input} /></div>
         {temPrevisaoDeEntrega(condition)
           ? <div><label htmlFor="pc-delivery" className={label}>Previsão de entrega (mês/ano)</label><input id="pc-delivery" name="deliveryForecast" type="month" min="2000-01" max="2100-12" className={input} /></div>
@@ -243,7 +251,7 @@ export default function PropertyCreateForm({ broker, blockedReason, onCreated, o
           <div className="flex gap-1.5"><input id="pc-cep" inputMode="numeric" value={cep} onChange={(e) => void lookupCep(e.target.value)} placeholder="00000-000" maxLength={9} className={`${input} font-mono`} /><span className="flex items-center rounded-xl bg-slate-800 px-3 text-slate-400"><Search className="w-3.5 h-3.5" /></span></div>
         </div>
         <div><label htmlFor="pc-city" className={label}>Cidade *</label><input id="pc-city" required list="pc-city-options" autoComplete="off" value={city} onChange={(e) => setCity(e.target.value)} className={input} /><datalist id="pc-city-options">{stateCities.map((name) => <option key={name} value={name} />)}</datalist></div>
-        <div><label htmlFor="pc-state" className={label}>UF *</label><select id="pc-state" required value={state} onChange={(e) => setState(e.target.value)} className={input}><option value="">Escolha</option>{BRAZILIAN_STATES.map((uf) => <option key={uf} value={uf}>{uf}</option>)}</select></div>
+        <div><label htmlFor="pc-state" className={label}>UF *</label><select id="pc-state" required value={state} onChange={(e) => setState(e.target.value)} className={`${input}${faltando.includes("pc-state") && !state ? " ring-2 ring-red-400" : ""}`}><option value="">Escolha</option>{BRAZILIAN_STATES.map((uf) => <option key={uf} value={uf}>{uf}</option>)}</select></div>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <div><label htmlFor="pc-neighborhood" className={label}>Bairro (aparece na vitrine) *</label><input id="pc-neighborhood" required value={neighborhood} onChange={(e) => setNeighborhood(e.target.value)} className={input} /></div>
