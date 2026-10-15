@@ -2,7 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { createElement } from "react";
 import { renderToStaticMarkup } from "react-dom/server";
-import { cobravel, descricaoDoVencimento, diaDeBrasilia, faturamentoPorAno, faturamentoPorMes, valorDaCobranca, vencimentosPrevistos, type UsuarioCobranca } from "../src/lib/admin-receita";
+import { cobravel, descricaoDoVencimento, motivoSemVencimento, diaDeBrasilia, faturamentoPorAno, faturamentoPorMes, valorDaCobranca, vencimentosPrevistos, type UsuarioCobranca } from "../src/lib/admin-receita";
 import { MonthlyChart } from "../src/components/FinanceCharts";
 
 const base: UsuarioCobranca = { id: "u1", role: "corretor", plan: "10", billingCycle: "monthly", monthlyFee: "59.90",
@@ -69,4 +69,12 @@ test("o gráfico do Financeiro continua com os mesmos textos; a Administração 
     labels: { titulo: "Faturado × a receber por ano", periodo: "Ano", a: "Faturado", b: "A receber", diferenca: null, realizadoA: null, realizadoB: null, vazio: "Nada de {de} a {ate}." } }));
   assert.match(admin, /Faturado × a receber por ano/);
   assert.doesNotMatch(admin, /Receitas/);
+});
+
+test("sem vencimento, a coluna diz o motivo (nunca fica em branco)", () => {
+  assert.equal(motivoSemVencimento({ ...base, billingExemptAt: "2026-10-10T00:00:00Z", nextBillingDate: null }), "Sem cobrança (isento)");
+  assert.equal(motivoSemVencimento({ ...base, subscriptionStatus: "cancelado" }), "Assinatura cancelada");
+  assert.equal(motivoSemVencimento({ ...base, verificationStatus: "suspenso" }), "Conta suspensa");
+  assert.equal(motivoSemVencimento({ ...base, role: "admin" }), "Administração");
+  assert.equal(motivoSemVencimento({ ...base, nextBillingDate: null }), "Sem vencimento definido");
 });

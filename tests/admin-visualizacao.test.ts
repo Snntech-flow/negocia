@@ -52,3 +52,15 @@ test("🔴 a Administração tem duas abas: Clientes (corretores e feedback) e F
   for (const secao of [/Faturamento da plataforma/, /Repasses aos sócios/, /Pagamentos via Pix/]) assert.match(faturamento, secao);
   assert.doesNotMatch(faturamento, /Feedback do piloto/);
 });
+
+test("🔴 coluna Vencimento para cada cliente: a data (vencido em destaque) ou o motivo de não ter", () => {
+  const comVencimento = { ...corretor, id: "22222222-2222-4222-8222-222222222222", name: "Com Vencimento", nextBillingDate: new Date("2099-11-05T15:00:00Z"), subscriptionStatus: "ativo" };
+  const isento = { ...corretor, id: "33333333-3333-4333-8333-333333333333", name: "Isenta", billingExemptAt: agora };
+  const html = renderToStaticMarkup(createElement(AdminPanel as never, { users: [comVencimento, isento, corretor], transactions: [], feedback: [], currentUserId: "x",
+    somenteLeitura: true, abaInicial: "clientes", onUsersChange: () => undefined, onTransactionsChange: () => undefined, onFeedbackChange: () => undefined, onMessage: () => undefined }));
+  assert.match(html, /<th class="py-3 px-4">Vencimento<\/th>/);
+  assert.match(html, /Vence em 05\/11\/2099/);
+  assert.match(html, /todo dia 5/);
+  assert.match(html, /Sem cobrança \(isento\)/);
+  assert.match(html, /Sem vencimento definido/);
+});

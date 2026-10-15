@@ -13,7 +13,7 @@ import Avatar from "./Avatar";
 import { MonthlyChart, monthShort, type MonthRow } from "./FinanceCharts";
 import RepassesDosSocios from "./RepassesDosSocios";
 import { addMonthsKeepingDay, brasiliaToday } from "@/lib/finance";
-import { descricaoDoVencimento, diaDeBrasilia, faturamentoPorAno, faturamentoPorMes } from "@/lib/admin-receita";
+import { descricaoDoVencimento, diaDeBrasilia, faturamentoPorAno, faturamentoPorMes, motivoSemVencimento } from "@/lib/admin-receita";
 
 const money = (value: string | number) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value));
 const when = (value: Date | string | null) => value ? new Date(value).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" }) : "";
@@ -151,16 +151,23 @@ export default function AdminPanel({ users, transactions, feedback, currentUserI
         </div>
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
-            <thead className="bg-slate-950/60 text-slate-400 uppercase tracking-wider border-b border-slate-800"><tr><th className="py-3 px-4">Corretor</th><th className="py-3 px-4">CRECI e cidade</th><th className="py-3 px-4">Plano</th><th className="py-3 px-4">Situação</th><th className="py-3 px-4 text-right">Ações</th></tr></thead>
+            <thead className="bg-slate-950/60 text-slate-400 uppercase tracking-wider border-b border-slate-800"><tr><th className="py-3 px-4">Corretor</th><th className="py-3 px-4">CRECI e cidade</th><th className="py-3 px-4">Plano</th><th className="py-3 px-4">Vencimento</th><th className="py-3 px-4">Situação</th><th className="py-3 px-4 text-right">Ações</th></tr></thead>
             <tbody className="divide-y divide-slate-800/60 text-slate-300">
               {filtered.map((user) => <tr key={user.id}>
-                <td className="py-3.5 px-4"><div className="flex items-center gap-3"><Avatar name={user.name} url={user.avatarUrl} size={36} /><div><div className="font-bold text-white flex items-center gap-1.5">{user.name}{user.adminViewAccess && <span className="rounded-full border border-sky-300 bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-900">vê a Administração</span>}{user.isVerified && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" aria-label="CRECI aprovado" />}</div><div className="text-[11px] text-slate-400">{user.email}</div></div></div></td>
+                <td className="py-3.5 px-4"><div className="flex items-center gap-3"><Avatar name={user.name} url={user.avatarUrl} size={36} /><div><div className="font-bold text-white flex items-center gap-1.5">{user.name}{user.adminViewAccess && <span className="whitespace-nowrap rounded-full border border-sky-300 bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-900">vê a Administração</span>}{user.isVerified && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" aria-label="CRECI aprovado" />}</div><div className="text-[11px] text-slate-400">{user.email}</div></div></div></td>
                 <td className="py-3.5 px-4"><div className="font-semibold">CRECI {user.creci}</div><div className="text-[11px] text-slate-400">{user.city}/{user.state}</div>
                   {creciConsultaUrl(user.state) && <a href={creciConsultaUrl(user.state)!} target="_blank" rel="noopener noreferrer" onClick={() => void copyCreci(user)} title={`Abre a busca do CRECI-${user.state} e copia o número`} className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-sky-300 hover:underline"><ExternalLink className="h-3 w-3" aria-hidden="true" />Conferir no CRECI-{user.state}</a>}</td>
                 <td className="py-3.5 px-4"><div className="font-semibold text-white">{planName(user.plan)}</div>{user.billingExemptAt
                   ? <><div className="text-[11px] font-semibold text-emerald-400">Sem cobrança</div><div className="text-[10px] text-slate-500">por {nameOf(user.billingExemptBy)} em {when(user.billingExemptAt)}</div></>
                   : <div className="text-[11px] text-slate-400">{money(user.monthlyFee)}/mês · {user.subscriptionStatus === "teste" ? "período grátis" : user.subscriptionStatus}</div>}
-                  {(() => { const vencimento = descricaoDoVencimento(user, hoje); return vencimento && <div className={`text-[11px] ${vencimento.vencido ? "font-semibold text-red-400" : "text-slate-400"}`}>{vencimento.texto}</div>; })()}</td>
+                </td>
+                {/* Vencimento de cada cliente (15/10/2026): a data, ou o motivo de não ter. */}
+                <td className="py-3.5 px-4">{(() => {
+                  const vencimento = descricaoDoVencimento(user, hoje);
+                  if (!vencimento) return <span className="text-[11px] text-slate-500">{motivoSemVencimento(user)}</span>;
+                  const [data, ciclo] = vencimento.texto.split(" · ");
+                  return <div className={vencimento.vencido ? "font-semibold text-red-400" : "text-slate-200"}><div className="whitespace-nowrap">{data}</div><div className="text-[11px] font-normal text-slate-400">{ciclo}</div></div>;
+                })()}</td>
                 <td className="py-3.5 px-4"><span className={`px-2.5 py-1 rounded-full text-[11px] font-semibold border ${user.verificationStatus === "aprovado" ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20" : user.verificationStatus === "suspenso" ? "bg-red-500/10 text-red-400 border-red-500/20" : "bg-amber-500/10 text-amber-400 border-amber-500/20"}`}>{VERIFICATION_LABELS[user.verificationStatus] || user.verificationStatus}</span>
                   {user.verificationReviewedAt && <div className="mt-1 text-[10px] text-slate-500">por {nameOf(user.verificationReviewedBy)} em {when(user.verificationReviewedAt)}</div>}</td>
                 <td className="py-3.5 px-4 text-right"><div className="flex items-center justify-end gap-2">

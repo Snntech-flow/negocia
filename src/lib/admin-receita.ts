@@ -87,3 +87,12 @@ export function descricaoDoVencimento(u: UsuarioCobranca, hoje: string): { texto
   const ciclo = u.billingCycle === "annual" ? "anual" : `todo dia ${Number(d)}`;
   return { texto: `${vencido ? "Venceu em" : "Vence em"} ${data} · ${ciclo}`, vencido };
 }
+
+/** Por que a conta não tem vencimento (a coluna Vencimento mostra o motivo em vez de ficar em branco). */
+export function motivoSemVencimento(u: UsuarioCobranca): string {
+  if (u.role === "admin") return "Administração";
+  if (u.billingExemptAt) return "Sem cobrança (isento)";
+  if (u.subscriptionStatus === "cancelado") return "Assinatura cancelada";
+  if (u.verificationStatus === "suspenso") return "Conta suspensa";
+  return "Sem vencimento definido";
+}
