@@ -29,7 +29,7 @@ async function getOwnPropertiesImpl(input: { page?: number; search?: string; sta
   ]);
   // Inventário é só do dono (scope = brokerId do ator): assina as fotos privadas dele.
   const itemsAssinados = await assinarFotosDeImoveis(items);
-  return { items: itemsAssinados, total: totals[0].total, activeListings: active[0].total, listingLimit: actor.role === "admin" ? null : listingLimit(actor.plan) };
+  return { items: itemsAssinados, total: totals[0].total, activeListings: active[0].total, listingLimit: actor.role === "admin" ? null : listingLimit(actor.plan), photoLimit: photoLimit(actor.plan) };
 }
 
 async function updateOwnPropertyImpl(id: string, revision: string, input: PropertyInput) {

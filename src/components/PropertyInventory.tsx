@@ -110,6 +110,8 @@ export default function PropertyInventory({ reloadKey, onChanged, abrirImovelId 
   const [items, setItems] = useState<OwnedProperty[]>([]);
   const [total, setTotal] = useState(0);
   const [usage, setUsage] = useState<{ active: number; limit: number | null } | null>(null);
+  // Teto de fotos por anúncio do plano — o form de edição mostra e respeita (o servidor já barra). Antes era fixo em 40.
+  const [fotosLimit, setFotosLimit] = useState<number | null>(null);
   const [page, setPage] = useState(1);
   const [search, setSearch] = useState("");
   const [status, setStatus] = useState("todos");
@@ -130,7 +132,7 @@ export default function PropertyInventory({ reloadKey, onChanged, abrirImovelId 
         if (cancelled) return;
         const last = Math.max(1, Math.ceil(result.total / 24));
         if (page > last) { setPage(last); return; }
-        setItems(result.items); setTotal(result.total); setUsage({ active: result.activeListings, limit: result.listingLimit });
+        setItems(result.items); setTotal(result.total); setUsage({ active: result.activeListings, limit: result.listingLimit }); setFotosLimit(result.photoLimit);
       } catch (error) { if (!cancelled) setError(error instanceof Error ? error.message : "Não foi possível carregar a carteira."); }
       finally { if (!cancelled) setLoadedRequest(requestKey); }
     }, 250);
@@ -141,8 +143,10 @@ export default function PropertyInventory({ reloadKey, onChanged, abrirImovelId 
     let cancelled = false;
     getOwnProperties({ id: abrirImovelId }).then((result) => {
       if (cancelled) return;
-      const item = unwrap(result).items[0];
+      const dados = unwrap(result);
+      const item = dados.items[0];
       if (!item) { setError("Este imóvel não está na sua carteira."); return; }
+      setFotosLimit(dados.photoLimit);
       setEditing(item); setError(""); setMessage("");
       requestAnimationFrame(() => document.getElementById("editar-imovel")?.scrollIntoView({ behavior: "smooth", block: "start" }));
     }).catch((error) => { if (!cancelled) setError(error instanceof Error ? error.message : "Não foi possível abrir o imóvel."); })
@@ -202,7 +206,13 @@ export default function PropertyInventory({ reloadKey, onChanged, abrirImovelId 
             if (field.kind === "boolean") return <label key={field.key} className="flex items-center gap-2 text-sm text-slate-700"><input type="checkbox" name={field.key} defaultChecked={Boolean(value)} />{field.label}</label>;
             if (field.kind === "photos") {
               const lista = Array.isArray(value) ? value.map(String) : [];
-              return <PhotoListField key={field.key} field={field} initial={field.key === "photos" ? fotosComCapaNaFrente(lista, editing.coverPhoto, field.max) : lista} />;
+              const fotos = field.key === "photos";
+              // Só o campo de fotos segue o teto do plano; plantas mantêm o limite fixo do campo.
+              const limite = fotos ? (fotosLimit ?? field.max ?? 40) : (field.max ?? 40);
+              // Não corta fotos já gravadas (ex.: downgrade de plano): mostra todas, o "adicionar" respeita o teto e o servidor barra o save acima do limite.
+              const inicial = fotos ? fotosComCapaNaFrente(lista, editing.coverPhoto, Math.max(limite, lista.length)) : lista;
+              const campo = fotos ? { ...field, max: limite, label: `Fotos (até ${limite})` } : field;
+              return <PhotoListField key={field.key} field={campo} initial={inicial} />;
             }
             if (field.kind === "checklist") {
               const selected = Array.isArray(value) ? value.map(String) : [];
