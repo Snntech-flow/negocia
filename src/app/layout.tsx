@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { headers } from "next/headers";
 import "./globals.css";
 import { THEME_BOOT_SCRIPT } from "@/lib/theme";
 
@@ -40,15 +41,17 @@ export const metadata: Metadata = {
   },
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  // Nonce da CSP (middleware.ts) para o script de boot de tema — sem ele, o enforce bloquearia o inline.
+  const nonce = (await headers()).get("x-nonce") ?? undefined;
   return (
     // data-tema vem do script abaixo (antes da página aparecer); o servidor não sabe o tema escolhido.
     <html lang="pt-BR" suppressHydrationWarning>
-      <head><script dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} /></head>
+      <head><script nonce={nonce} dangerouslySetInnerHTML={{ __html: THEME_BOOT_SCRIPT }} /></head>
       <body className="min-h-screen bg-slate-50 text-slate-900 antialiased">
         {children}
       </body>
