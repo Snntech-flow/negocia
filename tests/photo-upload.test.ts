@@ -39,7 +39,9 @@ test("envio usa o Storage pelo servidor, com caminho do corretor e URL pública"
     const url = await storePhoto(jpeg([]), "image/jpeg", "11111111-1111-4111-8111-111111111111", config, fake);
     assert.match(calls[0].url, /^https:\/\/projeto\.supabase\.co\/storage\/v1\/object\/imoveis\/11111111-1111-4111-8111-111111111111\/[0-9a-f-]{36}\.jpg$/);
     assert.equal((calls[0].init?.headers as Record<string, string>)["Content-Type"], "image/jpeg");
-    assert.match(url, /^https:\/\/projeto\.supabase\.co\/storage\/v1\/object\/public\/imoveis\/11111111-1111-4111-8111-111111111111\//);
+    // storePhoto agora devolve o CAMINHO do objeto (não a URL pública) — o bucket é privado e a
+    // exibição assina na leitura (ver photo-sign.ts).
+    assert.match(url, /^11111111-1111-4111-8111-111111111111\/[0-9a-f-]{36}\.jpg$/);
     const failing = (async () => new Response("erro", { status: 500 })) as typeof fetch;
     await assert.rejects(storePhoto(jpeg([]), "image/jpeg", "u", config, failing));
   } finally {
