@@ -9,6 +9,7 @@ import { requireActiveBroker, requireCurrentUser } from "../auth";
 import { ACTIVE_LISTING_STATUSES, listingLimit } from "../plans";
 import { isActiveListingStatus, reserveListingSlot } from "../listing-limit";
 import { propertyChanges, PropertyInventoryError, PROPERTY_STATUSES, validatePropertyRevision, type PropertyInput, type PropertyStatus } from "../property-input";
+import { assinarFotosDeImoveis } from "../photo-sign";
 
 async function getOwnPropertiesImpl(input: { page?: number; search?: string; status?: string; id?: string } = {}) {
   const actor = await requireCurrentUser();
@@ -26,7 +27,9 @@ async function getOwnPropertiesImpl(input: { page?: number; search?: string; sta
     db.select({ total: count() }).from(properties).where(scope),
     db.select({ total: count() }).from(properties).where(and(eq(properties.brokerId, actor.id), inArray(properties.status, [...ACTIVE_LISTING_STATUSES]))),
   ]);
-  return { items, total: totals[0].total, activeListings: active[0].total, listingLimit: actor.role === "admin" ? null : listingLimit(actor.plan) };
+  // Inventário é só do dono (scope = brokerId do ator): assina as fotos privadas dele.
+  const itemsAssinados = await assinarFotosDeImoveis(items);
+  return { items: itemsAssinados, total: totals[0].total, activeListings: active[0].total, listingLimit: actor.role === "admin" ? null : listingLimit(actor.plan) };
 }
 
 async function updateOwnPropertyImpl(id: string, revision: string, input: PropertyInput) {

@@ -8,6 +8,7 @@ import { getCurrentUserId } from "../auth";
 import { hasSubscriptionAccess } from "../subscription";
 import { networkPropertyScope, networkProfileScope } from "../property-access";
 import { validateMarketplaceQuery, PROPERTY_PAGE_SIZE, type MarketplaceQuery, type WorkspaceSection } from "../marketplace-query";
+import { assinarFotosDeImoveis } from "../photo-sign";
 
 // CRM, Radar e Visitas cruzam com o estoque recente; a vitrine pagina e enxerga tudo.
 const NETWORK_PROPERTY_CAP = 500;
@@ -386,8 +387,12 @@ export async function getMarketplaceData(input: MarketplaceQuery = {}) {
       .limit(500)
       : [];
 
+    // Fotos privadas: troca os caminhos guardados por URLs assinadas curtas, DEPOIS do filtro de
+    // acesso (o propertyListQuery já só traz imóvel que esta pessoa pode ver).
+    const propertyListAssinado = await assinarFotosDeImoveis(propertyList);
+
     return {
-      properties: propertyList,
+      properties: propertyListAssinado,
       propertyTotal: Number(propertyCounts[0]?.total ?? 0),
       radarList,
       users: allUsers,

@@ -63,5 +63,7 @@ export async function storePhoto(bytes: Uint8Array, type: PhotoType, userId: str
     signal: AbortSignal.timeout(20_000),
   });
   if (!response.ok) throw new Error(`Storage respondeu ${response.status}`);
-  return `${config.origin}/storage/v1/object/public/${config.bucket}/${path}`;
+  // Guarda só o CAMINHO do objeto (não a URL pública): a foto é confidencial e a exibição troca
+  // por uma URL assinada curta (ver photo-sign.ts). O bucket passa a ser privado.
+  return path;
 }
