@@ -3,6 +3,7 @@
 import { db, users, passwordResetTokens, authLoginAttempts } from "../db";
 import { and, eq, gt, inArray, isNull, lt, sql } from "drizzle-orm";
 import { cookies } from "next/headers";
+import { after } from "next/server";
 import crypto from "node:crypto";
 import { hashPassword, requestAddress, SESSION_COOKIE } from "../auth";
 import { createResetToken, recoveryConfig, resetTokenHash, sendPasswordRecovery, RESET_ERROR, RESET_MESSAGE, RecoveryError } from "../password-recovery";
@@ -31,16 +32,24 @@ export async function requestPasswordReset(email: string) {
   if (!await reserveRecovery(cleanEmail)) return { success: true, message: RESET_MESSAGE };
   const [user] = await db.select({ id: users.id, email: users.email, sessionVersion: users.sessionVersion, verificationStatus: users.verificationStatus })
     .from(users).where(eq(users.email, cleanEmail)).limit(1);
-  if (!user || user.verificationStatus === "suspenso") return { success: true, message: RESET_MESSAGE };
-  await db.delete(passwordResetTokens).where(and(eq(passwordResetTokens.userId, user.id), lt(passwordResetTokens.expiresAt, new Date())));
-  const reset = createResetToken();
-  await db.insert(passwordResetTokens).values({ tokenHash: reset.tokenHash, userId: user.id, sessionVersion: user.sessionVersion, expiresAt: reset.expiresAt });
-  try {
-    await sendPasswordRecovery(user.email, reset.token, config);
-  } catch {
-    await db.delete(passwordResetTokens).where(eq(passwordResetTokens.tokenHash, reset.tokenHash));
-    // No address, link, provider body or token in logs, nor account-dependent errors.
-    console.error("Falha ao entregar recuperação de senha.");
+  // Tempo UNIFORME (achado #4): responde JÁ, igual para conta inexistente/suspensa e válida. Para a
+  // conta válida, o token e o e-mail (que podem levar até ~10s) saem FORA da resposta, no `after` do
+  // Next — a Vercel conclui esse trabalho depois do response. Assim a LATÊNCIA não denuncia se a
+  // conta existe. O custo síncrono que resta (limite + uma busca por e-mail) é igual nos dois casos.
+  if (user && user.verificationStatus !== "suspenso") {
+    const resolvedUser = user;
+    after(async () => {
+      const reset = createResetToken();
+      try {
+        await db.delete(passwordResetTokens).where(and(eq(passwordResetTokens.userId, resolvedUser.id), lt(passwordResetTokens.expiresAt, new Date())));
+        await db.insert(passwordResetTokens).values({ tokenHash: reset.tokenHash, userId: resolvedUser.id, sessionVersion: resolvedUser.sessionVersion, expiresAt: reset.expiresAt });
+        await sendPasswordRecovery(resolvedUser.email, reset.token, config);
+      } catch {
+        // Desfaz o token se a entrega falhar. Sem endereço, link, corpo do provedor ou token no log.
+        await db.delete(passwordResetTokens).where(eq(passwordResetTokens.tokenHash, reset.tokenHash)).catch(() => {});
+        console.error("Falha ao entregar recuperação de senha.");
+      }
+    });
   }
   return { success: true, message: RESET_MESSAGE };
 }
