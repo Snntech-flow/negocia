@@ -424,7 +424,8 @@ async function createBuyerProfileImpl(profileData: {
       });
     }
   } catch (e) {
-    console.warn("Erro ao buscar matches para novo perfil:", e);
+    // Sem erro bruto nos logs (DrizzleQueryError traz SQL/parâmetros na mensagem): só o tipo.
+    console.warn("Erro ao buscar matches para novo perfil:", e instanceof Error ? e.constructor.name : typeof e);
   }
 
   revalidatePath("/");

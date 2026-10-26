@@ -402,7 +402,14 @@ export async function getMarketplaceData(input: MarketplaceQuery = {}) {
       pilotFeedback: pilotFeedbackList,
     };
   } catch (error) {
-    console.error("Erro ao carregar dados do banco:", error);
+    // Não logar o erro bruto: DrizzleQueryError traz o SQL e os PARÂMETROS na mensagem
+    // (vaza filtros/identificadores da consulta para os logs). Só o tipo e, quando houver,
+    // o código do Postgres (p.ex. 23505) — sem texto, SQL nem parâmetros.
+    const tipo = error instanceof Error ? error.constructor.name : typeof error;
+    const causa = (error as { cause?: unknown })?.cause;
+    const pgCode =
+      (causa as { code?: string })?.code ?? (error as { code?: string })?.code ?? null;
+    console.error("Erro ao carregar dados do marketplace:", { tipo, pgCode });
     throw error;
   }
 }
