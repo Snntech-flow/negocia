@@ -16,64 +16,78 @@ const NETWORK_PROPERTY_CAP = 500;
 const partnershipCaptor = alias(users, "partnership_captor");
 const partnershipPartner = alias(users, "partnership_partner");
 
-export async function getMarketplaceData(input: MarketplaceQuery = {}) {
+// Contexto do workspace: QUEM está pedindo (currentUser) + os escopos de acesso dele, computados uma
+// vez. Reutilizável pelas rotas da Fase 1. Devolve null quando não há sessão (o chamador trata).
+// Mesma lógica de antes — só foi extraída de dentro do getMarketplaceData (nenhuma query de dado mudou).
+export async function loadWorkspaceContext(input: MarketplaceQuery = {}) {
   const { section, page, search, purpose, propertyType } = validateMarketplaceQuery(input);
   const includes = (...sections: WorkspaceSection[]) => section === "full" || sections.includes(section);
   const includeProperties = includes("vitrine", "radar", "crm", "atendimento", "dvp");
   const includePropertyCount = includeProperties || includes("cadastrar");
   const includePartnerships = includes("dvp", "termo");
+  const currentUserId = await getCurrentUserId();
+  const [currentUser] = currentUserId
+    ? await db.select({
+        id: users.id, name: users.name, email: users.email, creci: users.creci,
+        whatsapp: users.whatsapp, avatarUrl: users.avatarUrl, city: users.city,
+        state: users.state, isVerified: users.isVerified,
+        verificationStatus: users.verificationStatus, plan: users.plan,
+        subscriptionStatus: users.subscriptionStatus, monthlyFee: users.monthlyFee,
+        nextBillingDate: users.nextBillingDate, billingCycle: users.billingCycle,
+        role: users.role, trustScore: users.trustScore,
+        successfulDeals: users.successfulDeals, bypassReports: users.bypassReports,
+        verificationReviewedAt: users.verificationReviewedAt, verificationReviewedBy: users.verificationReviewedBy,
+        billingExemptAt: users.billingExemptAt,
+        adminViewAccess: users.adminViewAccess,
+        // Para o aviso da mensalidade no sino: primeira cobrança (escolhe mensal ou anual) e Pix aguardando conferência.
+        // "users.id" escrito por extenso: o Drizzle põe só "id" no select de uma tabela, e na subconsulta isso viraria t.id.
+        hasPaid: sql<boolean>`exists (select 1 from transactions t where t.user_id = users.id and t.status = 'pago' and t.type like 'mensalidade\\_%')`,
+        pendingPix: sql<boolean>`exists (select 1 from transactions t where t.user_id = users.id and t.status = 'pendente' and t.payment_method = 'pix' and t.type like 'mensalidade\\_%')`,
+        createdAt: users.createdAt,
+      }).from(users).where(eq(users.id, currentUserId)).limit(1)
+    : [];
+  if (!currentUser) return null;
+  const isAdmin = currentUser.role === "admin";
+  // Visualização da Administração (15/10/2026): só os dados da aba Corretores e pagamentos — não amplia a Vitrine,
+  // os registros de visita nem as parcerias, que continuam com o escopo do corretor.
+  const veAdministracao = isAdmin || currentUser.adminViewAccess === true;
+  const paginated = section === "vitrine";
+  const pattern = `%${search.replace(/[\\%_]/g, character => `\\${character}`)}%`;
+  const emptySessionId = "00000000-0000-0000-0000-000000000000";
+  const ownsProperty = sql<boolean>`${properties.brokerId} = ${currentUser?.id ?? emptySessionId}`;
+  const ownsProfile = sql<boolean>`${buyerProfiles.brokerId} = ${currentUser?.id ?? emptySessionId}`;
+
+  // Private inventory stays with its owner. Only active, approved brokers
+  // can read available properties explicitly offered for partnership.
+  const canBrowseNetwork = currentUser?.verificationStatus === "aprovado" &&
+    hasSubscriptionAccess(currentUser.subscriptionStatus, currentUser.nextBillingDate);
+  const propertyScope = isAdmin ? undefined : currentUser
+    ? canBrowseNetwork
+      ? or(eq(properties.brokerId, currentUser.id), networkPropertyScope())
+      : eq(properties.brokerId, currentUser.id)
+    : eq(properties.id, emptySessionId);
+
+  const filteredPropertyScope = and(propertyScope, ne(properties.status, "arquivado"),
+    ...(paginated && purpose !== "todos" ? [eq(properties.purpose, purpose)] : []),
+    ...(paginated && propertyType !== "todos" ? [eq(properties.propertyType, propertyType)] : []),
+    ...(paginated && search ? [or(ilike(properties.title, pattern), ilike(properties.city, pattern), ilike(properties.neighborhood, pattern),
+      and(ownsProperty, ilike(properties.condoName, pattern)))] : []),
+  );
+  return { section, page, search, purpose, propertyType, includes, includeProperties, includePropertyCount,
+    includePartnerships, currentUser, isAdmin, veAdministracao, paginated, pattern, emptySessionId,
+    ownsProperty, ownsProfile, canBrowseNetwork, propertyScope, filteredPropertyScope };
+}
+
+export async function getMarketplaceData(input: MarketplaceQuery = {}) {
   try {
-    const currentUserId = await getCurrentUserId();
-    const [currentUser] = currentUserId
-      ? await db.select({
-          id: users.id, name: users.name, email: users.email, creci: users.creci,
-          whatsapp: users.whatsapp, avatarUrl: users.avatarUrl, city: users.city,
-          state: users.state, isVerified: users.isVerified,
-          verificationStatus: users.verificationStatus, plan: users.plan,
-          subscriptionStatus: users.subscriptionStatus, monthlyFee: users.monthlyFee,
-          nextBillingDate: users.nextBillingDate, billingCycle: users.billingCycle,
-          role: users.role, trustScore: users.trustScore,
-          successfulDeals: users.successfulDeals, bypassReports: users.bypassReports,
-          verificationReviewedAt: users.verificationReviewedAt, verificationReviewedBy: users.verificationReviewedBy,
-          billingExemptAt: users.billingExemptAt,
-          adminViewAccess: users.adminViewAccess,
-          // Para o aviso da mensalidade no sino: primeira cobrança (escolhe mensal ou anual) e Pix aguardando conferência.
-          // "users.id" escrito por extenso: o Drizzle põe só "id" no select de uma tabela, e na subconsulta isso viraria t.id.
-          hasPaid: sql<boolean>`exists (select 1 from transactions t where t.user_id = users.id and t.status = 'pago' and t.type like 'mensalidade\\_%')`,
-          pendingPix: sql<boolean>`exists (select 1 from transactions t where t.user_id = users.id and t.status = 'pendente' and t.payment_method = 'pix' and t.type like 'mensalidade\\_%')`,
-          createdAt: users.createdAt,
-        }).from(users).where(eq(users.id, currentUserId)).limit(1)
-      : [];
-    if (!currentUser) return {
+    const ctx = await loadWorkspaceContext(input);
+    if (!ctx) return {
       properties: [], propertyTotal: 0, radarList: [], users: [], transactions: [], currentUser: null,
       notifications: [], dvpList: [], partnerships: [], partnershipActivities: [], leads: [], leadActivities: [], pilotFeedback: [],
     };
-    const isAdmin = currentUser.role === "admin";
-    // Visualização da Administração (15/10/2026): só os dados da aba Corretores e pagamentos — não amplia a Vitrine,
-    // os registros de visita nem as parcerias, que continuam com o escopo do corretor.
-    const veAdministracao = isAdmin || currentUser.adminViewAccess === true;
-    const paginated = section === "vitrine";
-    const pattern = `%${search.replace(/[\\%_]/g, character => `\\${character}`)}%`;
-    const emptySessionId = "00000000-0000-0000-0000-000000000000";
-    const ownsProperty = sql<boolean>`${properties.brokerId} = ${currentUser?.id ?? emptySessionId}`;
-    const ownsProfile = sql<boolean>`${buyerProfiles.brokerId} = ${currentUser?.id ?? emptySessionId}`;
-
-    // Private inventory stays with its owner. Only active, approved brokers
-    // can read available properties explicitly offered for partnership.
-    const canBrowseNetwork = currentUser?.verificationStatus === "aprovado" &&
-      hasSubscriptionAccess(currentUser.subscriptionStatus, currentUser.nextBillingDate);
-    const propertyScope = isAdmin ? undefined : currentUser
-      ? canBrowseNetwork
-        ? or(eq(properties.brokerId, currentUser.id), networkPropertyScope())
-        : eq(properties.brokerId, currentUser.id)
-      : eq(properties.id, emptySessionId);
-
-    const filteredPropertyScope = and(propertyScope, ne(properties.status, "arquivado"),
-      ...(paginated && purpose !== "todos" ? [eq(properties.purpose, purpose)] : []),
-      ...(paginated && propertyType !== "todos" ? [eq(properties.propertyType, propertyType)] : []),
-      ...(paginated && search ? [or(ilike(properties.title, pattern), ilike(properties.city, pattern), ilike(properties.neighborhood, pattern),
-        and(ownsProperty, ilike(properties.condoName, pattern)))] : []),
-    );
+    const { section, page, search, purpose, propertyType, includes, includeProperties, includePropertyCount,
+      includePartnerships, currentUser, isAdmin, veAdministracao, paginated, pattern, emptySessionId,
+      ownsProperty, ownsProfile, canBrowseNetwork, propertyScope, filteredPropertyScope } = ctx;
     const propertyListQuery = includeProperties ? db
       .select({
         id: properties.id,
