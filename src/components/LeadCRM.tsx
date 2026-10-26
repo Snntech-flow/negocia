@@ -5,6 +5,7 @@ import CpfParcialInput from "./CpfParcialInput";
 import BotaoFechar from "./BotaoFechar";
 import { useVoltarFecha } from "@/lib/use-voltar-fecha";
 import { divisoesPermitidas } from "@/lib/partnership-models";
+import { PROPERTY_TYPES } from "@/lib/property-options";
 import type { NegotiationDocuments } from "@/lib/negotiation-documents";
 import BrokerWeeklyAgenda from "./BrokerWeeklyAgenda";
 import Image from "next/image";
@@ -869,7 +870,7 @@ export default function LeadCRM({
               <label className="text-xs font-semibold text-slate-300">E-mail<input name="email" type="email" defaultValue={editingLead?.email || ""} className={`${inputClass} mt-1`} placeholder="nome@email.com" /></label>
               <label className="text-xs font-semibold text-slate-300">Tipo de lead<select name="leadType" defaultValue={editingLead?.leadType || "comprador"} className={`${inputClass} mt-1`}>{leadTypes.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
               <label className="text-xs font-semibold text-slate-300">Como chegou<select name="source" defaultValue={editingLead?.source || "outro"} className={`${inputClass} mt-1`}>{sources.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-              <label className="text-xs font-semibold text-slate-300">Tipo de imóvel<input name="propertyType" defaultValue={editingLead?.propertyType || ""} className={`${inputClass} mt-1`} placeholder="Apartamento, casa..." /></label>
+              <label className="text-xs font-semibold text-slate-300">Tipo de imóvel<select name="propertyType" defaultValue={editingLead?.propertyType || ""} className={`${inputClass} mt-1`}><option value="">Qualquer tipo</option>{PROPERTY_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}{editingLead?.propertyType && !PROPERTY_TYPES.includes(editingLead.propertyType) && <option value={editingLead.propertyType}>{editingLead.propertyType}</option>}</select></label>
               <label className="text-xs font-semibold text-slate-300">Cidade<input name="city" list="lead-city-options" autoComplete="off" defaultValue={editingLead?.city || ""} className={`${inputClass} mt-1`} placeholder={stateCities.length ? `Digite para ver as cidades de ${currentUserState}` : "São Paulo"} /><datalist id="lead-city-options">{stateCities.map((city) => <option key={city} value={city} />)}</datalist></label>
               <label className="text-xs font-semibold text-slate-300">Bairros de interesse<input name="neighborhoods" defaultValue={editingLead?.neighborhoods?.join(", ") || ""} className={`${inputClass} mt-1`} placeholder="Moema, Pinheiros" /></label>
               <label className="text-xs font-semibold text-slate-300">Orçamento máximo (R$)<input name="maxBudget" type="number" min="1" step="0.01" defaultValue={editingLead?.maxBudget || ""} className={`${inputClass} mt-1`} placeholder="Ex.: 850000" /></label>
