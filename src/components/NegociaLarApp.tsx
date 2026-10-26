@@ -14,7 +14,7 @@ import type { Property } from "@/lib/property-types";
 import { PROPERTY_TYPES } from "@/lib/property-options";
 import { unwrap } from "@/lib/action-result";
 import { billingNotice, hasSubscriptionAccess } from "@/lib/subscription";
-import { planName } from "@/lib/plans";
+import { planName, photoLimit } from "@/lib/plans";
 import { readThemeChoice, saveThemeChoice, THEME_CHOICES, watchSystemTheme, type ThemeChoice } from "@/lib/theme";
 import type { WorkspaceSessionUser, WorkspaceFeedback, WorkspaceNotification, WorkspaceTransaction, WorkspaceUser } from "@/lib/workspace-types";
 import Avatar from "./Avatar";
@@ -1277,7 +1277,7 @@ export default function NegociaLarApp({
                 <h2 className="text-xl font-bold text-white flex items-center gap-2"><PlusCircle className="w-5 h-5 text-amber-500" />Cadastrar imóvel</h2>
                 <p className="text-sm text-slate-400">Endereço completo e dados do proprietário ficam visíveis só para você. Campos com * são obrigatórios.</p>
               </div>
-              <PropertyCreateForm key={reloadKey} broker={{ name: currentUser.name, city: currentUser.city, state: currentUser.state }} blockedReason={blockedReason} onMessage={(text) => showToast(text)}
+              <PropertyCreateForm key={reloadKey} broker={{ name: currentUser.name, city: currentUser.city, state: currentUser.state }} blockedReason={blockedReason} photoLimit={photoLimit(currentUser.plan)} onMessage={(text) => showToast(text)}
                 onCreated={(property) => {
                   setPropertyTotal(total => total + 1);
                   setPropertyList((prev) => [{ ...property, broker: { id: currentBroker.id, name: currentBroker.name, creci: currentBroker.creci, whatsapp: currentBroker.whatsapp, avatarUrl: currentBroker.avatar || null, city: property.city } }, ...prev]);

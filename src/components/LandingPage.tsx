@@ -37,7 +37,7 @@ export default function LandingPage({
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
   const [openFaq, setOpenFaq] = useState<number | null>(null);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
-  const [selectedPlanForOnboarding, setSelectedPlanForOnboarding] = useState("40");
+  const [selectedPlanForOnboarding, setSelectedPlanForOnboarding] = useState("20");
   const [onboardingMode, setOnboardingMode] = useState<"register" | "login">("register");
   const [menuOpen, setMenuOpen] = useState(false);
 
@@ -93,7 +93,7 @@ export default function LandingPage({
             <button
               onClick={() => {
                 setOnboardingMode("login");
-                setSelectedPlanForOnboarding("40");
+                setSelectedPlanForOnboarding("20");
                 setIsOnboardingOpen(true);
               }}
               className="bg-white hover:bg-slate-50 text-slate-800 font-bold text-xs sm:text-sm py-2 sm:py-2.5 px-4 sm:px-5 rounded-lg transition border border-slate-300"
@@ -134,7 +134,7 @@ export default function LandingPage({
                   type="button"
                   onClick={() => {
                     setOnboardingMode("register");
-                    setSelectedPlanForOnboarding("40");
+                    setSelectedPlanForOnboarding("20");
                     setIsOnboardingOpen(true);
                   }}
                   className="bg-slate-900 hover:bg-slate-800 text-white font-bold text-sm sm:text-base py-3.5 px-7 rounded-xl transition shadow-md flex items-center justify-center gap-2"
@@ -414,11 +414,11 @@ export default function LandingPage({
             </div>
           </div>
 
-          {/* Cards dos 3 Planos Individuais */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 items-stretch max-w-5xl mx-auto">
+          {/* Cards dos 4 Planos Individuais */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch max-w-6xl mx-auto">
             {PLAN_IDS.map((id) => {
               const plan = PLANS[id];
-              const highlight = id === "40";
+              const highlight = id === "50";
               return (
                 <div
                   key={id}
@@ -430,6 +430,7 @@ export default function LandingPage({
                   <div className="space-y-4">
                     <div>
                       <h3 className="text-lg font-bold text-slate-900">{plan.name}</h3>
+                      <p className="text-[11px] font-semibold text-amber-700 mt-0.5">{plan.photos} fotos por anúncio</p>
                       <p className="text-xs text-slate-500 mt-1 min-h-[32px]">{plan.description}</p>
                     </div>
                     <div className="py-2 border-y border-slate-100">
@@ -478,7 +479,7 @@ export default function LandingPage({
             <button
               onClick={() => {
                 setOnboardingMode("register");
-                setSelectedPlanForOnboarding("40");
+                setSelectedPlanForOnboarding("20");
                 setIsOnboardingOpen(true);
               }}
               className="bg-amber-500 hover:bg-amber-400 text-slate-950 font-bold text-xs py-3 px-6 rounded-xl transition whitespace-nowrap shadow"

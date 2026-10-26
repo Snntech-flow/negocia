@@ -12,11 +12,15 @@ import { validateBuyerProfileInput, validatePropertyInput } from "../input-valid
 import { normalizedSql, normalizeText } from "../text-match";
 import { previsaoParaBanco } from "../delivery-forecast";
 import { reserveListingSlot } from "../listing-limit";
+import { photoLimit } from "../plans";
 
 export async function createPropertyImpl(formData: PropertyInput) {
   const actor = await requireCurrentUser();
   requireActiveBroker(actor);
   validatePropertyInput(formData);
+  // Limite de fotos por anúncio é do plano (a garantia mora aqui, no servidor).
+  const maxFotos = photoLimit(actor.plan);
+  if ((formData.photos?.length ?? 0) > maxFotos) throw new ActionError(`Seu plano permite até ${maxFotos} fotos por anúncio.`);
   // No cadastro novo estes dados aparecem na vitrine: o corretor precisa escolher, o sistema não presume.
   if (!formData.condition) throw new ActionError("Informe a condição do imóvel (novo, usado, em construção ou na planta).");
   if (typeof formData.acceptsFinancing !== "boolean") throw new ActionError("Informe se o imóvel aceita financiamento.");

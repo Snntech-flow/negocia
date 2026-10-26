@@ -6,7 +6,7 @@ import { db, properties } from "../db";
 import { and, count, desc, eq, ilike, inArray, or } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { requireActiveBroker, requireCurrentUser } from "../auth";
-import { ACTIVE_LISTING_STATUSES, listingLimit } from "../plans";
+import { ACTIVE_LISTING_STATUSES, listingLimit, photoLimit } from "../plans";
 import { isActiveListingStatus, reserveListingSlot } from "../listing-limit";
 import { propertyChanges, PropertyInventoryError, PROPERTY_STATUSES, validatePropertyRevision, type PropertyInput, type PropertyStatus } from "../property-input";
 import { assinarFotosDeImoveis } from "../photo-sign";
@@ -35,6 +35,9 @@ async function getOwnPropertiesImpl(input: { page?: number; search?: string; sta
 async function updateOwnPropertyImpl(id: string, revision: string, input: PropertyInput) {
   const actor = await requireCurrentUser();
   validatePropertyRevision(id, revision);
+  // Limite de fotos por anúncio é do plano (a garantia mora no servidor, como no cadastro).
+  const maxFotos = photoLimit(actor.plan);
+  if ((input.photos?.length ?? 0) > maxFotos) throw new ActionError(`Seu plano permite até ${maxFotos} fotos por anúncio.`);
   const changes = propertyChanges(input);
   const property = await db.transaction(async tx => {
     const [current] = await tx.select().from(properties).where(and(eq(properties.id, id), eq(properties.brokerId, actor.id))).for("update").limit(1);

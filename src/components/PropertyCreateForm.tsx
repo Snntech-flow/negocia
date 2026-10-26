@@ -49,9 +49,11 @@ function Choices<T extends string | number>({ title, options, value, onChange, c
 
 const counts = (max: number) => Array.from({ length: max + 1 }, (_, index) => ({ id: index, label: index === max ? `${max}+` : String(index) }));
 
-export default function PropertyCreateForm({ broker, blockedReason, onCreated, onMessage }: {
+export default function PropertyCreateForm({ broker, blockedReason, photoLimit, onCreated, onMessage }: {
   broker: { name: string; city: string; state: string };
   blockedReason: string | null;
+  // Fotos por anúncio permitidas pelo plano do corretor (o servidor também garante).
+  photoLimit: number;
   onCreated: (property: CreatedProperty) => void;
   onMessage: (text: string) => void;
 }) {
@@ -119,7 +121,7 @@ export default function PropertyCreateForm({ broker, blockedReason, onCreated, o
     const value = (kind === "photo" ? photoUrl : floorPlanUrl).trim();
     if (!value) return;
     if (!safeHttps(value)) { setError("Cole um link que comece com https://"); return; }
-    if (kind === "photo") { if (photos.length >= 40) return; setPhotos([...photos, value]); setPhotoUrl(""); }
+    if (kind === "photo") { if (photos.length >= photoLimit) return; setPhotos([...photos, value]); setPhotoUrl(""); }
     else { if (floorPlans.length >= 10) return; setFloorPlans([...floorPlans, value]); setFloorPlanUrl(""); }
     setError("");
   }
@@ -278,8 +280,8 @@ export default function PropertyCreateForm({ broker, blockedReason, onCreated, o
     <div className={section}>
       <h3 className={heading}><ImageIcon className="w-4 h-4 text-amber-500" />6. Fotos, planta, vídeo e descrição</h3>
       <div className="space-y-2">
-        <p className={label}>Fotos do imóvel ({photos.length}/40) · a primeira é a capa</p>
-        <PhotoUploader remaining={40 - photos.length} label="Enviar fotos do celular ou computador" onUploaded={(urls) => setPhotos((current) => [...current, ...urls].slice(0, 40))} />
+        <p className={label}>Fotos do imóvel ({photos.length}/{photoLimit}) · a primeira é a capa</p>
+        <PhotoUploader remaining={photoLimit - photos.length} label="Enviar fotos do celular ou computador" onUploaded={(urls) => setPhotos((current) => [...current, ...urls].slice(0, photoLimit))} />
         <div className="flex gap-2"><input aria-label="Link de uma foto" value={photoUrl} onChange={(e) => setPhotoUrl(e.target.value)} onKeyDown={(e) => { if (e.key === "Enter") { e.preventDefault(); addUrl("photo"); } }} placeholder="Ou cole o link (https://) de uma foto" className={`${input} text-xs`} /><button type="button" onClick={() => addUrl("photo")} disabled={!photoUrl.trim()} title={photoUrl.trim() ? "Adicionar a foto deste link" : "Cole o link de uma foto ao lado — para enviar do celular ou computador, use o botão acima"} className="shrink-0 border border-slate-300 bg-white hover:bg-slate-50 text-slate-700 px-4 py-2 rounded-xl text-xs font-bold disabled:cursor-not-allowed disabled:opacity-40">Adicionar link</button></div>
         <PhotoGrid fotos={photos} onChange={setPhotos} />
       </div>

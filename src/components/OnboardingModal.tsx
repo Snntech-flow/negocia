@@ -28,7 +28,7 @@ interface OnboardingModalProps {
 const inputClass = "w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-amber-600 focus:bg-white";
 const money = (value: string) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value));
 
-export default function OnboardingModal({ isOpen, onClose, onComplete, initialPlan = "40", initialMode = "register" }: OnboardingModalProps) {
+export default function OnboardingModal({ isOpen, onClose, onComplete, initialPlan = "20", initialMode = "register" }: OnboardingModalProps) {
   const fechar = useVoltarFecha(onClose, isOpen); // X visível, Esc e voltar fecham (15/10/2026)
   const [step, setStep] = useState<1 | 2 | 3 | 4>(1);
   const [mode, setMode] = useState<"register" | "login" | "recovery">(initialMode);
@@ -42,7 +42,7 @@ export default function OnboardingModal({ isOpen, onClose, onComplete, initialPl
 
   const [formData, setFormData] = useState<{ name: string; email: string; password: string; whatsapp: string; creci: string; state: string; city: string; plan: PlanId; billingCycle: BillingCycle }>({
     name: "", email: "", password: "", whatsapp: "", creci: "", state: "SP", city: "",
-    plan: isPlanId(initialPlan) ? initialPlan : "40",
+    plan: isPlanId(initialPlan) ? initialPlan : "20",
     billingCycle: "monthly",
   });
   const [referralCode, setReferralCode] = useState(() => typeof window === "undefined" ? "" : new URLSearchParams(window.location.search).get("ref") || "");
@@ -248,7 +248,7 @@ export default function OnboardingModal({ isOpen, onClose, onComplete, initialPl
                       <span className={`w-4 h-4 rounded-full border flex items-center justify-center ${isSelected ? "border-amber-600 bg-amber-600" : "border-slate-300"}`}>{isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}</span>
                       <span>
                         <span className="block text-xs font-bold text-slate-900">{plan.name}</span>
-                        <span className="block text-[11px] text-slate-500">{formData.billingCycle === "annual" ? `${money(plan.annualTotal)} por ano` : plan.description}</span>
+                        <span className="block text-[11px] text-slate-500">{plan.photos} fotos por anúncio · {formData.billingCycle === "annual" ? `${money(plan.annualTotal)} por ano` : plan.description}</span>
                       </span>
                     </span>
                     <span className="text-sm font-extrabold text-slate-900">{money(planMonthlyEquivalent(id, formData.billingCycle))}<span className="text-[10px] text-slate-500 font-normal">/mês</span></span>
