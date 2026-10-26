@@ -242,13 +242,15 @@ export default function LeadCRM({
   blockedReason?: string | null;
   onCreateProperty?: () => void;
 }) {
+  // UF do form de lead: escolhe de qual estado vêm as sugestões de cidade (começa na do corretor). Antes era fixa na UF do corretor.
+  const [formState, setFormState] = useState(currentUserState || "");
   const [stateCities, setStateCities] = useState<string[]>([]);
   useEffect(() => {
-    if (!currentUserState) return;
+    if (!formState) { setStateCities([]); return; }
     let cancelled = false;
-    void loadStateCities(currentUserState).then((cities) => { if (!cancelled) setStateCities(cities); });
+    void loadStateCities(formState).then((cities) => { if (!cancelled) setStateCities(cities); });
     return () => { cancelled = true; };
-  }, [currentUserState]);
+  }, [formState]);
   const [crmView, setCrmView] = useState<"overview" | "clients" | "pipeline" | "agenda" | "properties" | "simulation" | "assistant">(initialView);
   const [monthFilter, setMonthFilter] = useState("");
   const [pagination, setPagination] = useState({ key: "", page: 1 });
@@ -275,6 +277,9 @@ export default function LeadCRM({
   const [followUpFilter, setFollowUpFilter] = useState("todos");
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [editingLead, setEditingLead] = useState<LeadItem | null>(null);
+  // Ao abrir o cadastro/edição, a UF da cidade volta para a do corretor.
+  const leadFormOpen = isCreateOpen || !!editingLead;
+  useEffect(() => { if (leadFormOpen) setFormState(currentUserState || ""); }, [leadFormOpen, currentUserState]);
   const [visitProperty, setVisitProperty] = useState<LeadMatchProperty | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -871,7 +876,7 @@ export default function LeadCRM({
               <label className="text-xs font-semibold text-slate-300">Tipo de lead<select name="leadType" defaultValue={editingLead?.leadType || "comprador"} className={`${inputClass} mt-1`}>{leadTypes.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
               <label className="text-xs font-semibold text-slate-300">Como chegou<select name="source" defaultValue={editingLead?.source || "outro"} className={`${inputClass} mt-1`}>{sources.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
               <label className="text-xs font-semibold text-slate-300">Tipo de imóvel<select name="propertyType" defaultValue={editingLead?.propertyType || ""} className={`${inputClass} mt-1`}><option value="">Qualquer tipo</option>{PROPERTY_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}{editingLead?.propertyType && !PROPERTY_TYPES.includes(editingLead.propertyType) && <option value={editingLead.propertyType}>{editingLead.propertyType}</option>}</select></label>
-              <label className="text-xs font-semibold text-slate-300">Cidade<input name="city" list="lead-city-options" autoComplete="off" defaultValue={editingLead?.city || ""} className={`${inputClass} mt-1`} placeholder={stateCities.length ? `Digite para ver as cidades de ${currentUserState}` : "São Paulo"} /><datalist id="lead-city-options">{stateCities.map((city) => <option key={city} value={city} />)}</datalist></label>
+              <label className="text-xs font-semibold text-slate-300">Cidade<div className="mt-1 flex gap-2"><select value={formState} onChange={(event) => setFormState(event.target.value)} aria-label="Estado da cidade" className="w-20 shrink-0 rounded-lg border border-slate-700 bg-slate-950 px-2 py-2.5 text-sm text-white focus:border-amber-500 focus:outline-none">{!formState && <option value="">UF</option>}{BRAZILIAN_STATES.map((uf) => <option key={uf} value={uf}>{uf}</option>)}</select><input name="city" list="lead-city-options" autoComplete="off" defaultValue={editingLead?.city || ""} className={`${inputClass} min-w-0 flex-1`} placeholder={!formState ? "Escolha a UF" : stateCities.length ? `Cidades de ${formState}` : "Digite a cidade"} /></div><datalist id="lead-city-options">{stateCities.map((city) => <option key={city} value={city} />)}</datalist></label>
               <label className="text-xs font-semibold text-slate-300">Bairros de interesse<input name="neighborhoods" defaultValue={editingLead?.neighborhoods?.join(", ") || ""} className={`${inputClass} mt-1`} placeholder="Moema, Pinheiros" /></label>
               <label className="text-xs font-semibold text-slate-300">Orçamento máximo (R$)<input name="maxBudget" type="number" min="1" step="0.01" defaultValue={editingLead?.maxBudget || ""} className={`${inputClass} mt-1`} placeholder="Ex.: 850000" /></label>
               <label className="text-xs font-semibold text-slate-300">Quartos mínimos<input name="minBedrooms" type="number" min="1" max="20" defaultValue={editingLead?.minBedrooms || ""} className={`${inputClass} mt-1`} placeholder="2" /></label>
