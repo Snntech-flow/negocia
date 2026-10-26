@@ -29,9 +29,10 @@ export default function WhiteLabelSheet({ property, broker, onClose }: { propert
     setError(null);
   }
   const photo = property.coverPhoto || property.photos[0];
-  return <div className="fixed inset-0 z-50 flex justify-center overflow-y-auto bg-slate-950/90 p-4 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="white-label-title"
-    onMouseDown={(event) => { if (event.target === event.currentTarget) fechar(); }}>
-    <div className="my-auto w-full max-w-xl overflow-clip rounded-3xl border border-slate-700 bg-slate-900 shadow-2xl">
+  // O scroll mora no container externo e o card é centralizado por um wrapper min-h-full: com my-auto num flex, card mais alto que a tela tinha o fim inacessível (26/10/2026).
+  return <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/90 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="white-label-title">
+    <div className="flex min-h-full items-center justify-center p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) fechar(); }}>
+    <div className="w-full max-w-xl overflow-clip rounded-3xl border border-slate-700 bg-slate-900 shadow-2xl">
       <div className="sticky top-0 z-10 flex items-start justify-between gap-3 border-b border-slate-800 bg-slate-900 p-6"><div><p className="flex items-center gap-2 text-xs font-bold uppercase text-amber-400"><Share2 className="h-4 w-4" />Ficha do imóvel</p><h3 id="white-label-title" className="mt-1 text-lg font-bold text-white">Compartilhar com seu cliente</h3></div><BotaoFechar onClick={fechar} rotulo="Fechar ficha" /></div>
       <div className="space-y-5 p-6">
         <p className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-3 text-xs text-amber-300">A ficha usa seus dados de atendimento: {broker.name}, CRECI {broker.creci} e seu WhatsApp. O endereço completo e os dados do proprietário e do captador ficam fora da ficha.</p>
@@ -45,6 +46,7 @@ export default function WhiteLabelSheet({ property, broker, onClose }: { propert
         <div className="grid gap-3 sm:grid-cols-2"><button type="button" onClick={() => void copy()} className="flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-3 text-xs font-bold text-slate-950">{copied ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}{copied ? "Ficha copiada" : "Copiar ficha"}</button><button type="button" onClick={print} className="flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-xs font-bold text-white"><FileText className="h-4 w-4" />Imprimir / salvar PDF</button></div>
         <button type="button" onClick={fechar} className="w-full rounded-xl border border-[#c5d3e0] bg-[#ffffff] px-4 py-3 text-xs font-bold text-[#083858] hover:bg-[#eef4fa]">Fechar e voltar ao aplicativo</button>
       </div>
+    </div>
     </div>
   </div>;
 }
