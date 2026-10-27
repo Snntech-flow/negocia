@@ -256,7 +256,7 @@ export default function OnboardingModal({ isOpen, onClose, onComplete, initialPl
                 );
               })}
             </div>
-            <p className="text-[11px] text-slate-500">Todos os planos: até 40 fotos por imóvel, vitrine de parcerias, Radar de compradores, CRM e registro de visitas.</p>
+            <p className="text-[11px] text-slate-500">Todos os planos incluem vitrine de parcerias, Radar de compradores, CRM e registro de visitas. As fotos por anúncio acompanham o plano.</p>
 
             <div className="bg-emerald-50 border border-emerald-200 p-3.5 rounded-2xl flex items-start gap-2.5">
               <ShieldCheck className="w-5 h-5 text-emerald-700 shrink-0 mt-0.5" />

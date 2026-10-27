@@ -43,7 +43,7 @@ export default function LandingPage({
 
   const money = (value: string) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value));
   const planFeatures = [
-    "Até 40 fotos por imóvel",
+    "Fotos por anúncio conforme o plano",
     "Vitrine de imóveis para parcerias",
     "Endereço e proprietário visíveis só para o captador",
     "Radar de compradores e CRM",
@@ -503,7 +503,7 @@ export default function LandingPage({
               {"q": "Como funcionam os 30 dias grátis?", "a": "Cada corretor tem 30 dias gratuitos a partir do cadastro, sem pagamento inicial. Use esse período para conhecer a plataforma. A verificação do CRECI é feita pela equipe e é necessária para acessar as funções restritas."},
               {"q": "Preciso pagar ou informar cartão para começar?", "a": "Não. O cadastro inicia o período gratuito sem cobrança e sem cartão. Após os 30 dias, você pode renovar o plano via Pix."},
               {"q": "O que acontece depois do período gratuito?", "a": "Para continuar usando as funções do plano, faça a renovação. Em Minha assinatura você consulta o prazo de acesso, o plano e o histórico de pagamentos. A cobrança não é automática."},
-              {"q": "Qual plano devo escolher?", "a": "O plano define quantos anúncios você mantém ativos ao mesmo tempo: 10, 20 ou 40. Imóveis vendidos, alugados ou arquivados não contam. Todos os planos têm até 40 fotos por imóvel e os mesmos recursos."},
+              {"q": "Qual plano devo escolher?", "a": `O plano define quantos anúncios você mantém ativos ao mesmo tempo: ${PLAN_IDS.map((id) => PLANS[id].listings).join(", ").replace(/, (\d+)$/, " ou $1")}. Imóveis vendidos, alugados ou arquivados não contam. O limite de fotos por imóvel acompanha o plano (de ${Math.min(...PLAN_IDS.map((id) => PLANS[id].photos))} a ${Math.max(...PLAN_IDS.map((id) => PLANS[id].photos))} fotos); os demais recursos são iguais em todos.`},
               {"q": "Como ganho um mês grátis por indicação?", "a": "Compartilhe seu link ou código de indicação, disponível em Minha assinatura. Quando a pessoa indicada tiver seu primeiro pagamento confirmado, você recebe mais 30 dias de acesso. O cadastro gratuito sozinho não gera a recompensa."},
               {"q": "Quem consegue ver os dados do proprietário?", "a": "O endereço completo e os dados de contato do proprietário ficam restritos ao corretor que cadastrou o imóvel. Confira as informações da ficha antes de compartilhar com um cliente."},
               {"q": "O que é a ficha para o cliente?", "a": "É uma apresentação do imóvel com o seu nome, CRECI e WhatsApp, para enviar ao seu cliente. Mostra bairro e cidade, sem o endereço completo e sem os dados do captador. Confira antes de enviar."},
