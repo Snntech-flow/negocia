@@ -143,7 +143,7 @@ export default function AppShellClient({ currentUser, initialNotifications, prop
     }
     setIsNotificationsOpen(false);
     if (notif.type === "dvp") router.push(`${href("dvp")}#acompanhamento-parcerias`);
-    else if (notif.propertyId) router.push(`${href("vitrine")}?imovel=${notif.propertyId}`);
+    else if (notif.propertyId) router.push(`${href("vitrine")}?ficha=${notif.propertyId}`);
   };
 
   const handleMarkAllRead = async () => {

@@ -4,17 +4,15 @@
 // como o monólito fazia. A ficha para o cliente (WhiteLabelSheet) abre aqui; a navegação entre telas é por rota.
 import { useEffect, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Info } from "lucide-react";
 import PropertyMarketplace from "@/components/PropertyMarketplace";
 import WhiteLabelSheet from "@/components/WhiteLabelSheet";
+import ScreenGuidance from "@/components/app-shell/ScreenGuidance";
 import { getMarketplaceData } from "@/lib/actions";
 import { unwrap } from "@/lib/action-result";
 import { PROPERTY_PAGE_SIZE } from "@/lib/marketplace-query";
 import { PROPERTY_TYPES } from "@/lib/property-options";
 import type { Property } from "@/lib/property-types";
 import type { SharingBroker } from "@/lib/white-label";
-
-const GUIDANCE = "MLS é uma rede em que corretores compartilham imóveis e oportunidades. Consulte as condições com o captador; o endereço completo e os dados do proprietário ficam restritos a ele. Para mudar fotos, valor ou condição de parceria de um imóvel SEU, use o botão “Editar em Meus imóveis” no cartão dele (ou o menu Imóveis › Meus imóveis).";
 
 export default function VitrineRouteClient({ initialProperties, initialPropertyTotal, broker, currentUserId, blockedReason }: {
   initialProperties: Property[];
@@ -25,6 +23,8 @@ export default function VitrineRouteClient({ initialProperties, initialPropertyT
 }) {
   const router = useRouter();
   const searchParams = useSearchParams();
+  // ?ficha=<id>: abre a ficha do imóvel (veio de uma notificação). ?imovel=<id>: só rola até ele (veio do CRM).
+  const fichaParam = searchParams.get("ficha");
   const imovelParam = searchParams.get("imovel");
 
   const [properties, setProperties] = useState(initialProperties);
@@ -62,13 +62,17 @@ export default function VitrineRouteClient({ initialProperties, initialPropertyT
     return () => { cancelled = true; window.clearTimeout(timer); };
   }, [requestKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // Veio de uma notificação (?imovel=…): abre a ficha se o imóvel está na lista; senão, rola até ele quando aparecer.
+  // ?ficha=…: abre a ficha se o imóvel está na lista; senão, rola até ele quando aparecer.
   useEffect(() => {
-    if (!imovelParam) return;
-    const prop = properties.find((p) => p.id === imovelParam);
+    if (!fichaParam) return;
+    const prop = properties.find((p) => p.id === fichaParam);
     if (prop) setSelectedForWhiteLabel(prop);
-    else setPendingPropertyId(imovelParam);
-  }, [imovelParam, properties]);
+    else setPendingPropertyId(fichaParam);
+  }, [fichaParam, properties]);
+  // ?imovel=…: só rola até o imóvel (sem abrir a ficha).
+  useEffect(() => {
+    if (imovelParam) setPendingPropertyId(imovelParam);
+  }, [imovelParam]);
   useEffect(() => {
     if (!loaded || !pendingPropertyId) return;
     const frame = requestAnimationFrame(() => {
@@ -80,13 +84,7 @@ export default function VitrineRouteClient({ initialProperties, initialPropertyT
 
   return (
     <>
-      <div className="mb-6 flex items-start gap-3 rounded-xl border border-sky-200 bg-sky-50 px-4 py-3">
-        <Info className="mt-0.5 h-4 w-4 shrink-0 text-sky-700" />
-        <div>
-          <h2 className="mls-guidance-title text-xs font-bold">Vitrine de imóveis compartilhados (MLS)</h2>
-          <p className="mt-1 text-xs leading-relaxed text-slate-300">{GUIDANCE}</p>
-        </div>
-      </div>
+      <ScreenGuidance screen="vitrine" />
 
       <PropertyMarketplace properties={properties} propertyTotal={propertyTotal} propertyPage={propertyPage} loading={!loaded}
         currentUserId={currentUserId} propertyTypes={PROPERTY_TYPES} propertyFilterPurpose={purpose} propertyFilterType={type} propertyFilterSearch={search}
