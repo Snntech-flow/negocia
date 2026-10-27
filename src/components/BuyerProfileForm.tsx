@@ -5,6 +5,7 @@ import { Radar } from "lucide-react";
 import { createBuyerProfile } from "@/lib/actions";
 import { unwrap, type ActionData } from "@/lib/action-result";
 import { loadStateCities } from "@/lib/cities";
+import { BRAZILIAN_STATES } from "@/lib/brazil-states";
 import { PROPERTY_TYPES } from "@/lib/property-options";
 
 export type CreatedProfile = ActionData<Awaited<ReturnType<typeof createBuyerProfile>>>["profile"];
@@ -12,15 +13,18 @@ const input = "mt-1 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 
 
 // Procura de comprador com os critérios que o corretor informa; o Radar cruza com os imóveis de venda da rede.
 export default function BuyerProfileForm({ brokerState, blockedReason, onCreated }: { brokerState: string; blockedReason: string | null; onCreated: (profile: CreatedProfile) => void }) {
+  // UF da procura: escolhe de qual estado vêm as cidades (começa na do corretor). Antes era fixa na UF do corretor.
+  const [uf, setUf] = useState(brokerState);
   const [cities, setCities] = useState<string[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   useEffect(() => {
+    if (!uf) { setCities([]); return; }
     let cancelled = false;
-    void loadStateCities(brokerState).then((list) => { if (!cancelled) setCities(list); });
+    void loadStateCities(uf).then((list) => { if (!cancelled) setCities(list); });
     return () => { cancelled = true; };
-  }, [brokerState]);
+  }, [uf]);
 
   async function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -42,6 +46,7 @@ export default function BuyerProfileForm({ brokerState, blockedReason, onCreated
       }));
       onCreated(result.profile);
       form.reset();
+      setUf(brokerState);
       setMessage("Procura salva. Quando um imóvel de venda da rede atender aos critérios, você recebe um aviso no sino.");
     } catch (problem) {
       setError(problem instanceof Error ? problem.message : "Não foi possível salvar a procura.");
@@ -55,7 +60,7 @@ export default function BuyerProfileForm({ brokerState, blockedReason, onCreated
     <fieldset disabled={busy || !!blockedReason} className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
       <label className="text-xs font-semibold text-slate-300 sm:col-span-2">Nome interno do cliente *<input name="clientInternalName" required maxLength={120} placeholder="Como você identifica o cliente" className={input} /></label>
       <label className="text-xs font-semibold text-slate-300">Tipo de imóvel *<select name="propertyType" required defaultValue="" className={input}><option value="" disabled>Escolha</option>{PROPERTY_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}</select></label>
-      <label className="text-xs font-semibold text-slate-300">Cidade *<input name="city" required list="radar-city-options" autoComplete="off" maxLength={120} className={input} /><datalist id="radar-city-options">{cities.map((city) => <option key={city} value={city} />)}</datalist></label>
+      <label className="text-xs font-semibold text-slate-300">Cidade *<div className="mt-1 flex gap-2"><select value={uf} onChange={(event) => setUf(event.target.value)} aria-label="Estado da cidade" className="w-20 shrink-0 rounded-lg border border-slate-700 bg-slate-950 px-2 py-2 text-sm text-white">{!uf && <option value="">UF</option>}{BRAZILIAN_STATES.map((estado) => <option key={estado} value={estado}>{estado}</option>)}</select><input name="city" required list="radar-city-options" autoComplete="off" maxLength={120} placeholder={!uf ? "Escolha a UF" : cities.length ? `Cidades de ${uf}` : "Digite a cidade"} className="min-w-0 flex-1 rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-sm text-white" /></div><datalist id="radar-city-options">{cities.map((city) => <option key={city} value={city} />)}</datalist></label>
       <label className="text-xs font-semibold text-slate-300 sm:col-span-2">Bairros (separados por vírgula; vazio = qualquer)<input name="neighborhoods" maxLength={1000} placeholder="Ex: Centro, Jardim América" className={input} /></label>
       <label className="text-xs font-semibold text-slate-300">Orçamento máximo (R$) *<input name="maxBudget" required type="number" min="1" step="0.01" className={input} /></label>
       <label className="text-xs font-semibold text-slate-300">Quartos (mínimo)<input name="minBedrooms" type="number" min="0" max="100" defaultValue="0" className={input} /></label>
