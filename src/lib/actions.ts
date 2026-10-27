@@ -30,6 +30,7 @@ import { registerUserWithPixImpl, loginUserImpl, logoutUserImpl, validateCreciFo
 import { getMySubscriptionImpl, requestSubscriptionRenewalImpl } from "./actions/my-subscription";
 import { getBrokerAssistantStatusImpl, askBrokerAssistantImpl } from "./actions/assistant";
 import { saveNegotiationDocumentsImpl, saveMyDocumentationTemplateImpl, getMyDocumentationTemplateImpl } from "./actions/documents";
+import { createListingShareLinkImpl } from "./actions/listing-share";
 
 // Cada ação devolve { ok, data } ou { ok, error }: a mensagem esperada chega à tela também em produção.
 export async function getMarketplaceData(...args: Parameters<typeof getMarketplaceDataImpl>) { return runAction(() => getMarketplaceDataImpl(...args)); }
@@ -65,3 +66,4 @@ export async function askBrokerAssistant(...args: Parameters<typeof askBrokerAss
 export async function saveNegotiationDocuments(...args: Parameters<typeof saveNegotiationDocumentsImpl>) { return runAction(() => saveNegotiationDocumentsImpl(...args)); }
 export async function saveMyDocumentationTemplate(...args: Parameters<typeof saveMyDocumentationTemplateImpl>) { return runAction(() => saveMyDocumentationTemplateImpl(...args)); }
 export async function getMyDocumentationTemplate(...args: Parameters<typeof getMyDocumentationTemplateImpl>) { return runAction(() => getMyDocumentationTemplateImpl(...args)); }
+export async function createListingShareLink(...args: Parameters<typeof createListingShareLinkImpl>) { return runAction(() => createListingShareLinkImpl(...args)); }

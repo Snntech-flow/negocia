@@ -5,6 +5,7 @@ import { cookies, headers } from "next/headers";
 import crypto from "node:crypto";
 import { isIP } from "node:net";
 import { hasSubscriptionAccess } from "./subscription";
+import { sessionSecret } from "./session-secret";
 
 export async function requestAddress() {
   const requestHeaders = await headers();
@@ -38,17 +39,6 @@ export async function limitRegistrationAttempts() {
 export const SESSION_COOKIE = "negocialar_session";
 const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
 
-function sessionSecret() {
-  const secret = process.env.NEGOCIAR_LAR_SESSION_SECRET;
-  if (secret && secret.length < 32) {
-    throw new Error("NEGOCIAR_LAR_SESSION_SECRET deve ter pelo menos 32 caracteres.");
-  }
-  if (secret) return secret;
-  if (process.env.NODE_ENV === "production") {
-    throw new Error("NEGOCIAR_LAR_SESSION_SECRET precisa estar configurado em produção.");
-  }
-  return "negociar-lar-local-development-secret-change-before-deploy";
-}
 
 function signUserId(userId: string, expiresAt: number, sessionVersion?: number) {
   const payload = sessionVersion === undefined ? `${userId}.${expiresAt}` : `${userId}.${sessionVersion}.${expiresAt}`;

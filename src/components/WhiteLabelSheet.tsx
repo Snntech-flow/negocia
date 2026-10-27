@@ -1,15 +1,19 @@
 "use client";
 
 import { useState } from "react";
-import { CheckCircle2, Copy, FileText, Phone, Share2 } from "lucide-react";
+import { CheckCircle2, Copy, FileText, Link2, Phone, Share2 } from "lucide-react";
 import type { Property } from "@/lib/property-types";
 import { formatArea, whiteLabelContact, whiteLabelHtml, whiteLabelText, type SharingBroker } from "@/lib/white-label";
+import { createListingShareLink } from "@/lib/actions";
+import { unwrap } from "@/lib/action-result";
 import Avatar from "./Avatar";
 import BotaoFechar from "./BotaoFechar";
 import { useVoltarFecha } from "@/lib/use-voltar-fecha";
 
 export default function WhiteLabelSheet({ property, broker, onClose }: { property: Property; broker: SharingBroker; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
+  const [linkCopied, setLinkCopied] = useState(false);
+  const [linkBusy, setLinkBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // X visível, Esc, clique fora e a seta de voltar fecham a ficha (15/10/2026) — antes só um "✕" cinza-claro sobre branco.
   const fechar = useVoltarFecha(onClose);
@@ -17,6 +21,18 @@ export default function WhiteLabelSheet({ property, broker, onClose }: { propert
   async function copy() {
     try { await navigator.clipboard.writeText(whiteLabelText(property, broker)); setCopied(true); setError(null); }
     catch { setError("Não foi possível copiar a ficha. Verifique a permissão da área de transferência."); }
+  }
+  // Gera o link público (white-label) da ficha e copia a URL para o corretor mandar ao cliente.
+  async function copyLink() {
+    if (linkBusy) return;
+    setLinkBusy(true);
+    try {
+      const { token } = unwrap(await createListingShareLink(property.id));
+      await navigator.clipboard.writeText(`${window.location.origin}/ficha/${token}`);
+      setLinkCopied(true); setError(null);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Não foi possível gerar o link.");
+    } finally { setLinkBusy(false); }
   }
   function print() {
     const preview = window.open("", "_blank", "width=900,height=800");
@@ -43,7 +59,8 @@ export default function WhiteLabelSheet({ property, broker, onClose }: { propert
           {contact ? <a href={contact} target="_blank" rel="noreferrer" className="inline-flex items-center gap-2 rounded-lg bg-emerald-500 px-4 py-2 text-xs font-bold text-slate-950"><Phone className="h-4 w-4" />{broker.whatsapp}</a> : <p className="text-xs text-slate-400">WhatsApp indisponível.</p>}
         </div>
         {error && <p role="alert" className="text-sm text-rose-300">{error}</p>}
-        <div className="grid gap-3 sm:grid-cols-2"><button type="button" onClick={() => void copy()} className="flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-3 text-xs font-bold text-slate-950">{copied ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}{copied ? "Ficha copiada" : "Copiar ficha"}</button><button type="button" onClick={print} className="flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-xs font-bold text-white"><FileText className="h-4 w-4" />Imprimir / salvar PDF</button></div>
+        <button type="button" onClick={() => void copyLink()} disabled={linkBusy} className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-3 text-xs font-bold text-slate-950 disabled:opacity-60">{linkCopied ? <CheckCircle2 className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}{linkBusy ? "Gerando link…" : linkCopied ? "Link copiado — cole no WhatsApp do cliente" : "Copiar link para o cliente"}</button>
+        <div className="grid gap-3 sm:grid-cols-2"><button type="button" onClick={() => void copy()} className="flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-xs font-bold text-white">{copied ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}{copied ? "Ficha copiada" : "Copiar texto"}</button><button type="button" onClick={print} className="flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-xs font-bold text-white"><FileText className="h-4 w-4" />Imprimir / salvar PDF</button></div>
         <button type="button" onClick={fechar} className="w-full rounded-xl border border-[#c5d3e0] bg-[#ffffff] px-4 py-3 text-xs font-bold text-[#083858] hover:bg-[#eef4fa]">Fechar e voltar ao aplicativo</button>
       </div>
     </div>
