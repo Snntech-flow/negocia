@@ -1,41 +1,13 @@
-// Componente de servidor: lê direto a consulta (um erro aqui cai na tela de erro, não volta como valor).
-import { getMarketplaceData } from "@/lib/queries/marketplace";
-import NegociaLarApp from "@/components/NegociaLarApp";
+// `/`: logado vai para o AppShell (/vitrine); deslogado vê a landing pública. `?site=1` mostra a landing mesmo logado
+// (link "Ver o site" do shell). O monólito NegociaLarApp foi aposentado — a Fase 1 virou rotas sob (app)/.
+import { redirect } from "next/navigation";
+import { getCurrentUserId } from "@/lib/auth";
+import LandingRouteClient from "@/components/app-shell/LandingRouteClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function HomePage() {
-  const {
-    properties,
-    propertyTotal,
-    radarList,
-    users,
-    transactions,
-    currentUser,
-    notifications,
-    dvpList,
-    partnerships,
-    partnershipActivities,
-    leads,
-    leadActivities,
-    pilotFeedback,
-  } = await getMarketplaceData({ section: "vitrine" });
-
-  return (
-    <NegociaLarApp
-      initialProperties={properties}
-      initialPropertyTotal={propertyTotal}
-      initialRadar={radarList}
-      initialUsers={users}
-      initialTransactions={transactions}
-      initialCurrentUser={currentUser}
-      initialNotifications={notifications}
-      initialDvpList={dvpList}
-      initialPartnerships={partnerships}
-      initialPartnershipActivities={partnershipActivities}
-      initialLeads={leads}
-      initialLeadActivities={leadActivities}
-      initialFeedback={pilotFeedback}
-    />
-  );
+export default async function HomePage({ searchParams }: { searchParams: Promise<{ site?: string }> }) {
+  const { site } = await searchParams;
+  if (!site && (await getCurrentUserId())) redirect("/vitrine");
+  return <LandingRouteClient />;
 }

@@ -264,7 +264,7 @@ export default function AppShellClient({ currentUser, initialNotifications, prop
                   <div className="p-2 space-y-1">
                     <button type="button" role="menuitem" onClick={() => { setIsUserSwitcherOpen(false); setIsSubscriptionOpen(true); }} className="w-full py-2 px-3 text-left text-xs font-semibold text-slate-300 hover:bg-slate-800 rounded-xl">Minha assinatura</button>
                     <ThemeSwitch />
-                    <Link href="/" className="block w-full py-2 px-3 text-left text-xs font-semibold text-slate-300 hover:bg-slate-800 rounded-xl">Ver o site do Negocia Lar</Link>
+                    <Link href="/?site=1" className="block w-full py-2 px-3 text-left text-xs font-semibold text-slate-300 hover:bg-slate-800 rounded-xl">Ver o site do Negocia Lar</Link>
                     <button type="button" role="menuitem" onClick={() => void handleLogout()} className="w-full py-2 px-3 text-left text-xs font-semibold text-slate-300 hover:bg-slate-800 rounded-xl">Sair <span className="font-normal text-slate-500">(encerra em todos os aparelhos)</span></button>
                   </div>
                 </div>
