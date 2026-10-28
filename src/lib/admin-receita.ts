@@ -4,7 +4,7 @@ import { addMonthsKeepingDay } from "./finance";
 import { isPlanId, planCharge, type BillingCycle } from "./plans";
 
 export type UsuarioCobranca = {
-  id: string; role: string; plan: string; billingCycle: string; monthlyFee: string | number;
+  id: string; role: string; plan: string; billingCycle: string; monthlyFee: string | number; priceTable?: string;
   nextBillingDate: Date | string | null; billingExemptAt: Date | string | null; subscriptionStatus: string; verificationStatus: string;
 };
 export type PagamentoDaPlataforma = { status: string; amount: string | number; confirmedAt: Date | string | null; createdAt: Date | string };
@@ -25,7 +25,7 @@ export function cobravel(u: UsuarioCobranca): boolean {
 /** Valor de cada cobrança: o preço do plano no ciclo (anual = o total do ano); plano antigo usa a mensalidade gravada. */
 export function valorDaCobranca(u: UsuarioCobranca): number {
   const ciclo: BillingCycle = u.billingCycle === "annual" ? "annual" : "monthly";
-  if (isPlanId(u.plan)) return centavos(planCharge(u.plan, ciclo));
+  if (isPlanId(u.plan)) return centavos(planCharge(u.plan, ciclo, u.priceTable));
   return centavos(u.monthlyFee) * (ciclo === "annual" ? 12 : 1);
 }
 

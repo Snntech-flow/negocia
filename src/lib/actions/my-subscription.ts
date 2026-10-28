@@ -8,7 +8,7 @@ import { isPlanId, planCharge, planMonthlyEquivalent, planName, type BillingCycl
 
 export async function getMySubscriptionImpl() {
   const actor = await requireCurrentUser();
-  const [user] = await db.select({ id: users.id, plan: users.plan, status: users.subscriptionStatus, expiresAt: users.nextBillingDate, billingCycle: users.billingCycle, exemptAt: users.billingExemptAt }).from(users).where(eq(users.id, actor.id)).limit(1);
+  const [user] = await db.select({ id: users.id, plan: users.plan, status: users.subscriptionStatus, expiresAt: users.nextBillingDate, billingCycle: users.billingCycle, priceTable: users.priceTable, exemptAt: users.billingExemptAt }).from(users).where(eq(users.id, actor.id)).limit(1);
   const payments = await db.select({ id: transactions.id, amount: transactions.amount, status: transactions.status, type: transactions.type, paymentMethod: transactions.paymentMethod, description: transactions.description, createdAt: transactions.createdAt }).from(transactions).where(eq(transactions.userId, actor.id)).orderBy(desc(transactions.createdAt));
   return { user, payments };
 }
@@ -31,9 +31,9 @@ export async function requestSubscriptionRenewalImpl(chosenCycle?: string) {
       const [paid] = await tx.select({ id: transactions.id }).from(transactions).where(and(eq(transactions.userId, actor.id), eq(transactions.status, "pago"), sql`${transactions.type} like 'mensalidade\\_%'`)).limit(1);
       if (paid) throw new ActionError(`Sua assinatura é ${cycle === "annual" ? "anual" : "mensal"}: o ciclo é escolhido no primeiro pagamento.`);
       cycle = chosenCycle;
-      await tx.update(users).set({ billingCycle: cycle, monthlyFee: planMonthlyEquivalent(user.plan, cycle), updatedAt: new Date() }).where(eq(users.id, actor.id));
+      await tx.update(users).set({ billingCycle: cycle, monthlyFee: planMonthlyEquivalent(user.plan, cycle, user.priceTable), updatedAt: new Date() }).where(eq(users.id, actor.id));
     }
-    const [created] = await tx.insert(transactions).values({ userId: actor.id, amount: planCharge(user.plan, cycle), type: "mensalidade_pro", paymentMethod: "pix", status: "pendente", description: `Renovação do plano ${planName(user.plan)} (${cycle === "annual" ? "anual" : "mensal"}) — confirmação manual` }).returning({ id: transactions.id });
+    const [created] = await tx.insert(transactions).values({ userId: actor.id, amount: planCharge(user.plan, cycle, user.priceTable), type: "mensalidade_pro", paymentMethod: "pix", status: "pendente", description: `Renovação do plano ${planName(user.plan)} (${cycle === "annual" ? "anual" : "mensal"}) — confirmação manual` }).returning({ id: transactions.id });
     return created;
   });
   revalidatePath("/");

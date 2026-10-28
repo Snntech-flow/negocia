@@ -25,6 +25,8 @@ export type BillingNotice = { tone: "aviso" | "vencido"; title: string; message:
 type BillingAccount = {
   role: string; subscriptionStatus: string; nextBillingDate: Date | null; billingExemptAt: Date | null;
   plan: string; billingCycle: string; hasPaid: boolean; pendingPix: boolean;
+  /** Tabela de preços da conta (users.price_table) — quem já assinava cobra pela v1. */
+  priceTable?: string;
 };
 const TIME_ZONE = "America/Sao_Paulo";
 // Dias contados no calendário de Brasília, não no relógio do servidor.
@@ -35,10 +37,10 @@ const brasiliaDayNumber = (date: Date) => {
 const brl = (value: string) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value));
 
 // Primeira cobrança: o corretor escolhe mensal ou anual. Depois, cobra só o ciclo escolhido.
-export function billingPrice(account: Pick<BillingAccount, "plan" | "billingCycle" | "hasPaid">) {
+export function billingPrice(account: Pick<BillingAccount, "plan" | "billingCycle" | "hasPaid" | "priceTable">) {
   if (!isPlanId(account.plan)) return null;
-  const monthly = brl(planCharge(account.plan, "monthly"));
-  const annual = brl(planCharge(account.plan, "annual"));
+  const monthly = brl(planCharge(account.plan, "monthly", account.priceTable));
+  const annual = brl(planCharge(account.plan, "annual", account.priceTable));
   if (!account.hasPaid) return `mensal ${monthly} ou anual ${annual}`;
   return account.billingCycle === "annual" ? `anuidade ${annual}` : `mensalidade ${monthly}`;
 }

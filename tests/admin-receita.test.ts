@@ -23,8 +23,15 @@ test("🔴 a receber só de quem é cobrável: fora isentos, cancelados, suspens
 });
 
 test("valor de cada cobrança: plano mensal, anual (o total do ano) e plano antigo pela mensalidade gravada", () => {
+  // Plano antigo ("10" saiu da tabela em 26/10): pela mensalidade gravada; o anual é 12 × ela (antes este teste esperava o
+  // anual do "10" vigente, 11 × 59,90 — ficou vermelho desde fdae353).
   assert.equal(valorDaCobranca(base), 5990);
-  assert.equal(valorDaCobranca({ ...base, billingCycle: "annual" }), 65890);
+  assert.equal(valorDaCobranca({ ...base, billingCycle: "annual" }), 71880);
+  // Plano vigente: pela tabela DA CONTA (⚖️ Sidney 28/10/2026: quem já assinava, v1, mantém o preço).
+  assert.equal(valorDaCobranca({ ...base, plan: "12", priceTable: "v1" }), 7990);
+  assert.equal(valorDaCobranca({ ...base, plan: "12", priceTable: "v1", billingCycle: "annual" }), 87890);
+  assert.equal(valorDaCobranca({ ...base, plan: "50", priceTable: "v1" }), 19990, "o de 50 de quem já assinava segue 199,90");
+  assert.equal(valorDaCobranca({ ...base, plan: "50", priceTable: "v2" }), 22990, "o de 50 novo é 229,90");
   assert.equal(valorDaCobranca({ ...base, plan: "pro", monthlyFee: "150.00" }), 15000);
   assert.equal(valorDaCobranca({ ...base, plan: "pro", monthlyFee: "150.00", billingCycle: "annual" }), 180000);
 });

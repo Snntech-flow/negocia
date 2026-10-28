@@ -414,11 +414,11 @@ export default function LandingPage({
             </div>
           </div>
 
-          {/* Cards dos 4 Planos Individuais */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 items-stretch max-w-6xl mx-auto">
+          {/* Cards dos planos (5 desde 28/10/2026: nasceu o de 100) — 3 por linha no notebook, os 5 numa linha na tela larga */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-5 gap-6 items-stretch max-w-7xl mx-auto">
             {PLAN_IDS.map((id) => {
               const plan = PLANS[id];
-              const highlight = id === "50";
+              const highlight = id === "100";
               return (
                 <div
                   key={id}

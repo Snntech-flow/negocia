@@ -27,6 +27,8 @@ export const users = pgTable("users", {
   monthlyFee: numeric("monthly_fee", { precision: 10, scale: 2 }).default("149.00").notNull(),
   nextBillingDate: timestamp("next_billing_date"),
   billingCycle: text("billing_cycle").default("monthly").notNull(),
+  // Tabela de preços em que a conta entrou (migration 20261028190000; valores em src/lib/plans.ts): a renovação cobra por ela.
+  priceTable: text("price_table").default("v2").notNull(),
   referredBy: uuid("referred_by").references((): AnyPgColumn => users.id, { onDelete: "set null" }),
   referralRewardedAt: timestamp("referral_rewarded_at"),
   // Conta sem cobrança (sócios, cortesia): quem da equipe isentou e quando. Isenta = ativa, sem vencimento e sem mensalidade.

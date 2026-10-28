@@ -13,8 +13,8 @@ import { billingPopupSlot, type BillingNotice } from "@/lib/subscription";
 const money = (value: string) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value));
 const storageKey = (userId: string) => `negocialar-aviso-cobranca:${userId}`;
 
-export default function BillingPopup({ userId, notice, pendingPix, now, plan, hasPaid, billingCycle, onRegistered, onOpenSubscription, onMessage }: {
-  userId: string; notice: BillingNotice; pendingPix: boolean; now: Date; plan: string; hasPaid: boolean; billingCycle: string;
+export default function BillingPopup({ userId, notice, pendingPix, now, plan, priceTable, hasPaid, billingCycle, onRegistered, onOpenSubscription, onMessage }: {
+  userId: string; notice: BillingNotice; pendingPix: boolean; now: Date; plan: string; priceTable?: string; hasPaid: boolean; billingCycle: string;
   onRegistered: () => void; onOpenSubscription: () => void; onMessage: (text: string) => void;
 }) {
   const slot = billingPopupSlot(notice, pendingPix, now);
@@ -73,7 +73,7 @@ export default function BillingPopup({ userId, notice, pendingPix, now, plan, ha
         <legend className="text-xs font-bold text-slate-300">Como você quer pagar? Depois do primeiro pagamento, a cobrança segue o mesmo ciclo.</legend>
         {(["monthly", "annual"] as const).map((option) => <label key={option} className={`flex cursor-pointer items-center gap-2 rounded-lg border p-3 ${cycle === option ? "border-amber-500" : "border-slate-700"}`}>
           <input type="radio" name="billing-popup-cycle" value={option} checked={cycle === option} onChange={() => setCycle(option)} />
-          <span className="text-slate-200">{option === "annual" ? `Anual: ${money(planCharge(plan, "annual"))} (paga 11 meses e usa 12)` : `Mensal: ${money(planCharge(plan, "monthly"))} por mês`}</span>
+          <span className="text-slate-200">{option === "annual" ? `Anual: ${money(planCharge(plan, "annual", priceTable))} (paga 11 meses e usa 12)` : `Mensal: ${money(planCharge(plan, "monthly", priceTable))} por mês`}</span>
         </label>)}
       </fieldset>}
       <div className="flex flex-col gap-2 sm:flex-row-reverse">

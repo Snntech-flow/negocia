@@ -21,7 +21,7 @@ test("renovação preserva dias restantes e ajusta fim de mês e ano bissexto", 
 
 const account = (changes: Partial<Parameters<typeof billingNotice>[0]> = {}) => ({
   role: "corretor", subscriptionStatus: "ativo", nextBillingDate: new Date("2026-10-13T15:00:00Z"), billingExemptAt: null,
-  plan: "40", billingCycle: "monthly", hasPaid: true, pendingPix: false, ...changes,
+  plan: "35", billingCycle: "monthly", hasPaid: true, pendingPix: false, ...changes,
 });
 test("aviso da mensalidade no sino aparece de 3 dias antes até pagar, contando o dia de Brasília", () => {
   const now = new Date("2026-10-10T15:00:00Z");
@@ -45,13 +45,16 @@ test("primeira cobrança oferece mensal ou anual; depois cobra só o ciclo escol
   const now = new Date("2026-10-10T15:00:00Z");
   const first = billingNotice(account({ subscriptionStatus: "teste", hasPaid: false }), now)!;
   assert.equal(first.title, "Seu período grátis termina em 3 dias");
-  assert.match(first.message, /mensal R\$\s150,00 ou anual R\$\s1\.650,00/);
+  assert.match(first.message, /mensal R\$\s189,90 ou anual R\$\s2\.088,90/);
   const monthly = billingNotice(account(), now)!;
-  assert.match(monthly.message, /mensalidade R\$\s150,00\.$/);
+  assert.match(monthly.message, /mensalidade R\$\s189,90\.$/);
   assert.doesNotMatch(monthly.message, /anual/);
   const annual = billingNotice(account({ billingCycle: "annual" }), now)!;
   assert.equal(annual.title, "Sua anuidade vence em 3 dias");
-  assert.match(annual.message, /anuidade R\$\s1\.650,00\.$/);
+  assert.match(annual.message, /anuidade R\$\s2\.088,90\.$/);
+  // 🔴 Quem já assinava (tabela v1, ⚖️ Sidney 28/10/2026) vê e paga o preço de antes.
+  assert.match(billingNotice(account({ priceTable: "v1" }), now)!.message, /mensalidade R\$\s159,90\.$/);
+  assert.match(billingNotice(account({ priceTable: "v1", billingCycle: "annual" }), now)!.message, /anuidade R\$\s1\.758,90\.$/);
   assert.equal(billingNotice(account({ pendingPix: true }), now)?.title, "Pix aguardando confirmação");
 });
 

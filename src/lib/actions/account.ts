@@ -6,7 +6,7 @@ import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
 import crypto from "crypto";
 import { addFreeDays } from "../subscription";
-import { isPlanId, planMonthlyEquivalent } from "../plans";
+import { CURRENT_PRICE_TABLE, isPlanId, planMonthlyEquivalent } from "../plans";
 import { isBrazilianState } from "../brazil-states";
 import { getCurrentUserId as readCurrentUserId, requestAddress, limitRegistrationAttempts, setBrokerSession, hashPassword, verifyPassword, SESSION_COOKIE } from "../auth";
 
@@ -83,6 +83,7 @@ export async function registerUserWithPixImpl(userData: {
         billingCycle: userData.billingCycle,
         referredBy: referrer?.id || null,
         monthlyFee,
+        priceTable: CURRENT_PRICE_TABLE,
         avatarUrl: null,
       }).returning();
 
