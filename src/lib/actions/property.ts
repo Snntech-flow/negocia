@@ -4,6 +4,7 @@ import { db, properties, buyerProfiles } from "../db";
 import { revalidatePath } from "next/cache";
 import { ehCondicaoValida, percentualDoCaptador } from "../partnership-models";
 import { capaDasFotos } from "../photo-order";
+import { fotosParaGravar } from "../photo-sign";
 import { requireCurrentUser, requireActiveBroker } from "../auth";
 import type { PropertyInput } from "../property-input";
 import { validateBuyerProfileInput, validatePropertyInput } from "../input-validation";
@@ -32,6 +33,9 @@ export async function createPropertyImpl(formData: PropertyInput) {
   }
   const partnershipModels = ehCondicaoValida(formData.partnershipModels) ? formData.partnershipModels : "ambos";
   const targetBrokerId = actor.id;
+  // Foto enviada chega como caminho no bucket privado; grava o caminho (lib/photo-sign).
+  const photos = fotosParaGravar(formData.photos, actor.id);
+  const floorPlanPhotos = fotosParaGravar(formData.floorPlanPhotos, actor.id);
 
   const newProperty = await db.transaction(async (tx) => {
     await reserveListingSlot(tx, actor);
@@ -78,9 +82,9 @@ export async function createPropertyImpl(formData: PropertyInput) {
         condoAmenities: formData.condoAmenities || [],
         description: formData.description,
         videoUrl: formData.videoUrl || null,
-        coverPhoto: capaDasFotos(formData.photos), // a primeira foto é a capa
-        photos: formData.photos || [],
-        floorPlanPhotos: formData.floorPlanPhotos || [],
+        coverPhoto: capaDasFotos(photos), // a primeira foto é a capa
+        photos,
+        floorPlanPhotos,
         confidentialAddress: formData.confidentialAddress,
         ownerName: formData.ownerName,
         ownerPhone: formData.ownerPhone,

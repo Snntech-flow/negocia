@@ -9,7 +9,8 @@ import { requireActiveBroker, requireCurrentUser } from "../auth";
 import { ACTIVE_LISTING_STATUSES, listingLimit, photoLimit } from "../plans";
 import { isActiveListingStatus, reserveListingSlot } from "../listing-limit";
 import { propertyChanges, PropertyInventoryError, PROPERTY_STATUSES, validatePropertyRevision, type PropertyInput, type PropertyStatus } from "../property-input";
-import { assinarFotosDeImoveis } from "../photo-sign";
+import { assinarFotosDeImoveis, fotosParaGravar } from "../photo-sign";
+import { capaDasFotos } from "../photo-order";
 
 async function getOwnPropertiesImpl(input: { page?: number; search?: string; status?: string; id?: string } = {}) {
   const actor = await requireCurrentUser();
@@ -53,7 +54,11 @@ async function updateOwnPropertyImpl(id: string, revision: string, input: Proper
     }
     const parceria = precisaConfirmar ? { partnershipConfirmedAt: new Date(), partnershipReviewPending: false }
       : naRede ? {} : { partnershipReviewPending: false };
-    const [updated] = await tx.update(properties).set({ ...changes, ...parceria, updatedAt }).where(and(eq(properties.id, id), eq(properties.brokerId, actor.id))).returning();
+    // A edição volta com as fotos assinadas e as novas como caminho: grava o caminho (lib/photo-sign). As que já estavam
+    // no imóvel continuam aceitas mesmo que outro tenha enviado.
+    const photos = fotosParaGravar(changes.photos, actor.id, [...(current.photos ?? []), current.coverPhoto]);
+    const fotos = { photos, coverPhoto: capaDasFotos(photos), floorPlanPhotos: fotosParaGravar(changes.floorPlanPhotos, actor.id, current.floorPlanPhotos ?? []) };
+    const [updated] = await tx.update(properties).set({ ...changes, ...fotos, ...parceria, updatedAt }).where(and(eq(properties.id, id), eq(properties.brokerId, actor.id))).returning();
     return updated;
   });
   revalidatePath("/");

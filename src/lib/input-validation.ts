@@ -3,6 +3,7 @@ import { ehCondicaoValida } from "./partnership-models";
 import { isBrazilianState } from "./brazil-states";
 import { CONDITIONS, DOCUMENTATION_STATUSES, GARAGE_TYPES, IPTU_PERIODS, PURPOSES, SOLAR_POSITIONS, VIEW_TYPES } from "./property-options";
 import { mesAnoValido } from "./delivery-forecast";
+import { ehCaminhoDeFoto } from "./photo-upload";
 
 type Input = Record<string, unknown>;
 
@@ -51,7 +52,7 @@ function list(input: Input, field: string, label: string, maxItems: number, maxT
   const value = input[field];
   if (value == null) return;
   if (!Array.isArray(value) || value.length > maxItems ||
-      value.some((item) => typeof item !== "string" || item.length > maxText || (urls && !safeHttpsUrl(item)))) {
+      value.some((item) => typeof item !== "string" || item.length > maxText || (urls && !safeHttpsUrl(item) && !ehCaminhoDeFoto(item)))) {
     throw new ActionError(`${label} inválido.`);
   }
 }

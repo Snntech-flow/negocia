@@ -29,17 +29,20 @@ test("a capa é a primeira foto", () => {
   assert.equal(capaDasFotos(undefined), null);
 });
 
-test("🔴 a grade marca a 1ª como capa, oferece “Capa” nas outras e trava as setas nas pontas", () => {
+test("🔴 a grade marca a 1ª como capa, oferece “Tornar capa” nas outras e trava as setas nas pontas", () => {
   const html = renderToStaticMarkup(createElement(PhotoGrid, { fotos: [a, b, c], onChange: () => undefined }));
   const botao = (rotulo: string) => html.match(new RegExp(`<button[^>]*aria-label="${rotulo}"[^>]*>`))?.[0];
   assert.match(botao("Mover foto 1 para trás") ?? "", /disabled=""/);
   assert.match(botao("Mover foto 3 para frente") ?? "", /disabled=""/);
   assert.doesNotMatch(botao("Mover foto 1 para frente") ?? "ausente disabled=\"\"", /disabled=""/);
   assert.doesNotMatch(botao("Mover foto 3 para trás") ?? "ausente disabled=\"\"", /disabled=""/);
-  assert.equal(botao("Usar foto 1 como capa"), undefined);
-  assert.ok(botao("Usar foto 2 como capa") && botao("Usar foto 3 como capa"));
+  assert.equal(botao("Tornar a foto 1 a capa"), undefined);
+  assert.ok(botao("Tornar a foto 2 a capa") && botao("Tornar a foto 3 a capa"));
   assert.deepEqual([...html.matchAll(/<img[^>]*src="([^"]+)"/g)].map((m) => m[1]), [a, b, c]);
   assert.equal(html.match(/>Capa<\/span>/g)?.length, 1);
+  // 29/10/2026, corretora: "aparece em todas a palavra Capa" — o botão das outras dizia só "Capa" e parecia rótulo.
+  assert.equal(html.match(/>Capa</g)?.length, 1, "a palavra “Capa” sozinha só na 1ª foto");
+  assert.equal(html.match(/>Tornar capa<\/button>/g)?.length, 2);
   const plantas = renderToStaticMarkup(createElement(PhotoGrid, { fotos: [a, b], onChange: () => undefined, nome: "Planta", capa: false }));
   assert.doesNotMatch(plantas, /Capa/);
   assert.match(plantas, /aria-label="Mover planta 2 para trás"/);

@@ -240,6 +240,48 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
     } finally { for (const id of [property.id, ...cleanupExtras]) await db.delete(properties).where(eq(properties.id, id)); }
   });
 
+  await t.test("🔴 foto enviada (caminho no bucket privado) grava no cadastro e na edição; foto que outro corretor enviou, não", async () => {
+    // 29/10/2026, corretora piloto: "as fotos estão dando inválidas" — desde o bucket privado o envio devolve o caminho, e o
+    // cadastro só aceitava link https. A edição volta com a URL assinada do loader: grava o caminho, nunca o token.
+    const anterior = { url: process.env.SUPABASE_URL, key: process.env.SUPABASE_SERVICE_ROLE_KEY };
+    process.env.SUPABASE_URL = "https://projeto.supabase.co"; process.env.SUPABASE_SERVICE_ROLE_KEY = "test-only";
+    const city = `Cidade fotos ${randomUUID()}`;
+    const minha = `${otherBroker.id}/${randomUUID()}.jpg`, outraMinha = `${otherBroker.id}/${randomUUID()}.webp`;
+    const alheia = `${owner.id}/${randomUUID()}.jpg`, externa = "https://fotos.exemplo.test/fachada.jpg";
+    const assinada = (caminho: string) => `https://projeto.supabase.co/storage/v1/object/sign/imoveis/${caminho}?token=abc.def.ghi`;
+    const form = { title: "Imóvel com foto enviada", propertyType: "Apartamento", salePrice: "300000", city, neighborhood: "Centro", bedrooms: 2,
+      parkingSpots: 1, bathrooms: 1, suites: 0, areaM2: "80", description: "Imóvel de testes", condition: "usado", acceptsFinancing: true, state: "SP",
+      confidentialAddress: "Endereço fictício", ownerName: "Pessoa fictícia", ownerPhone: "11900001234", acceptsPartnership: false, purpose: "venda",
+      photos: [minha, externa], floorPlanPhotos: [outraMinha] };
+    try {
+      const criado = (await asUser(otherBroker.id, () => actions.createProperty(form))).property;
+      assert.deepEqual(criado.photos, [minha, externa]);
+      assert.equal(criado.coverPhoto, minha);
+      assert.deepEqual(criado.floorPlanPhotos, [outraMinha]);
+      await assert.rejects(asUser(otherBroker.id, () => actions.createProperty({ ...form, photos: [alheia] })), /não foi enviada por você/);
+      await assert.rejects(asUser(otherBroker.id, () => actions.createProperty({ ...form, photos: ["../outro/foto.jpg"] })), /Fotos inválido/);
+
+      const inventory = strict(await import("../src/lib/actions/property-inventory"));
+      const nova = `${otherBroker.id}/${randomUUID()}.png`;
+      const editado = (await asUser(otherBroker.id, () => inventory.updateOwnProperty(criado.id, criado.updatedAt.toISOString(),
+        { ...form, photos: [nova, assinada(minha), externa], floorPlanPhotos: [assinada(outraMinha)] }))).property;
+      assert.deepEqual(editado.photos, [nova, minha, externa], "a assinada volta a ser caminho");
+      assert.equal(editado.coverPhoto, nova);
+      assert.deepEqual(editado.floorPlanPhotos, [outraMinha]);
+      await assert.rejects(asUser(otherBroker.id, () => inventory.updateOwnProperty(criado.id, editado.updatedAt.toISOString(),
+        { ...form, photos: [assinada(alheia), minha] })), /não foi enviada por você/);
+      // a que já estava no imóvel segue aceita (foto antiga gravada por outro caminho)
+      const [comAlheia] = await db.update(properties).set({ photos: [alheia, minha] }).where(eq(properties.id, criado.id)).returning();
+      const mantido = (await asUser(otherBroker.id, () => inventory.updateOwnProperty(criado.id, comAlheia.updatedAt.toISOString(),
+        { ...form, photos: [assinada(minha), assinada(alheia)] }))).property;
+      assert.deepEqual(mantido.photos, [minha, alheia]);
+    } finally {
+      await db.delete(properties).where(eq(properties.city, city));
+      if (anterior.url === undefined) delete process.env.SUPABASE_URL; else process.env.SUPABASE_URL = anterior.url;
+      if (anterior.key === undefined) delete process.env.SUPABASE_SERVICE_ROLE_KEY; else process.env.SUPABASE_SERVICE_ROLE_KEY = anterior.key;
+    }
+  });
+
   await t.test("visualização da Administração: vê corretores, pagamentos e feedback em modo leitura — as ações seguem só do administrador e a Vitrine não se amplia", async () => {
     // Imóvel só de carteira do otherBroker: o administrador vê; quem só visualiza a Administração, não.
     const [carteira] = await db.insert(properties).values({ title: "Só na carteira (teste)", propertyType: "Apartamento", salePrice: "300000", city: "São Paulo",

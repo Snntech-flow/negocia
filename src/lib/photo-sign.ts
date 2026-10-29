@@ -5,7 +5,8 @@
 // Compatível com o legado: valores que ainda são a URL pública antiga (/object/public/...) têm o
 // caminho extraído e são reassinados; links externos (colados pelo corretor) passam direto.
 
-import { photoStorageConfig } from "./photo-upload";
+import { ActionError } from "./action-result";
+import { ehCaminhoDeFoto, photoStorageConfig } from "./photo-upload";
 
 const SIGN_TTL_SEGUNDOS = 3600; // 1 hora
 const LOTE = 100; // máx. de caminhos por chamada ao endpoint de assinatura em lote
@@ -108,4 +109,23 @@ export async function assinarFotosDeImoveis<T extends FotosDeImovel>(imoveis: T[
     coverPhoto: aplicar(im.coverPhoto),
     floorPlanPhotos: fotosDe(im.floorPlanPhotos),
   }));
+}
+
+/**
+ * O que se GRAVA das fotos que a tela manda (29/10/2026, corretora piloto: "as fotos estão dando inválidas" — desde o bucket
+ * privado o envio devolve o caminho, e o cadastro só aceitava link https). A edição volta com as URLs ASSINADAS que o loader
+ * entregou e o envio novo com o caminho: as nossas viram caminho (o token assinado nunca vai ao banco); link externo segue
+ * como está. Foto nossa que ainda não estava no imóvel tem de ter sido enviada por quem salva — ninguém põe no próprio
+ * anúncio a foto que outro corretor enviou.
+ */
+export function fotosParaGravar(valores: string[] | undefined, donoId: string, jaGravadas: Array<string | null | undefined> = []): string[] {
+  if (!Array.isArray(valores)) return [];
+  const config = photoStorageConfig();
+  const antes = new Set(jaGravadas.map((valor) => normalizarPath(valor, config)));
+  return valores.map((valor) => {
+    const caminho = normalizarPath(valor, config);
+    if (caminho === null || !ehCaminhoDeFoto(caminho)) return valor; // link externo (já validado)
+    if (!caminho.startsWith(`${donoId}/`) && !antes.has(caminho)) throw new ActionError("Uma das fotos não foi enviada por você. Envie a foto de novo pelo botão de fotos.");
+    return caminho;
+  });
 }

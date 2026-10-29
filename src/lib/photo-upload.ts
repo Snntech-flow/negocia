@@ -54,6 +54,12 @@ export function photoStorageConfig() {
 
 const EXTENSIONS: Record<PhotoType, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp" };
 
+const UUID = "[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}";
+const CAMINHO_DE_FOTO = new RegExp(`^${UUID}/${UUID}\\.(?:jpg|png|webp)$`, "i");
+
+/** O caminho que storePhoto grava (`<corretor>/<uuid>.<ext>`): o cadastro aceita isto além do link https colado. */
+export const ehCaminhoDeFoto = (valor: string) => CAMINHO_DE_FOTO.test(valor);
+
 export async function storePhoto(bytes: Uint8Array, type: PhotoType, userId: string, config: NonNullable<ReturnType<typeof photoStorageConfig>>, fetcher: typeof fetch = fetch) {
   const path = `${userId}/${crypto.randomUUID()}.${EXTENSIONS[type]}`;
   const response = await fetcher(`${config.origin}/storage/v1/object/${config.bucket}/${path}`, {
