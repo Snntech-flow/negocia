@@ -214,30 +214,33 @@ export default function AppShellClient({ currentUser, initialNotifications, prop
                 <Bell className="w-4 h-4 text-slate-400" />
                 {bellCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-black min-w-4 h-4 px-1 rounded-full flex items-center justify-center">{bellCount}</span>}
               </button>
+              {/* Notificações em LARANJA, texto azul-marinho (28/10/2026, Sidney: "o branco está muito fraco; notificação tem que
+                  chamar mais a atenção e ser melhor para ler"). Cores fixas: o tema do cabeçalho repinta as classes slate e amber.
+                  Não lida: laranja forte, faixa marinho e bolinha; lida: laranja claro, sem transparência. */}
               {isNotificationsOpen && (
-                <div className="absolute right-0 mt-3 w-[calc(100vw-2rem)] max-w-96 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95">
-                  <div className="p-3.5 bg-slate-950 border-b border-slate-800 flex items-center justify-between">
-                    <div className="flex items-center gap-2"><Bell className="w-4 h-4 text-amber-400" /><span className="text-xs font-bold text-white">Notificações ({notifications.length + (billingAlert ? 1 : 0)})</span></div>
-                    {unreadCount > 0 && <button type="button" onClick={() => void handleMarkAllRead()} className="text-[10px] text-amber-400 hover:underline">Marcar todas como lidas</button>}
+                <div data-painel-notificacoes="" className="absolute right-0 mt-3 w-[calc(100vw-2rem)] max-w-96 rounded-2xl border-2 border-[#d97706] bg-[#f59e0b] text-[#083858] shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95">
+                  <div className="p-3.5 border-b-2 border-[#083858]/20 flex items-center justify-between">
+                    <div className="flex items-center gap-2"><Bell className="w-4 h-4 text-[#083858]" /><span className="text-sm font-bold text-[#083858]">Notificações ({notifications.length + (billingAlert ? 1 : 0)})</span></div>
+                    {unreadCount > 0 && <button type="button" onClick={() => void handleMarkAllRead()} className="text-[11px] font-bold text-[#083858] underline hover:no-underline">Marcar todas como lidas</button>}
                   </div>
-                  <div className="max-h-80 overflow-y-auto divide-y divide-slate-800/60">
+                  <div className="max-h-80 overflow-y-auto divide-y divide-[#083858]/15">
                     {billingAlert && (
-                      <div role="status" className={`p-3.5 space-y-1.5 border-l-2 ${billingAlert.tone === "vencido" ? "border-red-500 bg-red-950/30" : "border-amber-500 bg-amber-950/20"}`}>
-                        <span className="text-xs font-bold text-white flex items-center gap-1.5"><CreditCard className={`w-3.5 h-3.5 ${billingAlert.tone === "vencido" ? "text-red-400" : "text-amber-400"}`} aria-hidden="true" />{billingAlert.title}</span>
-                        <p className="text-xs text-slate-300 leading-relaxed">{billingAlert.message}</p>
-                        <button type="button" onClick={() => { setIsNotificationsOpen(false); setIsSubscriptionOpen(true); }} className="text-[11px] font-bold text-amber-400 hover:underline">Abrir Minha assinatura</button>
+                      <div role="status" className={`p-3.5 space-y-1.5 border-l-4 ${billingAlert.tone === "vencido" ? "border-[#b91c1c] bg-[#fecaca]" : "border-[#083858] bg-[#f59e0b]"}`}>
+                        <span className="text-sm font-bold text-[#083858] flex items-center gap-1.5"><CreditCard className={`w-4 h-4 ${billingAlert.tone === "vencido" ? "text-[#b91c1c]" : "text-[#083858]"}`} aria-hidden="true" />{billingAlert.title}</span>
+                        <p className="text-[13px] font-medium text-[#083858] leading-relaxed">{billingAlert.message}</p>
+                        <button type="button" onClick={() => { setIsNotificationsOpen(false); setIsSubscriptionOpen(true); }} className="text-xs font-bold text-[#083858] underline hover:no-underline">Abrir Minha assinatura</button>
                       </div>
                     )}
-                    {notifications.length === 0 ? (billingAlert ? null : <div className="p-6 text-center text-xs text-slate-500">Nenhuma notificação no momento.</div>) : (
+                    {notifications.length === 0 ? (billingAlert ? null : <div className="p-6 text-center text-[13px] font-medium text-[#083858]">Nenhuma notificação no momento.</div>) : (
                       notifications.map((notif) => (
                         <button type="button" key={notif.id} onClick={() => void handleNotificationClick(notif)}
-                          className={`block w-full text-left p-3.5 space-y-1.5 transition cursor-pointer hover:bg-slate-800/50 ${notif.read ? "bg-slate-900/60 opacity-75" : "bg-amber-950/20 border-l-2 border-amber-500"}`}>
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-bold text-white flex items-center gap-1.5">{!notif.read && <span className="w-1.5 h-1.5 rounded-full bg-amber-400"></span>}{notif.title}</span>
-                            <span className="text-[10px] text-slate-400 font-mono">{notif.createdAt ? new Date(notif.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "Hoje"}</span>
+                          className={`block w-full text-left p-3.5 space-y-1.5 transition cursor-pointer ${notif.read ? "bg-[#fcd34d] hover:bg-[#fde68a]" : "bg-[#f59e0b] border-l-4 border-[#083858] hover:bg-[#fbbf24]"}`}>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-sm font-bold text-[#083858] flex items-center gap-1.5">{!notif.read && <span className="w-2 h-2 shrink-0 rounded-full bg-[#083858]"></span>}{notif.title}</span>
+                            <span className="shrink-0 text-[11px] font-semibold text-[#083858] font-mono">{notif.createdAt ? new Date(notif.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "Hoje"}</span>
                           </div>
-                          <p className="text-xs text-slate-300 leading-relaxed">{notif.message}</p>
-                          {notif.propertyId && <div className="pt-1"><span className="text-[11px] font-bold text-amber-400 hover:text-amber-300 flex items-center gap-1"><span>Ver imóvel e ficha para o cliente</span><ArrowRight className="w-3 h-3" /></span></div>}
+                          <p className="text-[13px] font-medium text-[#083858] leading-relaxed">{notif.message}</p>
+                          {notif.propertyId && <div className="pt-1"><span className="text-xs font-bold text-[#083858] underline flex items-center gap-1"><span>Ver imóvel e ficha para o cliente</span><ArrowRight className="w-3.5 h-3.5" /></span></div>}
                         </button>
                       ))
                     )}
