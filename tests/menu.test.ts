@@ -34,3 +34,20 @@ test("🔴 sem o menu Atendimento: o endereço antigo cai no CRM já no Funil", 
   const crm = readFileSync(new URL("../src/app/(app)/crm/page.tsx", import.meta.url), "utf8");
   assert.match(crm, /initialView=\{visao === "funil" \? "pipeline" : "overview"\}/);
 });
+
+// 28/10/2026, Sidney: "esse Editar, Disponível e Arquivar pode se manter alinhado aos outros" — no imóvel de título comprido
+// os botões desciam para a linha de baixo (flex-wrap) e saíam do alinhamento dos outros cartões.
+test("🔴 em Meus imóveis os botões ficam à direita em todo cartão; o título comprido quebra linha", () => {
+  const inventario = readFileSync(new URL("../src/components/PropertyInventory.tsx", import.meta.url), "utf8");
+  assert.match(inventario, /<article key=\{property\.id\} className="flex flex-col gap-3 [^"]*sm:flex-row sm:items-center sm:justify-between">/);
+  assert.match(inventario, /<div className="min-w-0 flex-1"><h3 className="font-bold text-slate-900">\{property\.title\}<\/h3>/);
+  assert.match(inventario, /<div className="flex shrink-0 flex-wrap items-center gap-2 sm:flex-nowrap"><button disabled=\{busy\} type="button" onClick=\{\(\) => \{ setEditing\(property\);/);
+});
+
+test("🔴 o seletor da situação em Meus imóveis abraça a opção escolhida, sem a largura de 'Em negociação'", () => {
+  const inventario = readFileSync(new URL("../src/components/PropertyInventory.tsx", import.meta.url), "utf8");
+  const inicio = inventario.indexOf("aria-label={`Status: ${property.title}`}");
+  assert.ok(inicio > 0, "achei o seletor da situação");
+  const seletor = inventario.slice(inicio, inventario.indexOf("{PROPERTY_STATUSES.map(value =>", inicio));
+  assert.match(seletor, /className="rounded-lg border border-slate-300 py-2 pl-2\.5 pr-1\.5 text-sm \[field-sizing:content\]">$/);
+});
