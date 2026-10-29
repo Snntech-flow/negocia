@@ -8,7 +8,7 @@ import { db, properties, users } from "@/lib/db";
 import { verifyListingShare } from "@/lib/listing-share";
 import { signPhotos } from "@/lib/photo-sign";
 import { fotosComCapaNaFrente } from "@/lib/photo-order";
-import { descricaoSemContato } from "@/lib/descricao-sem-contato";
+import { descricaoParaOCliente } from "@/lib/descricao-para-o-cliente";
 import { whiteLabelContact, formatArea, type SharingBroker } from "@/lib/white-label";
 import Avatar from "@/components/Avatar";
 import FichaFotos from "@/components/FichaFotos";
@@ -58,7 +58,7 @@ export default async function FichaPublicaPage({ params }: { params: Promise<{ t
   const ordem = fotosComCapaNaFrente(prop.photos || [], prop.coverPhoto);
   const assinadas = await signPhotos(ordem);
   const fotos = ordem.map((f) => assinadas.get(f.trim())).filter((u): u is string => !!u);
-  const descricao = descricaoSemContato(prop.description);
+  const descricao = descricaoParaOCliente(prop.description);
   const sharingBroker: SharingBroker = { name: broker.name || "", creci: broker.creci || "", whatsapp: broker.whatsapp || "", avatar: broker.avatarUrl || "" };
   const contato = whiteLabelContact({ ...prop, coverPhoto: fotos[0] ?? null }, sharingBroker);
 

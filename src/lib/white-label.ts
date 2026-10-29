@@ -1,4 +1,4 @@
-import { descricaoSemContato } from "./descricao-sem-contato";
+import { descricaoParaOCliente } from "./descricao-para-o-cliente";
 
 type Listing = { title: string; city: string; neighborhood: string; salePrice: string; propertyType: string; bedrooms: number; bathrooms: number; parkingSpots: number; areaM2: string; coverPhoto?: string | null; photos: string[] ; description?: string | null };
 export type SharingBroker = { name: string; creci: string; whatsapp: string; avatar: string };
@@ -21,7 +21,7 @@ export function whiteLabelText(property: Listing, broker: SharingBroker) {
   return [property.title, `${property.neighborhood}, ${property.city}`, `${property.propertyType} · ${money(property.salePrice)}`,
     `${features(property)} · ${formatArea(property.areaM2)} m²`,
     // A descrição (28/10/2026), sem o contato direto do captador — a ficha é do corretor que compartilha.
-    ...(descricaoSemContato(property.description) ? ["", descricaoSemContato(property.description), ""] : []),
+    ...(descricaoParaOCliente(property.description) ? ["", descricaoParaOCliente(property.description), ""] : []),
     `Atendimento: ${broker.name} · CRECI ${broker.creci}`, ...(contact ? [contact] : [])].join("\n");
 }
 
@@ -38,7 +38,7 @@ export function whiteLabelHtml(property: Listing, broker: SharingBroker) {
     </head><body><header><strong>${escapeHtml(broker.name)}</strong><p>CRECI ${escapeHtml(broker.creci)}</p></header>${image}
     <h1>${escapeHtml(property.title)}</h1><p>${escapeHtml(property.neighborhood)}, ${escapeHtml(property.city)}</p><p class="price">${escapeHtml(money(property.salePrice))}</p>
     <p>${escapeHtml(property.propertyType)} · ${features(property)} · ${escapeHtml(formatArea(property.areaM2))} m²</p>
-    ${descricaoSemContato(property.description) ? `<p style="white-space:pre-line">${escapeHtml(descricaoSemContato(property.description))}</p>` : ""}
+    ${descricaoParaOCliente(property.description) ? `<p style="white-space:pre-line">${escapeHtml(descricaoParaOCliente(property.description))}</p>` : ""}
     ${contact ? `<p>Fale com ${escapeHtml(broker.name)}: <a href="${escapeHtml(contact)}">${escapeHtml(broker.whatsapp)}</a></p>` : ""}
     <p>Disponibilidade e condições devem ser confirmadas com o corretor.</p></body></html>`;
 }
