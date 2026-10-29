@@ -1,6 +1,6 @@
 "use client";
 
-// Wrapper client do CRM (Minha carteira e Funil de atendimento são o mesmo LeadCRM, com initialView diferente).
+// Wrapper client do CRM (Minha carteira). Abre na Visão geral ou, por /crm?visao=funil (e pelo antigo /atendimento), no Funil.
 // Dá os callbacks de navegação por rota que o monólito dava por setActiveTab.
 import type { ComponentProps } from "react";
 import { useRouter } from "next/navigation";

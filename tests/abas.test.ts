@@ -54,3 +54,14 @@ test("🔴 laranja só na tela atual: o menu aberto de outra seção não é pin
   const app = readFileSync(new URL("../src/components/app-shell/AppShellClient.tsx", import.meta.url), "utf8");
   assert.match(app, /data-ativa=\{activeTab && menu\.active\.includes\(activeTab\) \? "" : undefined\}/, "o menu da seção atual é marcado");
 });
+
+// 28/10/2026, Sidney: "a aba CRM tem o funil e o Atendimento tem o mesmo funil, então o módulo de Atendimento não se faz
+// necessário". Era a mesma tela do CRM aberta na aba Funil; o endereço antigo leva ao CRM já no Funil.
+test("🔴 sem o menu Atendimento: o endereço antigo cai no CRM já no Funil", () => {
+  const app = readFileSync(new URL("../src/components/app-shell/AppShellClient.tsx", import.meta.url), "utf8");
+  assert.doesNotMatch(app, /title: "Atendimento"|"atendimento"/, "nenhum menu, aba ou rótulo de Atendimento");
+  const antiga = readFileSync(new URL("../src/app/(app)/atendimento/page.tsx", import.meta.url), "utf8");
+  assert.match(antiga, /redirect\("\/crm\?visao=funil"\)/);
+  const crm = readFileSync(new URL("../src/app/(app)/crm/page.tsx", import.meta.url), "utf8");
+  assert.match(crm, /initialView=\{visao === "funil" \? "pipeline" : "overview"\}/);
+});

@@ -2,7 +2,6 @@
 import { Info } from "lucide-react";
 
 export const SCREEN_GUIDANCE: Record<string, { title: string; description: string }> = {
-  atendimento: { title: "Atendimento aos clientes", description: "Acompanhe o funil de atendimento e as próximas ações de cada cliente." },
   vitrine: { title: "Vitrine de imóveis compartilhados (MLS)", description: "MLS é uma rede em que corretores compartilham imóveis e oportunidades. Consulte as condições com o captador; o endereço completo e os dados do proprietário ficam restritos a ele. Para mudar fotos, valor ou condição de parceria de um imóvel SEU, use o botão “Editar em Meus imóveis” no cartão dele (ou o menu Imóveis › Meus imóveis)." },
   crm: { title: "CRM interno do corretor", description: "Organize clientes e parceiros, acompanhe cada oportunidade por etapa, registre contatos e programe retornos. Os leads ficam privados na sua carteira." },
   radar: { title: "Radar de Compradores", description: "Compare as preferências de compradores cadastrados com os imóveis disponíveis. Confira os critérios do match antes de falar com o corretor responsável." },

@@ -25,10 +25,10 @@ import type { WorkspaceNotification, WorkspaceSessionUser } from "@/lib/workspac
 
 const SubscriptionPanel = dynamic(() => import("@/components/SubscriptionPanel"));
 
-export type WorkspaceTab = "vitrine" | "crm" | "radar" | "atendimento" | "cadastrar" | "termo" | "dvp" | "financeiro" | "admin";
+export type WorkspaceTab = "vitrine" | "crm" | "radar" | "cadastrar" | "termo" | "dvp" | "financeiro" | "admin";
 
 const TAB_LABELS: Record<WorkspaceTab, string> = { vitrine: "Vitrine", crm: "Minha carteira", radar: "Radar de Compradores",
-  atendimento: "Funil de atendimento", cadastrar: "Meus imóveis", termo: "Termo de Parceria", dvp: "Registro de Visita",
+  cadastrar: "Meus imóveis", termo: "Termo de Parceria", dvp: "Registro de Visita",
   financeiro: "Receitas e despesas", admin: "Corretores e pagamentos" };
 
 const href = (tab: WorkspaceTab) => `/${tab}`;
@@ -58,7 +58,7 @@ export default function AppShellClient({ currentUser, initialNotifications, prop
   const pathname = usePathname();
   const router = useRouter();
   const veAdmin = currentUser.role === "admin" || currentUser.adminViewAccess === true;
-  const abasPermitidas = useMemo<WorkspaceTab[]>(() => ["vitrine", "crm", "radar", "atendimento", "cadastrar", "termo", "dvp", "financeiro", ...(veAdmin ? ["admin" as const] : [])], [veAdmin]);
+  const abasPermitidas = useMemo<WorkspaceTab[]>(() => ["vitrine", "crm", "radar", "cadastrar", "termo", "dvp", "financeiro", ...(veAdmin ? ["admin" as const] : [])], [veAdmin]);
 
   // Aba ativa = primeira parte do caminho (/vitrine → vitrine); fora das telas conhecidas, nenhuma fica marcada.
   const activeTab = useMemo<WorkspaceTab | null>(() => {
@@ -180,9 +180,10 @@ export default function AppShellClient({ currentUser, initialNotifications, prop
   const bellCount = unreadCount + (billingAlert ? 1 : 0);
   const blockedReason = blockedReasonFor(currentUser);
 
+  // Sem o menu "Atendimento" (28/10/2026, Sidney: "o CRM tem o funil e o Atendimento tem o mesmo funil"): era a mesma tela do
+  // CRM aberta na aba Funil. O endereço /atendimento leva ao CRM já no Funil.
   const navMenus: { title: string; active: WorkspaceTab[]; items: { id: WorkspaceTab; label: string; icon: typeof Users }[] }[] = [
     { title: "CRM", active: ["crm", "radar"], items: [{ id: "crm", label: "Minha carteira", icon: Users }, { id: "radar", label: "Radar de Compradores", icon: Radar }] },
-    { title: "Atendimento", active: ["atendimento"], items: [{ id: "atendimento", label: "Funil de atendimento", icon: Users }] },
     { title: "Documentos", active: ["termo", "dvp"], items: [{ id: "termo", label: "Termo de Parceria", icon: FileText }, { id: "dvp", label: "Registro de Visita", icon: Stamp }] },
     { title: "Imóveis", active: ["cadastrar"], items: [{ id: "cadastrar", label: "Meus imóveis", icon: PlusCircle }] },
     { title: "Financeiro", active: ["financeiro"], items: [{ id: "financeiro", label: "Receitas e despesas", icon: Wallet }] },

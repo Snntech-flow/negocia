@@ -1,4 +1,4 @@
-// Rota /crm (Minha carteira): LeadCRM na visão "overview".
+// Rota /crm (Minha carteira): LeadCRM na visão "overview"; com ?visao=funil (o antigo /atendimento), já no Funil.
 import { redirect } from "next/navigation";
 import { getMarketplaceData } from "@/lib/queries/marketplace";
 import { blockedReasonFor } from "@/lib/workspace-access";
@@ -7,7 +7,8 @@ import LeadCRMRouteClient from "@/components/app-shell/LeadCRMRouteClient";
 
 export const dynamic = "force-dynamic";
 
-export default async function CrmPage() {
+export default async function CrmPage({ searchParams }: { searchParams: Promise<{ visao?: string }> }) {
+  const { visao } = await searchParams;
   const data = await getMarketplaceData({ section: "crm" });
   const user = data.currentUser;
   if (!user) redirect("/");
@@ -15,7 +16,7 @@ export default async function CrmPage() {
   return (
     <>
       <ScreenGuidance screen="crm" />
-      <LeadCRMRouteClient initialView="overview" initialLeads={data.leads} initialActivities={data.leadActivities}
+      <LeadCRMRouteClient initialView={visao === "funil" ? "pipeline" : "overview"} initialLeads={data.leads} initialActivities={data.leadActivities}
         properties={properties} currentUserId={user.id} currentUserState={user.state ?? null} blockedReason={blockedReasonFor(user)} />
     </>
   );

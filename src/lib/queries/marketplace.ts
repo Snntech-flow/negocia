@@ -22,7 +22,7 @@ const partnershipPartner = alias(users, "partnership_partner");
 export async function loadWorkspaceContext(input: MarketplaceQuery = {}) {
   const { section, page, search, purpose, propertyType } = validateMarketplaceQuery(input);
   const includes = (...sections: WorkspaceSection[]) => section === "full" || sections.includes(section);
-  const includeProperties = includes("vitrine", "radar", "crm", "atendimento", "dvp");
+  const includeProperties = includes("vitrine", "radar", "crm", "dvp");
   const includePropertyCount = includeProperties || includes("cadastrar");
   const includePartnerships = includes("dvp", "termo");
   const currentUserId = await getCurrentUserId();
@@ -317,7 +317,7 @@ export async function getMarketplaceData(input: MarketplaceQuery = {}) {
       .limit(200)
       : [];
 
-    const leadListQuery = includes("crm", "atendimento") ? db
+    const leadListQuery = includes("crm") ? db
       .select({
         id: leads.id,
         fullName: leads.fullName,
@@ -345,7 +345,7 @@ export async function getMarketplaceData(input: MarketplaceQuery = {}) {
       .orderBy(desc(leads.updatedAt))
       : [];
 
-    const leadActivityListQuery = includes("crm", "atendimento") ? db
+    const leadActivityListQuery = includes("crm") ? db
       .select({
         id: leadActivities.id,
         leadId: leadActivities.leadId,
