@@ -204,10 +204,11 @@ export default function DvpRouteClient({ currentBroker, currentUserId, blockedRe
       <div>
         <h2 className="text-xl font-bold text-white flex items-center gap-2"><Stamp className="w-5 h-5 text-emerald-400" />Registrar uma visita</h2>
         <p className="text-sm text-slate-400">Este registro interno ainda não é um contrato e não tem assinatura eletrônica.</p>
-        <ol className="mt-4 grid gap-2 rounded-xl border border-sky-500/20 bg-sky-950/20 p-4 text-xs text-slate-300 sm:grid-cols-3">
-          <li><strong className="text-sky-900">1. Escolha o imóvel</strong><br />Na Vitrine, abra um imóvel de outro corretor que aceite parceria e clique em “Agendar visita”.</li>
-          <li><strong className="text-sky-900">2. Preencha os dados</strong><br />Informe o cliente, CPF parcialmente oculto e data da visita. Depois clique em “Registrar visita em rascunho”.</li>
-          <li><strong className="text-sky-900">3. Acompanhe aqui</strong><br />O registro de visita e a parceria aparecem nesta tela para consulta e acompanhamento.</li>
+        {/* Cada passo no seu quadro (28/10/2026, Sidney: "o 1, 2 e 3 poderiam ser quadrados separados"). */}
+        <ol className="mt-4 grid gap-3 text-xs text-slate-300 sm:grid-cols-3">
+          <li className="rounded-xl border border-sky-500/20 bg-sky-950/20 p-4"><strong className="text-sky-900">1. Escolha o imóvel</strong><br />Na Vitrine, abra um imóvel de outro corretor que aceite parceria e clique em “Agendar visita”.</li>
+          <li className="rounded-xl border border-sky-500/20 bg-sky-950/20 p-4"><strong className="text-sky-900">2. Preencha os dados</strong><br />Informe o cliente, CPF parcialmente oculto e data da visita. Depois clique em “Registrar visita em rascunho”.</li>
+          <li className="rounded-xl border border-sky-500/20 bg-sky-950/20 p-4"><strong className="text-sky-900">3. Acompanhe aqui</strong><br />O registro de visita e a parceria aparecem nesta tela para consulta e acompanhamento.</li>
         </ol>
       </div>
 
@@ -299,7 +300,7 @@ export default function DvpRouteClient({ currentBroker, currentUserId, blockedRe
               const transitions: Record<string, string[]> = { proposta: ["visita_agendada", "recusado"], visita_agendada: ["em_negociacao", "recusado"], em_negociacao: ["fechado", "recusado"] };
               const nextStatuses = transitions[partnership.status] || [];
               const history = partnershipActivityList.filter((activity) => activity.partnershipId === partnership.id);
-              return <article key={partnership.id} className="rounded-xl border border-slate-800 bg-slate-950 p-4">
+              return <article key={partnership.id} id={`parceria-${partnership.id}`} className="scroll-mt-28 rounded-xl border border-slate-800 bg-slate-950 p-4 target:border-amber-500 target:ring-2 target:ring-amber-500/40">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div className="min-w-0"><h4 className="truncate text-sm font-bold text-white">{partnership.propertyTitle}</h4><p className="mt-1 text-xs text-slate-400">Captador: {partnership.captorName} · Parceiro: {partnership.partnerName}</p><p className="mt-1 text-[11px] text-slate-500">Visita: {partnership.visitScheduledDate ? new Date(partnership.visitScheduledDate).toLocaleString("pt-BR") : "não agendada"} · divisão {partnership.commissionModel === "three_party_referral_40_40_20" ? "40/40/20" : "50/50"} · versão {partnership.commissionRevision}</p></div>
                   <span className="rounded-full border border-sky-500/25 bg-sky-500/10 px-2.5 py-1 text-[10px] font-bold text-sky-200">{labels[partnership.status] || partnership.status}</span>

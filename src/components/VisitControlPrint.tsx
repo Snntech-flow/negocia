@@ -92,8 +92,10 @@ export default function VisitControlPrint({ dvpId }: { dvpId: string }) {
   return (
     <div className="space-y-2 rounded-lg border border-slate-700 p-3">
       <p className="text-[11px] text-slate-400">Sai preenchido com você, seu CRECI, o imóvel (bairro, cidade e código — o endereço protegido não sai), o nome do cliente e a data da visita. O cliente completa CPF, endereços e assina no papel.</p>
+      {/* 28/10/2026, Sidney: "como assim, comissão se comprar por fora?" — o rótulo era jargão; a frase diz o que a declaração diz. */}
+      <p className="text-[11px] text-slate-300">Na declaração, o cliente diz que conheceu o imóvel por você e se compromete a pagar esta comissão, sobre o valor do imóvel, se comprar sem você (direto com o dono ou por outro corretor).</p>
       <div className="flex flex-wrap items-end gap-2">
-        <label className="text-[11px] text-slate-300">Comissão se comprar por fora (%)
+        <label className="text-[11px] text-slate-300">Comissão da declaração (%)
           <input type="text" inputMode="decimal" value={digitado} onChange={(e) => { setDigitado(e.target.value); setMensagem(""); }} placeholder="Ex.: 2,5"
             className="mt-1 block w-24 rounded-lg border border-slate-700 bg-slate-900 p-1.5 text-sm text-white" />
         </label>

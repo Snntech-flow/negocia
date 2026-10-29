@@ -2,6 +2,7 @@
 // Termo de Parceria de cada parceria: o corretor lê o texto gerado com os dados da parceria, aceita, acompanha o aceite do
 // outro e imprime / salva em PDF. O servidor confere o texto aceito (impressão sha-256) e grava data, hora e IP.
 import { useCallback, useEffect, useState } from "react";
+import Link from "next/link";
 import { CheckCircle2, Clock, Printer, Scale } from "lucide-react";
 import { acceptPartnershipTerm, listMyPartnershipTerms, type TermoDaParceria } from "@/lib/actions/partnership-terms";
 import { unwrap } from "@/lib/action-result";
@@ -139,14 +140,19 @@ export default function PartnershipTerms() {
         </ul>
       )}
 
+      {/* "Divisão a confirmar" é a situação, não um botão (28/10/2026, Sidney: "estou clicando e nada acontece"): a ação mora
+          aqui embaixo — leva ao acompanhamento DESTA parceria no Registro de Visita, onde a divisão é confirmada. */}
       {item && !termo && (
-        <p className="rounded-xl border border-slate-700 p-4 text-sm text-slate-300">
-          {item.status === "recusado"
-            ? "Esta parceria foi recusada; não há termo."
-            : item.divisao === "nao_registrada"
-              ? "Esta parceria não tem divisão da comissão registrada. Revise a divisão em Documentos › Registro de Visita, no acompanhamento da parceria; com os dois de acordo, o termo aparece aqui."
-              : "O termo sai quando os dois corretores confirmam a divisão da comissão (Documentos › Registro de Visita, no acompanhamento da parceria)."}
-        </p>
+        <div className="space-y-3 rounded-xl border border-slate-700 p-4">
+          <p className="text-sm text-slate-300">
+            {item.status === "recusado"
+              ? "Esta parceria foi recusada; não há termo."
+              : item.divisao === "nao_registrada"
+                ? "Esta parceria não tem divisão da comissão registrada. Revise a divisão em Documentos › Registro de Visita, no acompanhamento da parceria; com os dois de acordo, o termo aparece aqui."
+                : "O termo sai quando os dois corretores confirmam a divisão da comissão (Documentos › Registro de Visita, no acompanhamento da parceria)."}
+          </p>
+          {item.status !== "recusado" && <Link href={`/dvp#parceria-${item.id}`} className="inline-flex rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold text-slate-950">Ver e confirmar a divisão da comissão</Link>}
+        </div>
       )}
 
       {item && termo && (
