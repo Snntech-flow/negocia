@@ -1,8 +1,8 @@
 "use client";
 
-// Botão "Match" do cabeçalho (28/10/2026). Vermelho com o número quando há match que o corretor ainda não viu (contado no
+// Botão "Match" do cabeçalho (28/10/2026). Laranja com o número quando há match que o corretor ainda não viu (contado no
 // servidor, no layout). Ao abrir: carrega a lista, mostra "você já tem N matches" e marca os novos como vistos — o
-// vermelho apaga, e os que chegaram agora seguem com o selo NOVO até fechar o painel.
+// laranja apaga, e os que chegaram agora seguem com o selo NOVO até fechar o painel.
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { getMyMatches, markMatchesSeen } from "@/lib/actions";
@@ -33,7 +33,7 @@ export default function BotaoMatch({ novosIniciais }: { novosIniciais: number })
       const dados = unwrap(await getMyMatches());
       setEstado({ tipo: "pronto", ...dados });
       const chavesNovas = dados.matches.filter((match) => match.novo).map((match) => match.chave);
-      // Se marcar como visto falhar, a lista continua na tela e o vermelho fica para a próxima vez.
+      // Se marcar como visto falhar, a lista continua na tela e o laranja fica para a próxima vez.
       if (!chavesNovas.length || (await markMatchesSeen(chavesNovas)).ok) setNovos(0);
     } catch (error) {
       setEstado({ tipo: "erro", mensagem: error instanceof Error ? error.message : "Não foi possível carregar os matches." });

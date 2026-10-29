@@ -54,7 +54,7 @@ export default function AppShellClient({ currentUser, initialNotifications, prop
   currentUser: WorkspaceSessionUser;
   initialNotifications: WorkspaceNotification[];
   propertyTotal: number;
-  /** Matches que o corretor ainda não viu (contados no layout): o botão "Match" fica vermelho com esse número. */
+  /** Matches que o corretor ainda não viu (contados no layout): o botão "Match" fica laranja com esse número. */
   novosMatches: number;
   children: React.ReactNode;
 }) {

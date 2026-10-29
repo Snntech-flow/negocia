@@ -10,7 +10,7 @@ export const dynamic = "force-dynamic";
 export default async function AppLayout({ children }: { children: React.ReactNode }) {
   const data = await getMarketplaceData({ section: "vitrine" });
   if (!data.currentUser) redirect("/");
-  // Botão "Match" (28/10/2026): quantos matches o corretor ainda não viu. Se a conta falhar, o botão só não fica vermelho.
+  // Botão "Match" (28/10/2026): quantos matches o corretor ainda não viu. Se a conta falhar, o botão só não fica laranja.
   const novosMatches = await carregarMeusMatches(data.currentUser, { comFotos: false })
     .then(({ matches }) => matches.filter((match) => match.novo).length)
     .catch((error) => { console.warn("Match: não foi possível contar os novos:", error instanceof Error ? error.constructor.name : typeof error); return 0; });

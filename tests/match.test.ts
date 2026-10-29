@@ -54,13 +54,15 @@ test("a frase de cima: 'Você já tem 8 matches', '1 match' e zero sem número i
   assert.equal(frasePrincipalDoMatch(0), "Você ainda não tem match");
 });
 
-test("🔴 o botão fica vermelho com o número quando há match novo; sem novo, fica azul", () => {
-  const vermelho = renderToStaticMarkup(createElement(BotaoDoMatch, { novos: 3, aberto: false, onClick: () => {} }));
-  assert.match(vermelho, /bg-\[#dc2626\]/);
-  assert.match(vermelho, />3<\/span>/);
-  assert.match(vermelho, /aria-label="Match: 3 novos"/);
+// Laranja, não vermelho (Sidney, 28/10/2026: "tem como pôr o laranja ao invés do vermelho?").
+test("🔴 o botão fica laranja com o número quando há match novo; sem novo, fica azul", () => {
+  const laranja = renderToStaticMarkup(createElement(BotaoDoMatch, { novos: 3, aberto: false, onClick: () => {} }));
+  assert.match(laranja, /bg-\[#f59e0b\] text-\[#083858\]/);
+  assert.doesNotMatch(laranja, /#dc2626|#b91c1c/, "nada de vermelho no botão");
+  assert.match(laranja, />3<\/span>/);
+  assert.match(laranja, /aria-label="Match: 3 novos"/);
   const azul = renderToStaticMarkup(createElement(BotaoDoMatch, { novos: 0, aberto: false, onClick: () => {} }));
-  assert.doesNotMatch(azul, /#dc2626/);
+  assert.doesNotMatch(azul, /#f59e0b/);
 });
 
 test("🔴 o painel abre com 'Você já tem N matches', o selo NOVO e, sem match, o caminho para o primeiro", () => {
