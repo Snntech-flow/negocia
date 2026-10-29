@@ -23,10 +23,13 @@ test("abas guardadas (recarregar a página): só as permitidas, sem repetir, Vit
   assert.deepEqual(abasGuardadas(null, permitidas, "vitrine"), ["vitrine"]);
 });
 
-test("🔴 a barra de abas existe no app, com X em cada aba que não é a Vitrine", () => {
-  const app = readFileSync(new URL("../src/components/NegociaLarApp.tsx", import.meta.url), "utf8");
+// 28/10/2026: lia o NegociaLarApp.tsx, aposentado em 26/10 (0c33834) — o teste dava ENOENT e não conferia mais nada. A barra
+// mora no AppShellClient; cada aba é uma ROTA (a ativa vem da URL), então o pushState próprio da aba saiu.
+test("🔴 a barra de abas existe no app, com X em cada aba que não é a Vitrine, e cada aba é uma rota", () => {
+  const app = readFileSync(new URL("../src/components/app-shell/AppShellClient.tsx", import.meta.url), "utf8");
   assert.match(app, /role="tablist" aria-label="Telas abertas"/);
   assert.match(app, /aria-label=\{`Fechar a aba \$\{TAB_LABELS\[aba\]\}`\}/);
   assert.match(app, /aba !== "vitrine" && <button/);
-  assert.match(app, /window\.history\.pushState\(\{ negocialarAba: tab \}/);
+  assert.match(app, /href=\{href\(aba\)\}/, "a aba leva à rota dela");
+  assert.match(app, /const pathname = usePathname\(\)/, "a aba ativa vem da URL");
 });

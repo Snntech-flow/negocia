@@ -33,7 +33,8 @@ test("🔴 o campo manda só a forma mascarada — o CPF inteiro não vai ao for
 });
 
 test("🔴 os dois formulários de visita (Registro de Visita e CRM) usam o campo novo, sem o formato obrigatório antigo", () => {
-  for (const arquivo of ["NegociaLarApp.tsx", "LeadCRM.tsx"]) {
+  // O Registro de Visita saiu do NegociaLarApp.tsx (aposentado em 26/10, 0c33834) para o app-shell/DvpRouteClient.tsx.
+  for (const arquivo of ["app-shell/DvpRouteClient.tsx", "LeadCRM.tsx"]) {
     const fonte = readFileSync(new URL(`../src/components/${arquivo}`, import.meta.url), "utf8");
     assert.match(fonte, /<CpfParcialInput /, arquivo);
     assert.doesNotMatch(fonte, /placeholder="\*\*\*\./, arquivo);
