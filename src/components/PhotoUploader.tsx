@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ImagePlus } from "lucide-react";
 import { getPhotoUploadStatus, uploadPropertyPhoto } from "@/lib/actions/photos";
+import { registrarPrevia } from "@/lib/foto-previa";
 import { unwrap } from "@/lib/action-result";
 
 const MAX_SIDE = 1600;
@@ -46,7 +47,9 @@ export default function PhotoUploader({ remaining, onUploaded, label = "Enviar f
         try { prepared = await prepare(file); } catch { throw new Error(`Não foi possível abrir "${file.name}". Envie em JPG ou PNG.`); }
         const data = new FormData();
         data.append("file", prepared);
-        urls.push(unwrap(await uploadPropertyPhoto(data)).url);
+        const enviada = unwrap(await uploadPropertyPhoto(data));
+        if (enviada.previa) registrarPrevia(enviada.url, enviada.previa);
+        urls.push(enviada.url);
       }
       setStatus(chosen.length === 1 ? "Foto enviada." : `${chosen.length} fotos enviadas.`);
     } catch (problem) {

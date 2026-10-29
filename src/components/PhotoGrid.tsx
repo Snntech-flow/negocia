@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ChevronLeft, ChevronRight, Trash2 } from "lucide-react";
 import { moverFoto } from "@/lib/photo-order";
+import { enderecoParaExibir } from "@/lib/foto-previa";
 
 // Grade de fotos com troca de posição: setas em cada foto (celular e teclado) e arrastar e soltar (computador).
 // A ordem da grade é a ordem gravada; com `capa`, a primeira foto é a capa do anúncio.
@@ -24,7 +25,7 @@ export default function PhotoGrid({ fotos, onChange, nome = "Foto", capa = true 
         onDrop={(event) => { event.preventDefault(); if (arrastando !== null) mover(arrastando, index); soltar(); }}
         onDragEnd={soltar}
         className={`relative h-28 cursor-grab overflow-hidden rounded-xl border-2 bg-slate-100 ${sobre === index && arrastando !== index ? "border-amber-500" : "border-transparent"} ${arrastando === index ? "opacity-50" : ""}`}>
-        <img src={url} alt={`${nome} ${index + 1}`} draggable={false} className="h-full w-full object-cover" />
+        <img src={enderecoParaExibir(url)} alt={`${nome} ${index + 1}`} draggable={false} className="h-full w-full object-cover" />
         <span className="absolute left-1 top-1 rounded-md bg-[#083858]/85 px-1.5 py-0.5 text-[10px] font-bold text-[#ffffff]">{capa && index === 0 ? "Capa" : `${index + 1}ª`}</span>
         <button type="button" aria-label={`Remover ${item} ${index + 1}`} onClick={() => onChange(fotos.filter((_, i) => i !== index))} className="absolute right-1 top-1 flex h-8 w-8 items-center justify-center rounded-lg bg-red-600 text-[#ffffff]"><Trash2 className="h-4 w-4" /></button>
         {fotos.length > 1 && <div className="absolute inset-x-1 bottom-1 flex items-center justify-between gap-1">

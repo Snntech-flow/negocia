@@ -6,6 +6,7 @@ import { ActionError, runAction } from "../action-result";
 import { requireActiveBroker, requireCurrentUser } from "../auth";
 import { authLoginAttempts, db } from "../db";
 import { DAILY_PHOTO_UPLOADS, detectImageType, hasCameraMetadata, MAX_PHOTO_BYTES, photoStorageConfig, storePhoto } from "../photo-upload";
+import { signPhotos } from "../photo-sign";
 
 async function getPhotoUploadStatusImpl() {
   await requireCurrentUser();
@@ -32,12 +33,17 @@ async function uploadPropertyPhotoImpl(formData: FormData) {
   const type = detectImageType(bytes);
   if (!type) throw new ActionError("Envie a foto em JPG, PNG ou WebP.");
   if (hasCameraMetadata(bytes, type)) throw new ActionError("A foto ainda tem dados de câmera e localização. Envie pelo botão de fotos do NegociaLar, que remove esses dados.");
+  let caminho: string;
   try {
-    return { url: await storePhoto(bytes, type, actor.id, config) };
+    caminho = await storePhoto(bytes, type, actor.id, config);
   } catch {
     console.error("Falha ao gravar foto no Storage.");
     throw new ActionError("Não foi possível guardar a foto agora. Tente de novo em instantes.");
   }
+  // `url` é o que se grava (o caminho, bucket privado); `previa` é uma URL assinada curta só para a miniatura do formulário
+  // (lib/foto-previa). Se a assinatura falhar, a foto continua enviada — só a miniatura fica sem imagem.
+  const previa = (await signPhotos([caminho]).catch(() => new Map<string, string>())).get(caminho) ?? null;
+  return { url: caminho, previa };
 }
 
 export async function getPhotoUploadStatus(...args: Parameters<typeof getPhotoUploadStatusImpl>) { return runAction(() => getPhotoUploadStatusImpl(...args)); }
