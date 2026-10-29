@@ -12,6 +12,7 @@ import type { WorkspaceFeedback, WorkspaceTransaction, WorkspaceUser } from "@/l
 import Avatar from "./Avatar";
 import { MonthlyChart, monthShort, type MonthRow } from "./FinanceCharts";
 import RepassesDosSocios from "./RepassesDosSocios";
+import CorrigirCidadeUf from "./CorrigirCidadeUf";
 import { addMonthsKeepingDay, brasiliaToday } from "@/lib/finance";
 import { descricaoDoVencimento, diaDeBrasilia, faturamentoPorAno, faturamentoPorMes, motivoSemVencimento } from "@/lib/admin-receita";
 
@@ -156,6 +157,8 @@ export default function AdminPanel({ users, transactions, feedback, currentUserI
               {filtered.map((user) => <tr key={user.id}>
                 <td className="py-3.5 px-4"><div className="flex items-center gap-3"><Avatar name={user.name} url={user.avatarUrl} size={36} /><div><div className="font-bold text-white flex items-center gap-1.5">{user.name}{user.adminViewAccess && <span className="whitespace-nowrap rounded-full border border-sky-300 bg-sky-50 px-1.5 py-0.5 text-[10px] font-semibold text-sky-900">vê a Administração</span>}{user.isVerified && <CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" aria-label="CRECI aprovado" />}</div><div className="text-[11px] text-slate-400">{user.email}</div></div></div></td>
                 <td className="py-3.5 px-4"><div className="font-semibold">CRECI {user.creci}</div><div className="text-[11px] text-slate-400">{user.city}/{user.state}</div>
+                  {!somenteLeitura && <CorrigirCidadeUf user={user} onMessage={onMessage}
+                    onSalvo={(local) => onUsersChange((lista) => lista.map((item) => item.id === user.id ? { ...item, ...local } : item))} />}
                   {creciConsultaUrl(user.state) && <a href={creciConsultaUrl(user.state)!} target="_blank" rel="noopener noreferrer" onClick={() => void copyCreci(user)} title={`Abre a busca do CRECI-${user.state} e copia o número`} className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-sky-300 hover:underline"><ExternalLink className="h-3 w-3" aria-hidden="true" />Conferir no CRECI-{user.state}</a>}</td>
                 <td className="py-3.5 px-4"><div className="font-semibold text-white">{planName(user.plan)}</div>{user.billingExemptAt
                   ? <><div className="text-[11px] font-semibold text-emerald-400">Sem cobrança</div><div className="text-[10px] text-slate-500">por {nameOf(user.billingExemptBy)} em {when(user.billingExemptAt)}</div></>

@@ -20,7 +20,7 @@ async function updateLeadStageImpl(...args: Parameters<typeof crmActions.updateL
 async function addLeadActivityImpl(...args: Parameters<typeof crmActions.addLeadActivity>) { return crmActions.addLeadActivity(...args); }
 async function completeLeadFollowUpImpl(...args: Parameters<typeof crmActions.completeLeadFollowUp>) { return crmActions.completeLeadFollowUp(...args); }
 
-import { updateUserStatusImpl, setAdminViewAccessImpl, exemptUserFromBillingImpl, confirmPixSubscriptionPaymentImpl, refundPixSubscriptionPaymentImpl } from "./actions/admin";
+import { updateUserStatusImpl, setAdminViewAccessImpl, exemptUserFromBillingImpl, confirmPixSubscriptionPaymentImpl, refundPixSubscriptionPaymentImpl, updateUserLocationImpl } from "./actions/admin";
 import { createPropertyImpl, createBuyerProfileImpl } from "./actions/property";
 import { createDvpCertificateImpl } from "./actions/dvp";
 import { updatePartnershipStatusImpl, respondToPartnershipSplitImpl, revisePartnershipCommissionImpl } from "./actions/partnership";
@@ -45,6 +45,7 @@ export async function updateUserStatus(...args: Parameters<typeof updateUserStat
 export async function confirmPixSubscriptionPayment(...args: Parameters<typeof confirmPixSubscriptionPaymentImpl>) { return runAction(() => confirmPixSubscriptionPaymentImpl(...args)); }
 export async function exemptUserFromBilling(...args: Parameters<typeof exemptUserFromBillingImpl>) { return runAction(() => exemptUserFromBillingImpl(...args)); }
 export async function setAdminViewAccess(...args: Parameters<typeof setAdminViewAccessImpl>) { return runAction(() => setAdminViewAccessImpl(...args)); }
+export async function updateUserLocation(...args: Parameters<typeof updateUserLocationImpl>) { return runAction(() => updateUserLocationImpl(...args)); }
 export async function refundPixSubscriptionPayment(...args: Parameters<typeof refundPixSubscriptionPaymentImpl>) { return runAction(() => refundPixSubscriptionPaymentImpl(...args)); }
 export async function createProperty(...args: Parameters<typeof createPropertyImpl>) { return runAction(() => createPropertyImpl(...args)); }
 export async function createBuyerProfile(...args: Parameters<typeof createBuyerProfileImpl>) { return runAction(() => createBuyerProfileImpl(...args)); }

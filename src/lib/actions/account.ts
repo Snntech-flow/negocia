@@ -1,4 +1,5 @@
 // Cadastro, login, logout e validação de formato do CRECI. Movido de actions.ts (Fase 0) — comportamento idêntico.
+import { municipioDaUf } from "../municipios";
 import { ActionError, isUniqueViolation } from "../action-result";
 import { db, users, notifications, authLoginAttempts } from "../db";
 import { eq, and, or, inArray, isNull, lt, sql } from "drizzle-orm";
@@ -51,6 +52,9 @@ export async function registerUserWithPixImpl(userData: {
   if (!['monthly', 'annual'].includes(userData.billingCycle)) throw new ActionError("Ciclo de cobrança inválido.");
   if (cleanEmail.length > 254 || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail)) throw new ActionError("E-mail inválido.");
   if (userData.name.trim().length < 2 || userData.name.length > 120 || userData.city.trim().length < 2 || userData.city.length > 120 || !isBrazilianState(userData.state.toUpperCase())) throw new ActionError("Confira nome, cidade e estado.");
+  // A cidade tem de ser um município da UF (IBGE) e vai com o nome oficial — 28/10/2026, "São Paulo/BA" (lib/municipios).
+  const cidadeOficial = municipioDaUf(userData.state, userData.city);
+  if (!cidadeOficial) throw new ActionError(`Escolha a cidade na lista de municípios de ${userData.state.toUpperCase()}.`);
   const phoneDigits = userData.whatsapp.replace(/\D/g, "");
   if (phoneDigits.length < 10 || phoneDigits.length > 15 || userData.whatsapp.length > 30) throw new ActionError("WhatsApp inválido.");
   if (!/^[0-9]{3,7}-?[FJ]?$/.test(cleanCreci)) throw new ActionError("Informe um CRECI no formato numérico aceito.");
@@ -72,7 +76,7 @@ export async function registerUserWithPixImpl(userData: {
         whatsapp: userData.whatsapp,
         creci: cleanCreci,
         state: userData.state.toUpperCase(),
-        city: userData.city.trim(),
+        city: cidadeOficial,
         passwordHash,
         role: "corretor",
         isVerified: false,

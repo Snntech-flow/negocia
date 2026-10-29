@@ -10,6 +10,7 @@ import { validateCreciFormat, registerUserWithPix, loginUser } from "@/lib/actio
 import { unwrap, type ActionData } from "@/lib/action-result";
 import { BRAZILIAN_STATES } from "@/lib/brazil-states";
 import { loadStateCities } from "@/lib/cities";
+import { normalizeText } from "@/lib/normalize-text";
 import { isPlanId, PLAN_IDS, PLANS, planCharge, planMonthlyEquivalent, type BillingCycle, type PlanId } from "@/lib/plans";
 
 import { RequestPasswordRecovery } from "./PasswordRecovery";
@@ -75,6 +76,11 @@ export default function OnboardingModal({ isOpen, onClose, onComplete, initialPl
 
   const handleVerifyCreciAndProceed = async (e: React.FormEvent) => {
     e.preventDefault();
+    // A cidade sai da lista de municípios da UF (28/10/2026, "São Paulo/BA"). O servidor confere de novo, com a lista do IBGE.
+    if (stateCities.length && !stateCities.some((cidade) => normalizeText(cidade) === normalizeText(formData.city))) {
+      setActionError(`Escolha a cidade na lista de municípios de ${formData.state}.`);
+      return;
+    }
     setCheckingFormat(true);
     setCreciResult(null);
     setActionError(null);

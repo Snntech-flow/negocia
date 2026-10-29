@@ -6,6 +6,7 @@ import { eq, and, sql } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { requireCurrentUser } from "../auth";
 import { addFreeDays, extendPaidPeriod } from "../subscription";
+import { municipioDaUf } from "../municipios";
 
 export async function updateUserStatusImpl(userId: string, newStatus: string) {
   const actor = await requireCurrentUser();
@@ -29,6 +30,24 @@ export async function updateUserStatusImpl(userId: string, newStatus: string) {
 
   revalidatePath("/");
   return { success: true, reviewedBy: actor.id, reviewedAt };
+}
+
+// Cidade e UF do CRECI de uma conta (28/10/2026, Sidney: "onde é São Paulo, Bahia?" — o cadastro aceitava qualquer cidade com
+// qualquer UF e não havia como corrigir). Só o administrador; a cidade tem de ser um município da UF (IBGE) e vai com o nome
+// oficial — a mesma conferência do cadastro.
+export async function updateUserLocationImpl(userId: string, uf: string, cidade: string) {
+  const actor = await requireCurrentUser();
+  if (actor.role !== "admin") throw new ActionError("Ação restrita à administração.");
+  if (typeof userId !== "string" || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(userId)) throw new ActionError("Corretor inválido.");
+  if (typeof uf !== "string" || typeof cidade !== "string") throw new ActionError("Informe a UF e a cidade.");
+  const sigla = uf.trim().toUpperCase();
+  const cidadeOficial = municipioDaUf(sigla, cidade);
+  if (!cidadeOficial) throw new ActionError(`Escolha a cidade na lista de municípios de ${sigla}.`);
+  const [updated] = await db.update(users).set({ city: cidadeOficial, state: sigla, updatedAt: new Date() })
+    .where(eq(users.id, userId)).returning({ id: users.id, city: users.city, state: users.state });
+  if (!updated) throw new ActionError("Corretor não encontrado.");
+  revalidatePath("/");
+  return updated;
 }
 
 // Visualização da Administração (15/10/2026): a pessoa vê a aba Corretores e pagamentos em modo leitura; aprovar,
