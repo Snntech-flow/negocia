@@ -8,6 +8,9 @@ const field = 'w-full rounded-lg border border-slate-700 bg-slate-900 p-2 text-s
 export default function NegotiationDocumentation({ lead, properties, chosenProperty, onSaved }: { lead: LeadItem; properties: LeadMatchProperty[]; chosenProperty?: LeadMatchProperty; onSaved: (value: NegotiationDocuments) => void }) {
   const [data, setData] = useState<NegotiationDocuments>(lead.documentation || { propertyId: chosenProperty?.id || null, propertyTitle: chosenProperty?.title || '', city: chosenProperty?.city || lead.city || '', financing: false, fgts: false, statuses: {}, costs: costLabels.map(() => 0) });
   const [message, setMessage] = useState('');
+  // O aviso dos botões do modelo fica LOGO ABAIXO deles (28/10/2026, corretora piloto: "clico e não aparece nada"): o aviso
+  // único ia para o fim da seção, depois da lista inteira e dos custos — quem clica lá em cima não via a resposta.
+  const [avisoDoModelo, setAvisoDoModelo] = useState('');
   const [busy, setBusy] = useState(false);
   const [audience, setAudience] = useState<'comprador' | 'vendedor'>(lead.leadType === 'proprietario' ? 'vendedor' : 'comprador');
   const groups = data.customGroups || documentGroups;
@@ -19,10 +22,10 @@ export default function NegotiationDocumentation({ lead, properties, chosenPrope
     setData({...data, statuses, customGroups: {...groups, [group]: rows}});
   }
   async function template(load: boolean) {
-    setBusy(true); setMessage('');
-    try { if (load) { const saved = unwrap(await getMyDocumentationTemplate()); if (!saved) setMessage('Você ainda não salvou um modelo pessoal.'); else {setData({...saved, propertyId: data.propertyId, propertyTitle: data.propertyTitle, city: data.city || saved.city, statuses: {}}); setMessage('Modelo pessoal aplicado. Salve para manter neste cliente.');} }
-    else {unwrap(await saveMyDocumentationTemplate(data));setMessage('Modelo pessoal salvo para reutilizar.');} }
-    catch(error) {setMessage(error instanceof Error ? error.message : 'Não foi possível acessar o modelo.');} finally {setBusy(false);}
+    setBusy(true); setAvisoDoModelo('');
+    try { if (load) { const saved = unwrap(await getMyDocumentationTemplate()); if (!saved) setAvisoDoModelo('Você ainda não tem um modelo salvo. Ajuste a lista e os custos e clique em “Salvar como meu modelo”.'); else {setData({...saved, propertyId: data.propertyId, propertyTitle: data.propertyTitle, city: data.city || saved.city, statuses: {}}); setAvisoDoModelo('Modelo pessoal aplicado. Salve para manter neste cliente.');} }
+    else {unwrap(await saveMyDocumentationTemplate(data));setAvisoDoModelo('Modelo pessoal salvo para reutilizar.');} }
+    catch(error) {setAvisoDoModelo(error instanceof Error ? error.message : 'Não foi possível acessar o modelo.');} finally {setBusy(false);}
   }
   const text = `Olá, ${lead.fullName}! Para avançarmos na negociação${data.propertyTitle ? ` do imóvel ${data.propertyTitle}` : ''}, por favor separe os seguintes documentos:\n\n${clientDocumentList(data, audience).map(item => `• ${item}`).join('\n')}\n\nA lista será ajustada conforme as exigências da operação. Combine comigo um canal seguro para encaminhar seus documentos.`;
   async function save() { setBusy(true); setMessage(''); try { const result = unwrap(await saveNegotiationDocuments(lead.id, data)); onSaved(result.documentation); setMessage('Documentação salva.'); } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível salvar.'); } finally { setBusy(false); } }
@@ -33,7 +36,9 @@ export default function NegotiationDocumentation({ lead, properties, chosenPrope
   return <section className="space-y-4 rounded-xl border border-sky-800 bg-slate-900 p-4">
     <h4 className="font-bold text-white">Documentação da negociação</h4>
     <p className="text-xs text-slate-400">Escolha o imóvel após o match e acompanhe as pendências. Use a lista de imóvel usado como ponto de partida e personalize os itens para cada operação. Marcar “recebido” registra o acompanhamento, sem armazenar arquivos.</p>
-    <div className="flex flex-wrap gap-2"><button disabled={busy} onClick={() => template(true)} className="rounded-lg border border-sky-700 px-3 py-2 text-xs text-sky-800">Usar meu modelo</button><button disabled={busy} onClick={() => template(false)} className="rounded-lg border border-sky-700 px-3 py-2 text-xs text-sky-800">Salvar como meu modelo</button></div><p className="text-xs text-slate-400">O modelo pertence somente à sua conta. Guarda a lista e os custos; não guarda o cliente, o imóvel nem a situação dos documentos.</p>
+    <div className="flex flex-wrap gap-2"><button disabled={busy} title="Carrega a lista e os custos que você salvou como seu modelo" onClick={() => template(true)} className="rounded-lg border border-sky-700 px-3 py-2 text-xs text-sky-800 disabled:opacity-50">Usar meu modelo</button><button disabled={busy} title="Guarda esta lista e os custos para reaproveitar em outros clientes (não guarda o cliente nem o imóvel)" onClick={() => template(false)} className="rounded-lg border border-sky-700 px-3 py-2 text-xs disabled:opacity-50 text-sky-800">Salvar como meu modelo</button></div>
+    {avisoDoModelo && <p role="status" className="text-sm text-amber-300">{avisoDoModelo}</p>}
+    <p className="text-xs text-slate-400">O modelo pertence somente à sua conta. Guarda a lista e os custos; não guarda o cliente, o imóvel nem a situação dos documentos.</p>
     <label className="block text-xs text-slate-300">Imóvel vinculado<select className={field} value={data.propertyId || ''} onChange={e => { const property = properties.find(p => p.id === e.target.value); setData({ ...data, propertyId: property?.id || null, propertyTitle: property?.title || '', city: property?.city || data.city }); }}><option value="">Selecionar imóvel</option>{data.propertyId && !properties.some(p => p.id === data.propertyId) && <option value={data.propertyId}>{data.propertyTitle} (indisponível)</option>}{properties.filter(p => (p.purpose || 'venda') === 'venda').map(p => <option key={p.id} value={p.id}>{p.title}</option>)}</select></label>
     <label className="block text-xs text-slate-300">Cidade / UF<input className={field} value={data.city} maxLength={150} onChange={e => setData({ ...data, city: e.target.value })} /></label>
     <div className="flex flex-wrap gap-4 text-xs text-slate-300"><label><input type="checkbox" checked={data.financing} onChange={e => setData({ ...data, financing: e.target.checked })} /> Com financiamento</label><label><input type="checkbox" checked={data.fgts} onChange={e => setData({ ...data, fgts: e.target.checked })} /> Com FGTS</label></div>
