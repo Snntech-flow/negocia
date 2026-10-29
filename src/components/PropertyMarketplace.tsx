@@ -7,6 +7,7 @@ import type { Property } from "@/lib/property-types";
 import { optionLabel, CONDITIONS, PURPOSES } from "@/lib/property-options";
 import Avatar from "./Avatar";
 import PhotoViewer from "./PhotoViewer";
+import DescricaoDoImovel from "./DescricaoDoImovel";
 import { fotosComCapaNaFrente } from "@/lib/photo-order";
 import { useCallback, useState } from "react";
 import { previsaoParaTela } from "@/lib/delivery-forecast";
@@ -215,7 +216,7 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
                           </div>
                         </div>
 
-                        <p className="text-xs text-slate-400 line-clamp-2 leading-relaxed">{prop.description}</p>
+                        <DescricaoDoImovel texto={prop.description} />
 
                         {/* Características */}
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3 border-t border-slate-800/80 text-xs text-slate-300">
