@@ -8,13 +8,12 @@ import Image from "next/image";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
-import { ArrowRight, Bell, Building2, ChevronDown, CreditCard, FileText, MessageSquarePlus, PlusCircle, Radar, Stamp, UserCheck, Users, Wallet, X } from "lucide-react";
+import { ArrowRight, Bell, Building2, ChevronDown, CreditCard, FileText, MessageSquarePlus, PlusCircle, Radar, Stamp, UserCheck, Users, Wallet } from "lucide-react";
 import Avatar from "@/components/Avatar";
 import BotaoMatch from "./BotaoMatch";
 import BotaoFechar from "@/components/BotaoFechar";
 import DialogHost from "@/components/DialogHost";
 import BillingPopup from "@/components/BillingPopup";
-import { abasGuardadas, abrirAba, fecharAba, mostrarBarraDeAbas } from "@/lib/abas";
 import { useVoltarFecha } from "@/lib/use-voltar-fecha";
 import { logoutUser, markAllNotificationsAsRead, markNotificationAsRead, submitPilotFeedback } from "@/lib/actions";
 import { unwrap } from "@/lib/action-result";
@@ -27,10 +26,6 @@ import type { WorkspaceNotification, WorkspaceSessionUser } from "@/lib/workspac
 const SubscriptionPanel = dynamic(() => import("@/components/SubscriptionPanel"));
 
 export type WorkspaceTab = "vitrine" | "crm" | "radar" | "cadastrar" | "termo" | "dvp" | "financeiro" | "admin";
-
-const TAB_LABELS: Record<WorkspaceTab, string> = { vitrine: "Vitrine", crm: "Minha carteira", radar: "Radar de Compradores",
-  cadastrar: "Meus imóveis", termo: "Termo de Parceria", dvp: "Registro de Visita",
-  financeiro: "Receitas e despesas", admin: "Corretores e pagamentos" };
 
 const href = (tab: WorkspaceTab) => `/${tab}`;
 
@@ -54,7 +49,7 @@ export default function AppShellClient({ currentUser, initialNotifications, prop
   currentUser: WorkspaceSessionUser;
   initialNotifications: WorkspaceNotification[];
   propertyTotal: number;
-  /** Matches que o corretor ainda não viu (contados no layout): o botão "Match" fica laranja com esse número. */
+  /** Matches que o corretor ainda não viu (contados no layout): o botão "Match" fica vermelho com esse número. */
   novosMatches: number;
   children: React.ReactNode;
 }) {
@@ -91,29 +86,6 @@ export default function AppShellClient({ currentUser, initialNotifications, prop
     const timer = window.setInterval(() => setClock(Date.now()), 60_000);
     return () => { cancelAnimationFrame(frame); window.clearInterval(timer); };
   }, []);
-
-  // Abas abertas (estilo Flow): a Vitrine é fixa; as demais abrem ao navegar e podem ser fechadas com o X.
-  const [abasAbertas, setAbasAbertas] = useState<WorkspaceTab[]>(["vitrine"]);
-  useEffect(() => {
-    let abasSalvas: unknown = null;
-    try { abasSalvas = JSON.parse(sessionStorage.getItem(`negocialar-abas:${currentUser.id}`) || "null"); } catch {}
-    const base = abasGuardadas<WorkspaceTab>(abasSalvas, abasPermitidas, "vitrine");
-    setAbasAbertas(activeTab ? abrirAba(base, activeTab) : base);
-  }, [currentUser.id, abasPermitidas]); // eslint-disable-line react-hooks/exhaustive-deps
-  useEffect(() => {
-    if (!activeTab) return;
-    setAbasAbertas((abertas) => {
-      const proximas = abrirAba(abertas, activeTab);
-      try { sessionStorage.setItem(`negocialar-abas:${currentUser.id}`, JSON.stringify(proximas)); } catch {}
-      return proximas;
-    });
-  }, [activeTab, currentUser.id]);
-  const fecharAbaDaTela = (aba: WorkspaceTab) => {
-    const resultado = fecharAba(abasAbertas, aba, activeTab ?? "vitrine", "vitrine");
-    setAbasAbertas(resultado.abertas);
-    try { sessionStorage.setItem(`negocialar-abas:${currentUser.id}`, JSON.stringify(resultado.abertas)); } catch {}
-    if (aba === activeTab && resultado.ativa !== activeTab) router.push(href(resultado.ativa));
-  };
 
   // Fecha os popovers (sino, conta) e os menus do nav ao clicar fora.
   useEffect(() => {
@@ -221,33 +193,34 @@ export default function AppShellClient({ currentUser, initialNotifications, prop
                 <Bell className="w-4 h-4 text-slate-400" />
                 {bellCount > 0 && <span className="absolute -top-1 -right-1 bg-red-600 text-white text-[10px] font-black min-w-4 h-4 px-1 rounded-full flex items-center justify-center">{bellCount}</span>}
               </button>
-              {/* Notificações em LARANJA, texto azul-marinho (28/10/2026, Sidney: "o branco está muito fraco; notificação tem que
-                  chamar mais a atenção e ser melhor para ler"). Cores fixas: o tema do cabeçalho repinta as classes slate e amber.
-                  Não lida: laranja forte, faixa marinho e bolinha; lida: laranja claro, sem transparência. */}
+              {/* Notificações: quadro azul-marinho com a LETRA LARANJA (28/10/2026). Sidney: "o branco está muito fraco; tem que
+                  chamar mais a atenção e ser melhor para ler" → o quadro ficou laranja; a corretora piloto achou "muito chamativo"
+                  → volta o azul de antes e a letra, que era branca, fica laranja. Cores fixas: o tema do cabeçalho repinta as
+                  classes slate e amber. Não lida: azul um tom acima, faixa e bolinha laranja; lida: azul, sem transparência. */}
               {isNotificationsOpen && (
-                <div data-painel-notificacoes="" className="absolute right-0 mt-3 w-[calc(100vw-2rem)] max-w-96 rounded-2xl border-2 border-[#d97706] bg-[#f59e0b] text-[#083858] shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95">
-                  <div className="p-3.5 border-b-2 border-[#083858]/20 flex items-center justify-between">
-                    <div className="flex items-center gap-2"><Bell className="w-4 h-4 text-[#083858]" /><span className="text-sm font-bold text-[#083858]">Notificações ({notifications.length + (billingAlert ? 1 : 0)})</span></div>
-                    {unreadCount > 0 && <button type="button" onClick={() => void handleMarkAllRead()} className="text-[11px] font-bold text-[#083858] underline hover:no-underline">Marcar todas como lidas</button>}
+                <div data-painel-notificacoes="" className="absolute right-0 mt-3 w-[calc(100vw-2rem)] max-w-96 rounded-2xl border-2 border-[#326480] bg-[#083858] text-[#f59e0b] shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95">
+                  <div className="p-3.5 border-b border-[#326480] flex items-center justify-between">
+                    <div className="flex items-center gap-2"><Bell className="w-4 h-4 text-[#f59e0b]" /><span className="text-sm font-bold text-[#f59e0b]">Notificações ({notifications.length + (billingAlert ? 1 : 0)})</span></div>
+                    {unreadCount > 0 && <button type="button" onClick={() => void handleMarkAllRead()} className="text-[11px] font-bold text-[#f59e0b] underline hover:no-underline">Marcar todas como lidas</button>}
                   </div>
-                  <div className="max-h-80 overflow-y-auto divide-y divide-[#083858]/15">
+                  <div className="max-h-80 overflow-y-auto divide-y divide-[#326480]">
                     {billingAlert && (
-                      <div role="status" className={`p-3.5 space-y-1.5 border-l-4 ${billingAlert.tone === "vencido" ? "border-[#b91c1c] bg-[#fecaca]" : "border-[#083858] bg-[#f59e0b]"}`}>
-                        <span className="text-sm font-bold text-[#083858] flex items-center gap-1.5"><CreditCard className={`w-4 h-4 ${billingAlert.tone === "vencido" ? "text-[#b91c1c]" : "text-[#083858]"}`} aria-hidden="true" />{billingAlert.title}</span>
-                        <p className="text-[13px] font-medium text-[#083858] leading-relaxed">{billingAlert.message}</p>
-                        <button type="button" onClick={() => { setIsNotificationsOpen(false); setIsSubscriptionOpen(true); }} className="text-xs font-bold text-[#083858] underline hover:no-underline">Abrir Minha assinatura</button>
+                      <div role="status" className={`p-3.5 space-y-1.5 border-l-4 ${billingAlert.tone === "vencido" ? "border-[#dc2626] bg-[#0d4a72]" : "border-[#f59e0b] bg-[#0d4a72]"}`}>
+                        <span className="text-sm font-bold text-[#f59e0b] flex items-center gap-1.5"><CreditCard className={`w-4 h-4 ${billingAlert.tone === "vencido" ? "text-[#f87171]" : "text-[#f59e0b]"}`} aria-hidden="true" />{billingAlert.title}</span>
+                        <p className="text-[13px] font-medium text-[#fbbf24] leading-relaxed">{billingAlert.message}</p>
+                        <button type="button" onClick={() => { setIsNotificationsOpen(false); setIsSubscriptionOpen(true); }} className="text-xs font-bold text-[#f59e0b] underline hover:no-underline">Abrir Minha assinatura</button>
                       </div>
                     )}
-                    {notifications.length === 0 ? (billingAlert ? null : <div className="p-6 text-center text-[13px] font-medium text-[#083858]">Nenhuma notificação no momento.</div>) : (
+                    {notifications.length === 0 ? (billingAlert ? null : <div className="p-6 text-center text-[13px] font-medium text-[#fbbf24]">Nenhuma notificação no momento.</div>) : (
                       notifications.map((notif) => (
                         <button type="button" key={notif.id} onClick={() => void handleNotificationClick(notif)}
-                          className={`block w-full text-left p-3.5 space-y-1.5 transition cursor-pointer ${notif.read ? "bg-[#fcd34d] hover:bg-[#fde68a]" : "bg-[#f59e0b] border-l-4 border-[#083858] hover:bg-[#fbbf24]"}`}>
+                          className={`block w-full text-left p-3.5 space-y-1.5 transition cursor-pointer ${notif.read ? "bg-[#083858] hover:bg-[#0d4a72]" : "bg-[#0d4a72] border-l-4 border-[#f59e0b] hover:bg-[#105584]"}`}>
                           <div className="flex items-center justify-between gap-2">
-                            <span className="text-sm font-bold text-[#083858] flex items-center gap-1.5">{!notif.read && <span className="w-2 h-2 shrink-0 rounded-full bg-[#083858]"></span>}{notif.title}</span>
-                            <span className="shrink-0 text-[11px] font-semibold text-[#083858] font-mono">{notif.createdAt ? new Date(notif.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "Hoje"}</span>
+                            <span className="text-sm font-bold text-[#f59e0b] flex items-center gap-1.5">{!notif.read && <span className="w-2 h-2 shrink-0 rounded-full bg-[#f59e0b]"></span>}{notif.title}</span>
+                            <span className="shrink-0 text-[11px] font-semibold text-[#fbbf24] font-mono">{notif.createdAt ? new Date(notif.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "Hoje"}</span>
                           </div>
-                          <p className="text-[13px] font-medium text-[#083858] leading-relaxed">{notif.message}</p>
-                          {notif.propertyId && <div className="pt-1"><span className="text-xs font-bold text-[#083858] underline flex items-center gap-1"><span>Ver imóvel e ficha para o cliente</span><ArrowRight className="w-3.5 h-3.5" /></span></div>}
+                          <p className="text-[13px] font-medium text-[#fbbf24] leading-relaxed">{notif.message}</p>
+                          {notif.propertyId && <div className="pt-1"><span className="text-xs font-bold text-[#f59e0b] underline flex items-center gap-1"><span>Ver imóvel e ficha para o cliente</span><ArrowRight className="w-3.5 h-3.5" /></span></div>}
                         </button>
                       ))
                     )}
@@ -302,13 +275,8 @@ export default function AppShellClient({ currentUser, initialNotifications, prop
             </details>
           ))}
         </div>
-        {/* Abas abertas (estilo Flow): a tela de cada aba e um X para fechar; a Vitrine é a fixa. Só com 2 telas ou mais. */}
-        {mostrarBarraDeAbas(abasAbertas) && <div role="tablist" aria-label="Telas abertas" className="max-w-7xl mx-auto flex items-center gap-1 overflow-x-auto px-4 pb-2 sm:px-6 lg:px-8 [scrollbar-width:none]">
-          {abasAbertas.map((aba) => <div key={aba} className={`flex h-8 shrink-0 items-center rounded-md text-xs font-semibold ${aba === activeTab ? "bg-[#ffffff] text-[#083858]" : "bg-[#ffffff]/10 text-[#ffffff] hover:bg-[#ffffff]/20"}`}>
-            <Link href={href(aba)} role="tab" aria-selected={aba === activeTab} className={`flex h-full items-center ${aba === "vitrine" ? "px-3" : "pl-3 pr-1"}`}>{TAB_LABELS[aba]}</Link>
-            {aba !== "vitrine" && <button type="button" aria-label={`Fechar a aba ${TAB_LABELS[aba]}`} title="Fechar aba" onClick={() => fecharAbaDaTela(aba)} className="mr-1 flex h-6 w-6 items-center justify-center rounded hover:bg-[#083858]/15"><X className="h-3.5 w-3.5" aria-hidden="true" /></button>}
-          </div>)}
-        </div>}
+        {/* Sem a barra de abas abertas (28/10/2026, pedido das corretoras: "por ser tão pouco não precisaria ter"): o menu
+            acima já leva a cada tela, e o voltar do navegador volta para a anterior. */}
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">
