@@ -10,6 +10,8 @@ import Avatar from "./Avatar";
 import BotaoFechar from "./BotaoFechar";
 import { useVoltarFecha } from "@/lib/use-voltar-fecha";
 import { descricaoSemContato } from "@/lib/descricao-sem-contato";
+import { fotosComCapaNaFrente } from "@/lib/photo-order";
+import FichaFotos from "./FichaFotos";
 
 export default function WhiteLabelSheet({ property, broker, onClose }: { property: Property; broker: SharingBroker; onClose: () => void }) {
   const [copied, setCopied] = useState(false);
@@ -45,7 +47,7 @@ export default function WhiteLabelSheet({ property, broker, onClose }: { propert
     preview.document.close();
     setError(null);
   }
-  const photo = property.coverPhoto || property.photos[0];
+  const fotos = fotosComCapaNaFrente(property.photos || [], property.coverPhoto);
   // O scroll mora no container externo e o card é centralizado por um wrapper min-h-full: com my-auto num flex, card mais alto que a tela tinha o fim inacessível (26/10/2026).
   return <div className="fixed inset-0 z-50 overflow-y-auto bg-slate-950/90 backdrop-blur-sm" role="dialog" aria-modal="true" aria-labelledby="white-label-title">
     <div className="flex min-h-full items-center justify-center p-4" onMouseDown={(event) => { if (event.target === event.currentTarget) fechar(); }}>
@@ -54,7 +56,7 @@ export default function WhiteLabelSheet({ property, broker, onClose }: { propert
       <div className="space-y-5 p-6">
         <p className="rounded-xl border border-amber-500/30 bg-amber-950/20 p-3 text-xs text-amber-300">A ficha usa seus dados de atendimento: {broker.name}, CRECI {broker.creci} e seu WhatsApp. O endereço completo e os dados do proprietário e do captador ficam fora da ficha.</p>
         <div className="space-y-4 rounded-2xl border border-slate-800 bg-slate-950 p-4"><header className="flex items-center gap-3 border-b border-slate-800 pb-3"><Avatar name={broker.name} url={broker.avatar} size={40} /><div><p className="text-sm font-bold text-white">{broker.name}</p><p className="text-xs text-slate-400">CRECI {broker.creci}</p></div></header>
-          {photo && <img src={photo} alt={property.title} className="h-48 w-full rounded-xl object-cover" />}
+          <FichaFotos fotos={fotos} titulo={property.title} variante="janela" />
           <p className="text-xs text-slate-400">{property.neighborhood}, {property.city}</p><h4 className="font-bold text-white">{property.title}</h4><p className="text-xl font-extrabold text-amber-400">{Number(property.salePrice).toLocaleString("pt-BR", { style: "currency", currency: "BRL" })}</p>
           <p className="text-xs text-slate-300">{property.bedrooms} {property.bedrooms === 1 ? "quarto" : "quartos"} · {property.bathrooms} {property.bathrooms === 1 ? "banheiro" : "banheiros"} · {property.parkingSpots} {property.parkingSpots === 1 ? "vaga" : "vagas"} · {formatArea(property.areaM2)} m²</p>
           {descricaoSemContato(property.description) && <p className="whitespace-pre-line text-xs leading-relaxed text-slate-300">{descricaoSemContato(property.description)}</p>}

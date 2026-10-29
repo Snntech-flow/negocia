@@ -57,3 +57,14 @@ test("🔴 na ficha pública todas as fotos abrem a galeria: capa e miniaturas s
   assert.doesNotMatch(pagina, /\.slice\(0, 8\)/, "sem o teto antigo de 8 fotos");
   assert.match(pagina, /const descricao = descricaoSemContato\(prop\.description\)/, "a descrição vai, sem contato");
 });
+
+test("🔴 na janela 'Ficha para o cliente' da Vitrine vão todas as fotos, e cada uma abre a galeria", () => {
+  const fotos = ["https://x/a.jpg", "https://x/b.jpg", "https://x/c.jpg", "https://x/d.jpg"];
+  const html = renderToStaticMarkup(createElement(FichaFotos, { fotos, titulo: "Casa", variante: "janela" }));
+  assert.equal((html.match(/<button/g) ?? []).length, 4, "capa + 3 miniaturas clicáveis");
+  assert.match(html, /overflow-x-auto/, "as miniaturas rolam de lado, sem esticar a janela");
+  const janela = ler("src/components/WhiteLabelSheet.tsx");
+  assert.match(janela, /const fotos = fotosComCapaNaFrente\(property\.photos \|\| \[\], property\.coverPhoto\)/);
+  assert.match(janela, /<FichaFotos fotos=\{fotos\} titulo=\{property\.title\} variante="janela" \/>/);
+  assert.doesNotMatch(janela, /<img src=\{photo\}/, "sem a capa solta, que não abria nada");
+});
