@@ -41,7 +41,7 @@ function ThemeSwitch() {
   }, []);
   return <div className="px-3 py-2">
     <p className="mb-1.5 text-[11px] font-semibold text-slate-400">Tema</p>
-    <div role="radiogroup" aria-label="Tema" className="grid grid-cols-3 gap-1 rounded-xl bg-slate-950 p-1">
+    <div role="radiogroup" aria-label="Tema" className="grid grid-cols-2 gap-1 rounded-xl bg-slate-950 p-1">
       {THEME_CHOICES.map((option) => <button key={option.id} type="button" role="radio" aria-checked={choice === option.id}
         onClick={() => { saveThemeChoice(option.id); setChoice(option.id); }}
         className={`rounded-lg px-2 py-1.5 text-[11px] font-semibold ${choice === option.id ? "bg-amber-500 text-slate-950" : "text-slate-300 hover:bg-slate-800"}`}>{option.label}</button>)}

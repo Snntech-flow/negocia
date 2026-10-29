@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { THEME_BOOT_SCRIPT } from "../src/lib/theme";
+import { THEME_BOOT_SCRIPT, THEME_CHOICES } from "../src/lib/theme";
 
 // Roda o script do <head> com um navegador de mentira: ele decide o tema antes de a página aparecer.
 function boot(stored: string | null | Error, systemDark = false) {
@@ -14,14 +14,20 @@ function boot(stored: string | null | Error, systemDark = false) {
   return attributes["data-tema"];
 }
 
-test("script do tema: claro por padrão, escuro escolhido, automático segue o aparelho e falha sem quebrar", () => {
+test("script do tema: claro por padrão, escuro escolhido, e falha sem quebrar", () => {
   assert.equal(boot(null), "claro");
   assert.equal(boot("qualquer coisa"), "claro");
   assert.equal(boot("escuro"), "escuro");
   assert.equal(boot("claro", true), "claro");
-  assert.equal(boot("automatico", true), "escuro");
-  assert.equal(boot("automatico", false), "claro");
   assert.equal(boot(new Error("armazenamento bloqueado")), undefined, "sem acesso ao armazenamento, a página segue no claro (CSS padrão)");
+});
+
+// 28/10/2026, Sidney: "tirar esse Automático, 97% das vezes vai ser claro". Quem o tinha escolhido vê o claro, mesmo com o
+// aparelho no escuro, e o seletor só oferece Claro e Escuro.
+test("🔴 sem o tema Automático: só Claro e Escuro, e a escolha antiga 'automatico' vira claro", () => {
+  assert.equal(boot("automatico", true), "claro");
+  assert.equal(boot(null, true), "claro", "aparelho no escuro não muda nada");
+  assert.deepEqual(THEME_CHOICES.map((opcao) => opcao.label), ["Claro", "Escuro"]);
 });
 
 // Vídeo da corretora piloto (11/10/2026), simulador de amortização: a área logada pinta bg-slate-900 de BRANCO e text-white
