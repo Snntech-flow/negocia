@@ -1,15 +1,12 @@
 // Cadastro de imóvel e de perfil de comprador (Radar). Movido de actions.ts (Fase 0) — comportamento idêntico.
 import { ActionError } from "../action-result";
-import { db, properties, buyerProfiles, users, notifications } from "../db";
-import { eq, ne, and, lte, gte, inArray } from "drizzle-orm";
+import { db, properties, buyerProfiles } from "../db";
 import { revalidatePath } from "next/cache";
 import { ehCondicaoValida, percentualDoCaptador } from "../partnership-models";
 import { capaDasFotos } from "../photo-order";
 import { requireCurrentUser, requireActiveBroker } from "../auth";
-import { networkPropertyScope, networkProfileScope } from "../property-access";
 import type { PropertyInput } from "../property-input";
 import { validateBuyerProfileInput, validatePropertyInput } from "../input-validation";
-import { normalizedSql, normalizeText } from "../text-match";
 import { previsaoParaBanco } from "../delivery-forecast";
 import { reserveListingSlot } from "../listing-limit";
 import { photoLimit } from "../plans";
@@ -98,50 +95,8 @@ export async function createPropertyImpl(formData: PropertyInput) {
     return created;
   });
 
-  // Cruzamento dos critérios cadastrados para imóveis de venda compartilhados.
-  try {
-    if (formData.acceptsPartnership && (formData.purpose || "venda") === "venda") {
-    const matchingProfiles = await db
-      .select({
-        id: buyerProfiles.id,
-        brokerId: buyerProfiles.brokerId,
-        propertyType: buyerProfiles.propertyType,
-        neighborhoods: buyerProfiles.neighborhoods,
-        maxBudget: buyerProfiles.maxBudget,
-        minBedrooms: buyerProfiles.minBedrooms,
-        minParkingSpots: buyerProfiles.minParkingSpots,
-      })
-      .from(buyerProfiles)
-      .innerJoin(users, eq(buyerProfiles.brokerId, users.id))
-      .where(and(networkProfileScope(), eq(normalizedSql(buyerProfiles.city), normalizeText(formData.city))));
-
-    const actualMatches = matchingProfiles.filter((bp) => {
-      const maxBudget = Number(bp.maxBudget);
-      const price = Number(formData.salePrice);
-      const neighborhoods = Array.isArray(bp.neighborhoods) ? (bp.neighborhoods as string[]).map(normalizeText) : [];
-      return normalizeText(bp.propertyType) === normalizeText(formData.propertyType)
-        && (!neighborhoods.length || neighborhoods.includes(normalizeText(formData.neighborhood)))
-        && (!Number.isFinite(maxBudget) || maxBudget <= 0 || price <= maxBudget)
-        && formData.bedrooms >= bp.minBedrooms
-        && formData.parkingSpots >= bp.minParkingSpots;
-    });
-    for (const bp of actualMatches) {
-      if (bp.brokerId !== targetBrokerId) {
-        await db.insert(notifications).values({
-          userId: bp.brokerId,
-          title: `Match no Radar: imóvel em ${formData.neighborhood}`,
-          message: "Um imóvel compatível com os critérios do seu cliente foi cadastrado na rede.",
-          type: "ai_match",
-          propertyId: newProperty.id,
-          read: false,
-        });
-      }
-    }
-    }
-  } catch (matchErr) {
-    console.warn("Aviso ao cruzar radar:", matchErr);
-  }
-
+  // O match com as procuras da rede aparece no botão "Match" do cabeçalho, calculado na hora (lib/meus-matches) — desde
+  // 28/10/2026 não vira mais aviso no sino.
   revalidatePath("/");
   return { success: true, property: newProperty };
 }
@@ -177,46 +132,8 @@ export async function createBuyerProfileImpl(profileData: {
     })
     .returning();
 
-  // Cruzamento imediato com os imóveis da rede (mesmos critérios do Radar).
-  try {
-    const matchingProps = await db
-      .select({
-        id: properties.id,
-        title: properties.title,
-        neighborhood: properties.neighborhood,
-      })
-      .from(properties)
-      .innerJoin(users, eq(properties.brokerId, users.id))
-      .where(
-        and(
-          networkPropertyScope(),
-          ne(properties.brokerId, targetBrokerId),
-          eq(normalizedSql(properties.city), normalizeText(profileData.city)),
-          eq(properties.purpose, "venda"),
-          eq(normalizedSql(properties.propertyType), normalizeText(profileData.propertyType)),
-          ...(profileData.neighborhoods.length ? [inArray(normalizedSql(properties.neighborhood), profileData.neighborhoods.map(normalizeText))] : []),
-          lte(properties.salePrice, profileData.maxBudget),
-          gte(properties.bedrooms, profileData.minBedrooms),
-          gte(properties.parkingSpots, profileData.minParkingSpots),
-        )
-      )
-      .limit(3);
-
-    if (matchingProps.length > 0) {
-      await db.insert(notifications).values({
-        userId: targetBrokerId,
-        title: matchingProps.length === 1 ? `1 imóvel compatível com "${profileData.clientInternalName}"` : `${matchingProps.length} imóveis compatíveis com "${profileData.clientInternalName}"`,
-        message: "Encontramos imóveis da rede que atendem aos critérios cadastrados. Confirme os detalhes e as condições de parceria com o captador.",
-        type: "ai_match",
-        propertyId: matchingProps[0].id,
-        read: false,
-      });
-    }
-  } catch (e) {
-    // Sem erro bruto nos logs (DrizzleQueryError traz SQL/parâmetros na mensagem): só o tipo.
-    console.warn("Erro ao buscar matches para novo perfil:", e instanceof Error ? e.constructor.name : typeof e);
-  }
-
+  // Os imóveis da rede que atendem a esta procura aparecem no botão "Match" do cabeçalho (lib/meus-matches) — desde
+  // 28/10/2026 não viram mais aviso no sino.
   revalidatePath("/");
   return { success: true, profile: newProfile };
 }

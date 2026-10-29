@@ -245,7 +245,8 @@ export async function getMarketplaceData(input: MarketplaceQuery = {}) {
           createdAt: notifications.createdAt,
         })
         .from(notifications)
-        .where(eq(notifications.userId, currentUser.id))
+        // Os avisos de match (ai_match) moram no botão "Match" desde 28/10/2026; os antigos não voltam ao sino.
+        .where(and(eq(notifications.userId, currentUser.id), ne(notifications.type, "ai_match")))
         .orderBy(desc(notifications.createdAt))
         .limit(20);
 

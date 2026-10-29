@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, uuid, text, numeric, integer, boolean, timestamp, date, jsonb, index, uniqueIndex, type AnyPgColumn } from "drizzle-orm/pg-core";
+import { pgTable, uuid, text, numeric, integer, boolean, timestamp, date, jsonb, index, uniqueIndex, primaryKey, type AnyPgColumn } from "drizzle-orm/pg-core";
 
 export const users = pgTable("users", {
   id: uuid("id").defaultRandom().primaryKey(),
@@ -374,3 +374,14 @@ export const revenueSplitShares = pgTable("revenue_split_shares", {
   kind: text("kind").notNull(),
   percent: numeric("percent", { precision: 5, scale: 2 }).notNull(),
 });
+
+// Botão "Match" (28/10/2026, migration 20261028230000): quais matches (procura + imóvel) o corretor já viu. O match em si é
+// calculado na hora (lib/meus-matches); esta tabela só separa os novos dos já vistos.
+export const seenMatches = pgTable("seen_matches", {
+  userId: uuid("user_id").references(() => users.id, { onDelete: "cascade" }).notNull(),
+  buyerProfileId: uuid("buyer_profile_id").references(() => buyerProfiles.id, { onDelete: "cascade" }).notNull(),
+  propertyId: uuid("property_id").references(() => properties.id, { onDelete: "cascade" }).notNull(),
+  seenAt: timestamp("seen_at").defaultNow().notNull(),
+}, (table) => ({
+  pk: primaryKey({ name: "seen_matches_pkey", columns: [table.userId, table.buyerProfileId, table.propertyId] }),
+}));

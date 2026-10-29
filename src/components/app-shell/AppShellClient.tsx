@@ -10,6 +10,7 @@ import { usePathname, useRouter } from "next/navigation";
 import dynamic from "next/dynamic";
 import { ArrowRight, Bell, Building2, ChevronDown, CreditCard, FileText, MessageSquarePlus, PlusCircle, Radar, Stamp, UserCheck, Users, Wallet, X } from "lucide-react";
 import Avatar from "@/components/Avatar";
+import BotaoMatch from "./BotaoMatch";
 import BotaoFechar from "@/components/BotaoFechar";
 import DialogHost from "@/components/DialogHost";
 import BillingPopup from "@/components/BillingPopup";
@@ -49,10 +50,12 @@ function ThemeSwitch() {
   </div>;
 }
 
-export default function AppShellClient({ currentUser, initialNotifications, propertyTotal, children }: {
+export default function AppShellClient({ currentUser, initialNotifications, propertyTotal, novosMatches, children }: {
   currentUser: WorkspaceSessionUser;
   initialNotifications: WorkspaceNotification[];
   propertyTotal: number;
+  /** Matches que o corretor ainda não viu (contados no layout): o botão "Match" fica vermelho com esse número. */
+  novosMatches: number;
   children: React.ReactNode;
 }) {
   const pathname = usePathname();
@@ -207,6 +210,9 @@ export default function AppShellClient({ currentUser, initialNotifications, prop
           <div className="flex items-center gap-1.5 sm:gap-2">
             <button type="button" onClick={() => setIsSubscriptionOpen(true)} className="hidden md:inline-flex rounded-lg border border-slate-700 bg-slate-800/90 px-3 py-1.5 text-xs font-semibold text-white">Minha assinatura</button>
             <button type="button" onClick={() => setIsFeedbackOpen(true)} aria-label="Ajuda e fale conosco" className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 bg-slate-800/90 px-2.5 py-1.5 text-xs text-slate-300 transition hover:border-amber-500/40"><MessageSquarePlus className="h-4 w-4" /><span className="hidden md:inline">Ajuda</span></button>
+
+            {/* key: quando o layout recontar os novos, o botão recomeça com o número do servidor. */}
+            <BotaoMatch key={novosMatches} novosIniciais={novosMatches} />
 
             <div className="relative" data-header-popover="">
               <button type="button" onClick={() => { setIsNotificationsOpen(!isNotificationsOpen); setIsUserSwitcherOpen(false); }}
