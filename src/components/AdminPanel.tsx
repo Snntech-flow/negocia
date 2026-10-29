@@ -35,6 +35,8 @@ export default function AdminPanel({ users, transactions, feedback, currentUserI
   const [search, setSearch] = useState("");
   const [aba, setAba] = useState<"clientes" | "faturamento">(() => {
     if (abaInicial) return abaInicial;
+    // O aviso de feedback no sino abre /admin#feedback-piloto, que fica na aba Clientes.
+    if (typeof window !== "undefined" && window.location.hash === "#feedback-piloto") return "clientes";
     try { return typeof window !== "undefined" && sessionStorage.getItem("negocialar-admin-aba") === "faturamento" ? "faturamento" : "clientes"; } catch { return "clientes"; }
   });
   const trocarAba = (nova: "clientes" | "faturamento") => { setAba(nova); try { sessionStorage.setItem("negocialar-admin-aba", nova); } catch {} };
@@ -188,7 +190,7 @@ export default function AdminPanel({ users, transactions, feedback, currentUserI
         </div>
       </section>
 
-      <section className="bg-slate-900 rounded-2xl border border-slate-800 p-6 shadow-xl space-y-4">
+      <section id="feedback-piloto" className="scroll-mt-28 bg-slate-900 rounded-2xl border border-slate-800 p-6 shadow-xl space-y-4">
         <div className="flex items-center justify-between border-b border-slate-800 pb-3"><div><h3 className="text-lg font-bold text-white">Feedback do piloto ({feedback.length})</h3><p className="text-xs text-slate-400">Dúvidas, erros e sugestões enviados pelos corretores.</p></div><MessageSquarePlus className="h-5 w-5 text-amber-400" /></div>
         {feedback.length === 0 ? <p className="rounded-lg border border-dashed border-slate-700 px-4 py-6 text-center text-xs text-slate-400">Nenhum feedback recebido ainda.</p> : <div className="space-y-3">{feedback.map((item) => <article key={item.id} className="rounded-xl border border-slate-800 bg-slate-950 p-4"><div className="flex flex-wrap items-start justify-between gap-3"><div><p className="text-xs font-bold text-white">{item.userName} · CRECI {item.userCreci}</p><p className="mt-1 text-[10px] text-slate-500">{item.screen} · {item.category === "erro" ? "Erro" : item.category === "ideia" ? "Ideia" : "Dúvida"} · {when(item.createdAt)}</p></div><select aria-label="Status do feedback" value={item.status} disabled={somenteLeitura || busy === `fb:${item.id}`} onChange={(event) => void feedbackStatus(item, event.target.value)} className="rounded-lg border border-slate-700 bg-slate-900 px-2 py-1.5 text-[11px] text-white"><option value="novo">Novo</option><option value="em_analise">Em análise</option><option value="concluido">Concluído</option></select></div><p className="mt-3 whitespace-pre-wrap text-xs leading-relaxed text-slate-300">{item.message}</p></article>)}</div>}
       </section>

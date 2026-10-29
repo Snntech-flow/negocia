@@ -1,7 +1,8 @@
 // Feedback do piloto (envio pelo corretor; triagem pelo admin). Movido de actions.ts (Fase 0) — comportamento idêntico.
 import { ActionError } from "../action-result";
-import { db, pilotFeedback } from "../db";
-import { eq } from "drizzle-orm";
+import { db, pilotFeedback, users, notifications } from "../db";
+import { and, eq, ne } from "drizzle-orm";
+import { avisoDeFeedback } from "../aviso-de-feedback";
 import { revalidatePath } from "next/cache";
 import { requireCurrentUser } from "../auth";
 
@@ -13,7 +14,15 @@ export async function submitPilotFeedbackImpl(input: { screen: string; category:
   if (!["vitrine", "crm", "radar", "cadastrar", "termo", "dvp", "financeiro", "admin"].includes(screen)) throw new ActionError("Selecione uma tela válida.");
   if (!["duvida", "erro", "ideia"].includes(category)) throw new ActionError("Selecione um tipo de feedback válido.");
   if (message.length < 10 || message.length > 2000) throw new ActionError("Escreva de 10 a 2.000 caracteres.");
-  const [feedback] = await db.insert(pilotFeedback).values({ userId: actor.id, screen, category, message }).returning({ id: pilotFeedback.id, createdAt: pilotFeedback.createdAt });
+  // O feedback e o aviso no sino de cada administrador (menos quem mandou) entram juntos (28/10/2026, lib/aviso-de-feedback).
+  const feedback = await db.transaction(async (tx) => {
+    const [criado] = await tx.insert(pilotFeedback).values({ userId: actor.id, screen, category, message }).returning({ id: pilotFeedback.id, createdAt: pilotFeedback.createdAt });
+    const [autor] = await tx.select({ name: users.name }).from(users).where(eq(users.id, actor.id)).limit(1);
+    const administradores = await tx.select({ id: users.id }).from(users).where(and(eq(users.role, "admin"), ne(users.id, actor.id)));
+    const aviso = avisoDeFeedback({ nome: autor?.name || "Corretor", screen, category, message });
+    if (administradores.length) await tx.insert(notifications).values(administradores.map((admin) => ({ userId: admin.id, ...aviso, type: "feedback", read: false })));
+    return criado;
+  });
   revalidatePath("/");
   return { success: true, feedback };
 }

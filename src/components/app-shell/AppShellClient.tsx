@@ -118,6 +118,7 @@ export default function AppShellClient({ currentUser, initialNotifications, prop
     }
     setIsNotificationsOpen(false);
     if (notif.type === "dvp") router.push(`${href("dvp")}#acompanhamento-parcerias`);
+    else if (notif.type === "feedback") router.push(`${href("admin")}#feedback-piloto`);
     else if (notif.propertyId) router.push(`${href("vitrine")}?ficha=${notif.propertyId}`);
   };
 
