@@ -13,7 +13,7 @@ import Avatar from "@/components/Avatar";
 import BotaoFechar from "@/components/BotaoFechar";
 import DialogHost from "@/components/DialogHost";
 import BillingPopup from "@/components/BillingPopup";
-import { abasGuardadas, abrirAba, fecharAba } from "@/lib/abas";
+import { abasGuardadas, abrirAba, fecharAba, mostrarBarraDeAbas } from "@/lib/abas";
 import { useVoltarFecha } from "@/lib/use-voltar-fecha";
 import { logoutUser, markAllNotificationsAsRead, markNotificationAsRead, submitPilotFeedback } from "@/lib/actions";
 import { unwrap } from "@/lib/action-result";
@@ -292,13 +292,13 @@ export default function AppShellClient({ currentUser, initialNotifications, prop
             </details>
           ))}
         </div>
-        {/* Abas abertas (estilo Flow): a tela de cada aba e um X para fechar; a Vitrine é a fixa. */}
-        <div role="tablist" aria-label="Telas abertas" className="max-w-7xl mx-auto flex items-center gap-1 overflow-x-auto px-4 pb-2 sm:px-6 lg:px-8 [scrollbar-width:none]">
+        {/* Abas abertas (estilo Flow): a tela de cada aba e um X para fechar; a Vitrine é a fixa. Só com 2 telas ou mais. */}
+        {mostrarBarraDeAbas(abasAbertas) && <div role="tablist" aria-label="Telas abertas" className="max-w-7xl mx-auto flex items-center gap-1 overflow-x-auto px-4 pb-2 sm:px-6 lg:px-8 [scrollbar-width:none]">
           {abasAbertas.map((aba) => <div key={aba} className={`flex h-8 shrink-0 items-center rounded-md text-xs font-semibold ${aba === activeTab ? "bg-[#ffffff] text-[#083858]" : "bg-[#ffffff]/10 text-[#ffffff] hover:bg-[#ffffff]/20"}`}>
             <Link href={href(aba)} role="tab" aria-selected={aba === activeTab} className={`flex h-full items-center ${aba === "vitrine" ? "px-3" : "pl-3 pr-1"}`}>{TAB_LABELS[aba]}</Link>
             {aba !== "vitrine" && <button type="button" aria-label={`Fechar a aba ${TAB_LABELS[aba]}`} title="Fechar aba" onClick={() => fecharAbaDaTela(aba)} className="mr-1 flex h-6 w-6 items-center justify-center rounded hover:bg-[#083858]/15"><X className="h-3.5 w-3.5" aria-hidden="true" /></button>}
           </div>)}
-        </div>
+        </div>}
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 sm:py-8">

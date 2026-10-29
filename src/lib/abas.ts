@@ -17,3 +17,9 @@ export function abasGuardadas<T extends string>(guardado: unknown, permitidas: r
   const lista = Array.isArray(guardado) ? guardado.filter((item): item is T => typeof item === "string" && permitidas.includes(item as T)) : [];
   return [fixa, ...lista.filter((item, i) => item !== fixa && lista.indexOf(item) === i)];
 }
+
+/**
+ * A barra de abas só aparece com DUAS telas abertas ou mais (28/10/2026, Sidney: "por que aparece duas vezes o nome
+ * Vitrine?"). Com a Vitrine sozinha, a barra repetia o botão do menu logo acima e não servia para nada.
+ */
+export const mostrarBarraDeAbas = (abertas: readonly unknown[]) => abertas.length > 1;

@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { abasGuardadas, abrirAba, fecharAba } from "../src/lib/abas";
+import { abasGuardadas, abrirAba, fecharAba, mostrarBarraDeAbas } from "../src/lib/abas";
 
 test("abrir aba: entra no fim, sem repetir", () => {
   assert.deepEqual(abrirAba(["vitrine"], "crm"), ["vitrine", "crm"]);
@@ -32,4 +32,25 @@ test("🔴 a barra de abas existe no app, com X em cada aba que não é a Vitrin
   assert.match(app, /aba !== "vitrine" && <button/);
   assert.match(app, /href=\{href\(aba\)\}/, "a aba leva à rota dela");
   assert.match(app, /const pathname = usePathname\(\)/, "a aba ativa vem da URL");
+});
+
+// 28/10/2026, Sidney: "por que aparece duas vezes o nome Vitrine?" · "clico em Documentos e a Vitrine continua laranja".
+test("🔴 a barra de abas só aparece com 2 telas abertas ou mais (a Vitrine sozinha repetia o menu)", () => {
+  assert.equal(mostrarBarraDeAbas(["vitrine"]), false);
+  assert.equal(mostrarBarraDeAbas(["vitrine", "crm"]), true);
+  const app = readFileSync(new URL("../src/components/app-shell/AppShellClient.tsx", import.meta.url), "utf8");
+  assert.match(app, /\{mostrarBarraDeAbas\(abasAbertas\) && <div role="tablist" aria-label="Telas abertas"/);
+});
+
+test("🔴 laranja só na tela atual: o menu aberto de outra seção não é pintado de laranja (claro e escuro)", () => {
+  const css = readFileSync(new URL("../src/app/globals.css", import.meta.url), "utf8").replace(/\/\*[\s\S]*?\*\//g, "");
+  const regrasDoMenuAberto = css.split("\n").filter((linha) => linha.includes("details[open]"));
+  assert.equal(regrasDoMenuAberto.length, 2, "uma regra no claro, uma no escuro");
+  for (const regra of regrasDoMenuAberto) {
+    assert.match(regra, /details\[open\]:not\(\[data-ativa\]\) > summary/, "a regra vale só para o menu de OUTRA seção");
+    assert.doesNotMatch(regra, /background-color: #f59e0b/, "o fundo do menu aberto não é laranja");
+    assert.match(regra, /box-shadow: inset 0 0 0 2px #f59e0b/, "o menu aberto ganha só um contorno laranja");
+  }
+  const app = readFileSync(new URL("../src/components/app-shell/AppShellClient.tsx", import.meta.url), "utf8");
+  assert.match(app, /data-ativa=\{activeTab && menu\.active\.includes\(activeTab\) \? "" : undefined\}/, "o menu da seção atual é marcado");
 });

@@ -58,8 +58,10 @@ body {
 /* Menus do cabeçalho (sino, Minha conta) seguem azul-escuros como o cabeçalho: a regra dos cartões brancos
    deixava o texto branco sobre fundo branco. */
 .negocialar-interior > header [class*="rounded-2xl"][class*="bg-slate-900"] { background-color: #083858; }
-/* Aba do menu aberto: laranja como a seção atual, também com o mouse em cima. */
-.negocialar-interior > header .workspace-navigation details[open] > summary { background-color: #f59e0b; color: #083858; }
+/* Laranja é só "você está aqui" (28/10/2026, Sidney: "clico em Documentos e a Vitrine continua laranja" — o menu aberto
+   também ficava laranja e eram dois botões laranja). O menu aberto de outra seção ganha um contorno laranja, sem
+   preencher; o menu da seção atual, aberto, continua laranja. Também com o mouse em cima. */
+.negocialar-interior > header .workspace-navigation details[open]:not([data-ativa]) > summary { background-color: #205779; color: #ffffff; box-shadow: inset 0 0 0 2px #f59e0b; }
 .negocialar-interior > header [class*="bg-amber-500"],
 .negocialar-interior > header [class*="bg-amber-400"] { color: #083858; }
 .negocialar-interior > header [class*="bg-slate-"] input,
@@ -224,8 +226,8 @@ input::-ms-reveal { display: none; }
 [data-tema="escuro"] .negocialar-interior > header[class] { background-color: #082236; border-color: #163a55; box-shadow: 0 3px 16px rgb(0 0 0 / 35%); }
 [data-tema="escuro"] .negocialar-interior > header [class*="rounded-2xl"][class*="bg-slate-900"] { background-color: #0c2a3f; }
 
-/* Aba do menu aberto continua laranja no escuro, também com o mouse (ou o toque, no celular) em cima. */
-[data-tema="escuro"] .negocialar-interior > header .workspace-navigation details[open] > summary { background-color: #f59e0b; color: #0c2333; }
+/* No escuro, o mesmo: menu aberto de outra seção com contorno laranja, sem preencher, também com o mouse (ou o toque) em cima. */
+[data-tema="escuro"] .negocialar-interior > header .workspace-navigation details[open]:not([data-ativa]) > summary { background-color: #1a4262; color: #ffffff; box-shadow: inset 0 0 0 2px #f59e0b; }
 
 /* Fundo de cor forte (âmbar, verde, azul-claro) leva texto escuro, como no claro. */
 [data-tema="escuro"] .negocialar-interior :is([class~="bg-amber-400"], [class~="bg-amber-500"], [class~="bg-emerald-400"], [class~="bg-emerald-500"], [class~="bg-sky-400"], [class~="bg-yellow-400"]) { color: #0c2333; }
