@@ -117,7 +117,7 @@ export default function OnboardingModal({ isOpen, onClose, onComplete, initialPl
         <div className="bg-[#121214] text-white p-5 flex items-center justify-between border-b border-white/10">
           <div className="flex items-center gap-3">
             <div className="relative w-8 h-8 rounded-lg overflow-hidden bg-white">
-              <Image src="/logo-negocialar.png" alt="Negocia Lar" fill sizes="32px" className="object-contain" />
+              <Image src="/logo-negocialar-icone.png" alt="Negocia Lar" fill sizes="32px" className="object-contain" />
             </div>
             <div>
               <div className="text-sm font-extrabold flex items-center gap-1.5">

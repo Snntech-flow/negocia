@@ -19,8 +19,9 @@ export const metadata: Metadata = {
   ],
   authors: [{ name: "SNNtech", url: "https://snntech.com.br" }],
   icons: {
-    icon: "/logo-negocialar.png",
-    apple: "/logo-negocialar.png",
+    // Ícone da aba e do celular: só a casa da logo (29/10/2026); a logo inteira fica para a prévia de link.
+    icon: "/logo-negocialar-icone.png",
+    apple: "/logo-negocialar-icone.png",
   },
   openGraph: {
     title: "Negocia Lar — Rede de Parcerias Imobiliárias (MLS B2B)",
@@ -31,8 +32,8 @@ export const metadata: Metadata = {
     images: [
       {
         url: "/logo-negocialar.png",
-        width: 800,
-        height: 600,
+        width: 1024,
+        height: 1024,
         alt: "Negocia Lar - Um produto SNNtech",
       },
     ],

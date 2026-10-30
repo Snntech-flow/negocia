@@ -120,7 +120,7 @@ export default function LandingPage({
           <div className="flex h-[68px] items-center justify-between md:h-[84px]">
             <a href="#" className="flex items-center gap-3 text-[22px] font-extrabold tracking-[-0.01em]">
               <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-[10px] bg-white">
-                <Image src="/logo-negocialar.png" alt="Negocia Lar" fill sizes="40px" className="object-contain p-1" />
+                <Image src="/logo-negocialar-icone.png" alt="Negocia Lar" fill sizes="40px" className="object-contain p-1" />
               </span>
               <span>Negocia<span className="text-[#f08a3c]">lar</span></span>
             </a>

@@ -172,7 +172,7 @@ export default function AppShellClient({ currentUser, initialNotifications, prop
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex items-center justify-between gap-3">
           <Link href={href("vitrine")} className="flex items-center gap-2.5 min-w-0">
             <div className="relative w-10 h-10 rounded-lg overflow-hidden shadow-lg border border-amber-500/30">
-              <Image src="/logo-negocialar.png" alt="Negocia Lar" fill sizes="48px" className="object-contain" />
+              <Image src="/logo-negocialar-icone.png" alt="Negocia Lar" fill sizes="48px" className="object-contain" />
             </div>
             <div className="min-w-0">
               <span className="font-extrabold text-lg sm:text-xl tracking-tight text-slate-900 bg-white rounded-md px-2 py-0.5">Negocia<span className="text-amber-600">lar</span></span>
