@@ -18,7 +18,7 @@ import {
   UserX,
 } from "lucide-react";
 import OnboardingModal from "./OnboardingModal";
-import { PLAN_IDS, PLANS, planMonthlyEquivalent, type PlanId } from "@/lib/plans";
+import { PLAN_IDS, PLANS, planCharge, planMonthlyEquivalent, type PlanId } from "@/lib/plans";
 import { manrope } from "@/lib/fonte-landing";
 
 // Página inicial (29/10/2026, ⚖️ Sidney: "o preto ficou melhor"): uma cor escura, laranja só nos botões, fundo branco.
@@ -82,6 +82,10 @@ export default function LandingPage({
     { href: "#duvidas", label: "Dúvidas" },
   ];
   const plano = PLANS[planoEscolhido];
+  // Preços da tabela vigente (a de quem se cadastra agora).
+  const mensalCheio = planCharge(planoEscolhido, "monthly");
+  const totalAnual = planCharge(planoEscolhido, "annual");
+  const economiaNoAno = (Number(mensalCheio) * 12 - Number(totalAnual)).toFixed(2);
 
   // As 6 primeiras são as que aparecem de cara; as outras abrem em "Ver todas as dúvidas".
   const duvidas = [
@@ -227,7 +231,8 @@ export default function LandingPage({
         <div className="mx-auto grid max-w-[1160px] items-start gap-9 px-5 lg:grid-cols-[.9fr_1.1fr] lg:gap-20">
           <div className="min-w-0">
             <p className={sobretitulo}>Muito além de uma vitrine</p>
-            <h2 className={`mt-3.5 ${titulo}`}>O Match, o CRM e a documentação no mesmo lugar.</h2>
+            {/* ⚖️ Sidney 29/10/2026: "o Match" em laranja. */}
+            <h2 className={`mt-3.5 ${titulo}`}>O <span className="text-[color:var(--nl-laranja)]">Match</span>, o CRM e a documentação no mesmo lugar.</h2>
             <p className={apoio}>Encontre oportunidades de parceria, organize seus clientes e prepare a documentação da negociação sem sair da plataforma.</p>
           </div>
           <div className="grid min-w-0 gap-3.5">
@@ -308,10 +313,19 @@ export default function LandingPage({
               <h3 className="text-[26px] font-extrabold text-[color:var(--nl-escuro)]">{plano.name}</h3>
               <p className="text-sm font-bold text-[color:var(--nl-suave)]">{plano.photos} fotos por anúncio</p>
               <p className="mt-2.5 text-base leading-relaxed text-[color:var(--nl-suave)]">{plano.description}</p>
-              <p className="mt-[22px] text-[44px] font-extrabold tabular-nums tracking-[-0.02em] text-[color:var(--nl-escuro)]">
-                {money(planMonthlyEquivalent(planoEscolhido, billingCycle))} <span className="text-base font-semibold tracking-normal text-[color:var(--nl-suave)]">/mês</span>
+              {/* ⚖️ Sidney 29/10/2026: no anual, o mês muda e o preço cheio aparece riscado — o corretor vê a diferença. */}
+              <p className="mt-[22px] flex flex-wrap items-baseline gap-x-3 font-extrabold tabular-nums tracking-[-0.02em] text-[color:var(--nl-escuro)]">
+                {billingCycle === "annual" && (
+                  <span className="text-2xl font-bold text-[color:var(--nl-suave)]"><span className="sr-only">De </span><s>{money(mensalCheio)}</s><span className="sr-only"> por</span></span>
+                )}
+                <span className="text-[44px]">{money(planMonthlyEquivalent(planoEscolhido, billingCycle))}</span>
+                <span className="text-base font-semibold tracking-normal text-[color:var(--nl-suave)]">/mês</span>
               </p>
-              <p className="min-h-[22px] text-sm text-[color:var(--nl-suave)]">{billingCycle === "annual" ? `Cobrado no ano: ${money(plano.annualTotal)} (use 12, pague 11)` : ""}</p>
+              <p className="min-h-[22px] text-sm text-[color:var(--nl-suave)]">
+                {billingCycle === "annual"
+                  ? <>Cobrado no ano: {money(totalAnual)}. <strong className="font-bold text-emerald-800">Você economiza {money(economiaNoAno)} no ano.</strong></>
+                  : <>No anual, sai por {money(planMonthlyEquivalent(planoEscolhido, "annual"))}/mês.</>}
+              </p>
               <button type="button" onClick={() => abrir("register", planoEscolhido)} className={`${botao} mt-[22px] w-full`}>Começar 30 dias grátis</button>
               <p className="mt-2.5 text-center text-sm text-[color:var(--nl-suave)]">Sem cartão. Depois, renovação via Pix.</p>
             </div>
