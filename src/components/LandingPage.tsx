@@ -30,6 +30,8 @@ const CORES = {
   "--nl-laranja": "#e4610f",
   "--nl-laranja-forte": "#c9530a",
   "--nl-laranja-claro": "#f5b27a",
+  // O "lar" escrito tem o dourado da logo (⚖️ Sidney 29/10/2026); o laranja fica para os botões.
+  "--nl-dourado": "#c4822e",
   "--nl-texto": "#1d1d1f",
   "--nl-suave": "#5d6066",
   "--nl-linha": "#e6e6e9",
@@ -122,7 +124,7 @@ export default function LandingPage({
               <span className="relative h-10 w-10 shrink-0 overflow-hidden rounded-[10px] bg-white">
                 <Image src="/logo-negocialar-icone.png" alt="Negocia Lar" fill sizes="40px" className="object-contain p-1" />
               </span>
-              <span>Negocia<span className="text-[#f08a3c]">lar</span></span>
+              <span>Negocia<span className="text-[color:var(--nl-dourado)]">lar</span></span>
             </a>
 
             <nav aria-label="Seções" className="hidden items-center gap-9 text-[15px] font-semibold text-white/75 md:flex">
@@ -389,7 +391,7 @@ export default function LandingPage({
 
       <footer className="bg-[color:var(--nl-escuro)] py-12 text-[15px] text-white/65">
         <div className="mx-auto flex max-w-[1160px] flex-col items-start justify-between gap-6 px-5 md:flex-row md:items-center">
-          <span className="text-[19px] font-extrabold text-white">Negocia<span className="text-[#f08a3c]">lar</span></span>
+          <span className="text-[19px] font-extrabold text-white">Negocia<span className="text-[color:var(--nl-dourado)]">lar</span></span>
           <nav aria-label="Rodapé" className="flex flex-wrap gap-x-7 gap-y-3">
             {navLinks.map((link) => <a key={link.href} href={link.href} className="hover:text-white">{link.label}</a>)}
             <button type="button" onClick={() => abrir("login")} className="hover:text-white">Entrar</button>

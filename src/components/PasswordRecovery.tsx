@@ -61,7 +61,7 @@ export default function PasswordRecovery() {
   }
   return <main className="flex min-h-screen items-center justify-center bg-slate-50 p-4">
     <div className="w-full max-w-md space-y-5 rounded-2xl border border-slate-200 bg-white p-6 shadow-lg">
-      <Link href="/" className="text-xl font-extrabold text-slate-900">Negocia<span className="text-amber-600">Lar</span></Link>
+      <Link href="/" className="text-xl font-extrabold text-slate-900">Negocia<span className="text-[#c4822e]">Lar</span></Link>
       {!ready ? <p role="status">Carregando…</p> : success ? <>
         <h1 className="text-xl font-bold text-slate-900">Senha atualizada</h1>
         <p role="status" className="text-sm text-slate-600">Entre com sua nova senha. Os acessos anteriores foram encerrados.</p>

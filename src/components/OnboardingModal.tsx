@@ -121,7 +121,7 @@ export default function OnboardingModal({ isOpen, onClose, onComplete, initialPl
             </div>
             <div>
               <div className="text-sm font-extrabold flex items-center gap-1.5">
-                <span>Negocia<span className="text-[#f08a3c]">lar</span></span>
+                <span>Negocia<span className="text-[#c4822e]">lar</span></span>
                 <span className="text-[10px] bg-white/10 text-white/70 font-mono px-1.5 rounded">SNNtech</span>
               </div>
               <div id="onboarding-title" className="text-[11px] text-white/60">{mode === "login" ? "Entrar na sua conta" : mode === "recovery" ? "Recuperar senha" : "Cadastro do corretor"}</div>
@@ -146,7 +146,7 @@ export default function OnboardingModal({ isOpen, onClose, onComplete, initialPl
         {step === 1 && mode === "login" && (
           <form onSubmit={handleLogin} className="p-6 space-y-4">
             <div>
-              <h3 className="text-lg font-extrabold text-[#121214]">Entrar no Negocia <span className="text-amber-600">Lar</span></h3>
+              <h3 className="text-lg font-extrabold text-[#121214]">Entrar no Negocia <span className="text-[#c4822e]">Lar</span></h3>
               <p className="text-xs text-slate-500">Use o e-mail e a senha do seu cadastro.</p>
             </div>
             <label className="block text-xs font-bold text-slate-700">E-mail
@@ -311,7 +311,7 @@ export default function OnboardingModal({ isOpen, onClose, onComplete, initialPl
           <div className="p-8 text-center space-y-6">
             <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-inner"><CheckCircle2 className="w-10 h-10" /></div>
             <div className="space-y-1">
-              <h3 className="text-2xl font-black text-[#121214]">Bem-vindo ao Negocia <span className="text-amber-600">Lar</span>!</h3>
+              <h3 className="text-2xl font-black text-[#121214]">Bem-vindo ao Negocia <span className="text-[#c4822e]">Lar</span>!</h3>
               <p className="text-xs text-slate-500 max-w-sm mx-auto">Seu cadastro no plano <strong>{selectedPlan.name}</strong> foi criado e os 30 dias grátis já começaram. A equipe confere o CRECI para liberar o uso da rede.</p>
             </div>
             <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl text-xs text-slate-600 text-left flex items-center gap-2.5">

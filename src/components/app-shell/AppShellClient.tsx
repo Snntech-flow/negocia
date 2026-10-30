@@ -175,7 +175,7 @@ export default function AppShellClient({ currentUser, initialNotifications, prop
               <Image src="/logo-negocialar-icone.png" alt="Negocia Lar" fill sizes="48px" className="object-contain" />
             </div>
             <div className="min-w-0">
-              <span className="font-extrabold text-lg sm:text-xl tracking-tight text-slate-900 bg-white rounded-md px-2 py-0.5">Negocia<span className="text-amber-600">lar</span></span>
+              <span className="font-extrabold text-lg sm:text-xl tracking-tight text-slate-900 bg-white rounded-md px-2 py-0.5">Negocia<span className="text-[#c4822e]">lar</span></span>
               <p className="hidden text-[11px] text-slate-400 sm:block">Rede de co-corretagem</p>
             </div>
           </Link>
