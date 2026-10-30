@@ -15,6 +15,7 @@ import {
   Lock,
   Menu,
   MessageSquare,
+  Radar,
   UserX,
 } from "lucide-react";
 import OnboardingModal from "./OnboardingModal";
@@ -149,7 +150,8 @@ export default function LandingPage({
           <div className="grid items-center gap-11 pb-[72px] pt-9 lg:grid-cols-[1.15fr_.85fr] lg:gap-16 lg:pb-28 lg:pt-[72px]">
             <div className="min-w-0">
               <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-4 py-2 text-[15px] font-bold md:text-base text-[color:var(--nl-laranja-claro)]">
-                <span aria-hidden="true" className="h-[7px] w-[7px] rounded-full bg-[color:var(--nl-laranja-claro)]" />
+                {/* ⚖️ Sidney 29/10/2026: o ícone do Radar no lugar do ponto (era o da página antiga). */}
+                <Radar className="h-[18px] w-[18px] shrink-0" aria-hidden="true" />
                 Match automático entre corretores
               </span>
               <h1 className="mb-[22px] mt-[26px] text-[40px] font-extrabold leading-[1.05] tracking-[-0.03em] [text-wrap:balance] md:text-[60px]">Chega de perder comissão e captação.</h1>
