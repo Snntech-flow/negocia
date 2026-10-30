@@ -17,7 +17,7 @@ test("voltar no histórico fecha a janela cuja entrada saiu — e só ela (janel
 test("🔴 o X de fechar tem cores fixas (o tema não apaga) e nome para o leitor de tela", () => {
   const html = renderToStaticMarkup(createElement(BotaoFechar, { onClick: () => undefined, rotulo: "Fechar ficha" }));
   assert.match(html, /aria-label="Fechar ficha"/);
-  assert.match(html, /text-\[#083858\]/);
+  assert.match(html, /text-\[#131315\]/);
   assert.match(html, /bg-\[#ffffff\]/);
   assert.doesNotMatch(html, /text-slate-/);
 });

@@ -55,7 +55,7 @@ test("a frase de cima: 'Você já tem 8 matches', '1 match' e zero sem número i
 });
 
 // Vermelho (a corretora piloto, 28/10/2026: o vermelho do botão "ficou legal"; o que ficou chamativo foi o quadro laranja).
-test("🔴 o botão fica vermelho com o número quando há match novo; sem novo, fica azul", () => {
+test("🔴 o botão fica vermelho com o número quando há match novo; sem novo, fica escuro (preto desde 29/10/2026)", () => {
   const vermelho = renderToStaticMarkup(createElement(BotaoDoMatch, { novos: 3, aberto: false, onClick: () => {} }));
   assert.match(vermelho, /bg-\[#dc2626\] text-\[#ffffff\]/);
   assert.match(vermelho, />3<\/span>/);
@@ -64,9 +64,9 @@ test("🔴 o botão fica vermelho com o número quando há match novo; sem novo,
   assert.doesNotMatch(azul, /#dc2626/);
 });
 
-test("🔴 o quadro do Match é azul-marinho com a letra laranja, como o do sino", () => {
+test("🔴 o quadro do Match é escuro (preto desde 29/10/2026) com a letra laranja, como o do sino", () => {
   const html = renderToStaticMarkup(createElement(PainelDoMatch, { estado: { tipo: "pronto", podeVerARede: true, matches: [] }, onIr: () => {} }));
-  assert.match(html, /data-painel-match="" class="[^"]*bg-\[#083858\] text-\[#f59e0b\]/);
+  assert.match(html, /data-painel-match="" class="[^"]*bg-\[#131315\] text-\[#f59e0b\]/);
   assert.doesNotMatch(html, /bg-\[#fcd34d\]|border-\[#d97706\] bg-\[#f59e0b\]/, "o quadro laranja saiu");
 });
 

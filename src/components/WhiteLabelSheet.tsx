@@ -65,7 +65,7 @@ export default function WhiteLabelSheet({ property, broker, onClose }: { propert
         {error && <p role="alert" className="text-sm text-rose-300">{error}</p>}
         <button type="button" onClick={() => void copyLink()} disabled={linkBusy} className="flex w-full items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-3 text-xs font-bold text-slate-950 disabled:opacity-60">{linkCopied ? <CheckCircle2 className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}{linkBusy ? "Gerando link…" : linkCopied ? "Link copiado — cole no WhatsApp do cliente" : "Copiar link para o cliente"}</button>
         <div className="grid gap-3 sm:grid-cols-2"><button type="button" onClick={() => void copy()} className="flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-xs font-bold text-white">{copied ? <CheckCircle2 className="h-4 w-4" /> : <Copy className="h-4 w-4" />}{copied ? "Ficha copiada" : "Copiar texto"}</button><button type="button" onClick={print} className="flex items-center justify-center gap-2 rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-xs font-bold text-white"><FileText className="h-4 w-4" />Imprimir / salvar PDF</button></div>
-        <button type="button" onClick={fechar} className="w-full rounded-xl border border-[#c5d3e0] bg-[#ffffff] px-4 py-3 text-xs font-bold text-[#083858] hover:bg-[#eef4fa]">Fechar e voltar ao aplicativo</button>
+        <button type="button" onClick={fechar} className="w-full rounded-xl border border-[#d0d0d5] bg-[#ffffff] px-4 py-3 text-xs font-bold text-[#131315] hover:bg-[#f3f3f5]">Fechar e voltar ao aplicativo</button>
       </div>
     </div>
     </div>

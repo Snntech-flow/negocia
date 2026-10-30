@@ -141,8 +141,8 @@ export default function AdminPanel({ users, transactions, feedback, currentUserI
     <div role="tablist" aria-label="Administração" className="flex flex-wrap gap-1 border-b border-slate-800">
       {([["clientes", "Clientes", users.length], ["faturamento", "Faturamento e repasses", pendingPix]] as const).map(([id, rotulo, contagem]) =>
         <button key={id} type="button" role="tab" id={`admin-aba-${id}`} aria-selected={aba === id} aria-controls={`admin-painel-${id}`} onClick={() => trocarAba(id)}
-          className={`-mb-px flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-bold ${aba === id ? "border-[#eb6834] text-[#083858]" : "border-transparent text-slate-400 hover:text-slate-200"}`}>
-          {rotulo}{contagem > 0 && <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${id === "faturamento" ? "bg-[#eb6834] text-[#ffffff]" : "bg-[#e2e8f0] text-[#083858]"}`} title={id === "faturamento" ? "Pix aguardando confirmação" : "Corretores cadastrados"}>{contagem}</span>}
+          className={`-mb-px flex items-center gap-2 border-b-2 px-4 py-2.5 text-sm font-bold ${aba === id ? "border-[#eb6834] text-[#131315]" : "border-transparent text-slate-400 hover:text-slate-200"}`}>
+          {rotulo}{contagem > 0 && <span className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${id === "faturamento" ? "bg-[#eb6834] text-[#ffffff]" : "bg-[#e8e8ea] text-[#131315]"}`} title={id === "faturamento" ? "Pix aguardando confirmação" : "Corretores cadastrados"}>{contagem}</span>}
         </button>)}
     </div>
 
@@ -203,7 +203,7 @@ export default function AdminPanel({ users, transactions, feedback, currentUserI
             <p className="text-xs text-slate-400">Faturado: Pix confirmado, na data da confirmação. A receber: mensalidades pelo vencimento de cada corretor (mensal ou anual), inclusive as vencidas e não pagas; isentos e suspensos ficam fora.</p></div>
           <div className="flex flex-wrap items-end gap-2">
             <div role="group" aria-label="Agrupar por" className="flex rounded-lg border border-slate-700 p-0.5 text-xs font-semibold">
-              {(["mes", "ano"] as const).map((opcao) => <button key={opcao} type="button" aria-pressed={modo === opcao} onClick={() => setModo(opcao)} className={`rounded-md px-3 py-1.5 ${modo === opcao ? "bg-[#083858] text-[#ffffff]" : "text-slate-300"}`}>{opcao === "mes" ? "Por mês" : "Por ano"}</button>)}
+              {(["mes", "ano"] as const).map((opcao) => <button key={opcao} type="button" aria-pressed={modo === opcao} onClick={() => setModo(opcao)} className={`rounded-md px-3 py-1.5 ${modo === opcao ? "bg-[#131315] text-[#ffffff]" : "text-slate-300"}`}>{opcao === "mes" ? "Por mês" : "Por ano"}</button>)}
             </div>
             {modo === "mes" && <>
               <label className="text-[11px] text-slate-400">De<input type="month" value={deMes} onChange={(event) => event.target.value && setDeMes(event.target.value)} className="mt-1 block rounded-lg border border-slate-700 bg-slate-950 px-2 py-1.5 text-xs text-white" /></label>

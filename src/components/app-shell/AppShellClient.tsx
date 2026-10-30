@@ -171,11 +171,12 @@ export default function AppShellClient({ currentUser, initialNotifications, prop
       <header className="relative sm:sticky top-0 z-40 border-b border-slate-800 bg-slate-900/90 backdrop-blur">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-2.5 flex items-center justify-between gap-3">
           <Link href={href("vitrine")} className="flex items-center gap-2.5 min-w-0">
-            <div className="relative w-10 h-10 rounded-lg overflow-hidden shadow-lg border border-amber-500/30">
+            <div className="relative w-10 h-10 rounded-[10px] overflow-hidden bg-white">
               <Image src="/logo-negocialar-icone.png" alt="Negocia Lar" fill sizes="48px" className="object-contain" />
             </div>
             <div className="min-w-0">
-              <span className="font-extrabold text-lg sm:text-xl tracking-tight text-slate-900 bg-white rounded-md px-2 py-0.5">Negocia<span className="text-[#c4822e]">lar</span></span>
+              {/* A marca como na página inicial: casa, "Negocia" branco e "lar" dourado (29/10/2026). */}
+              <span className="font-extrabold text-lg sm:text-xl tracking-tight text-white">Negocia<span className="text-[#c4822e]">lar</span></span>
               <p className="hidden text-[11px] text-slate-400 sm:block">Rede de co-corretagem</p>
             </div>
           </Link>
@@ -199,14 +200,14 @@ export default function AppShellClient({ currentUser, initialNotifications, prop
                   → volta o azul de antes e a letra, que era branca, fica laranja. Cores fixas: o tema do cabeçalho repinta as
                   classes slate e amber. Não lida: azul um tom acima, faixa e bolinha laranja; lida: azul, sem transparência. */}
               {isNotificationsOpen && (
-                <div data-painel-notificacoes="" className="absolute right-0 mt-3 w-[calc(100vw-2rem)] max-w-96 rounded-2xl border-2 border-[#326480] bg-[#083858] text-[#f59e0b] shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95">
-                  <div className="p-3.5 border-b border-[#326480] flex items-center justify-between">
+                <div data-painel-notificacoes="" className="absolute right-0 mt-3 w-[calc(100vw-2rem)] max-w-96 rounded-2xl border-2 border-[#242427] bg-[#131315] text-[#f59e0b] shadow-2xl z-50 overflow-hidden animate-in fade-in zoom-in-95">
+                  <div className="p-3.5 border-b border-[#242427] flex items-center justify-between">
                     <div className="flex items-center gap-2"><Bell className="w-4 h-4 text-[#f59e0b]" /><span className="text-sm font-bold text-[#f59e0b]">Notificações ({notifications.length + (billingAlert ? 1 : 0)})</span></div>
                     {unreadCount > 0 && <button type="button" onClick={() => void handleMarkAllRead()} className="text-[11px] font-bold text-[#f59e0b] underline hover:no-underline">Marcar todas como lidas</button>}
                   </div>
-                  <div className="max-h-80 overflow-y-auto divide-y divide-[#326480]">
+                  <div className="max-h-80 overflow-y-auto divide-y divide-[#242427]">
                     {billingAlert && (
-                      <div role="status" className={`p-3.5 space-y-1.5 border-l-4 ${billingAlert.tone === "vencido" ? "border-[#dc2626] bg-[#0d4a72]" : "border-[#f59e0b] bg-[#0d4a72]"}`}>
+                      <div role="status" className={`p-3.5 space-y-1.5 border-l-4 ${billingAlert.tone === "vencido" ? "border-[#dc2626] bg-[#19191c]" : "border-[#f59e0b] bg-[#19191c]"}`}>
                         <span className="text-sm font-bold text-[#f59e0b] flex items-center gap-1.5"><CreditCard className={`w-4 h-4 ${billingAlert.tone === "vencido" ? "text-[#f87171]" : "text-[#f59e0b]"}`} aria-hidden="true" />{billingAlert.title}</span>
                         <p className="text-[13px] font-medium text-[#fbbf24] leading-relaxed">{billingAlert.message}</p>
                         <button type="button" onClick={() => { setIsNotificationsOpen(false); setIsSubscriptionOpen(true); }} className="text-xs font-bold text-[#f59e0b] underline hover:no-underline">Abrir Minha assinatura</button>
@@ -215,7 +216,7 @@ export default function AppShellClient({ currentUser, initialNotifications, prop
                     {notifications.length === 0 ? (billingAlert ? null : <div className="p-6 text-center text-[13px] font-medium text-[#fbbf24]">Nenhuma notificação no momento.</div>) : (
                       notifications.map((notif) => (
                         <button type="button" key={notif.id} onClick={() => void handleNotificationClick(notif)}
-                          className={`block w-full text-left p-3.5 space-y-1.5 transition cursor-pointer ${notif.read ? "bg-[#083858] hover:bg-[#0d4a72]" : "bg-[#0d4a72] border-l-4 border-[#f59e0b] hover:bg-[#105584]"}`}>
+                          className={`block w-full text-left p-3.5 space-y-1.5 transition cursor-pointer ${notif.read ? "bg-[#131315] hover:bg-[#19191c]" : "bg-[#19191c] border-l-4 border-[#f59e0b] hover:bg-[#1e1e21]"}`}>
                           <div className="flex items-center justify-between gap-2">
                             <span className="text-sm font-bold text-[#f59e0b] flex items-center gap-1.5">{!notif.read && <span className="w-2 h-2 shrink-0 rounded-full bg-[#f59e0b]"></span>}{notif.title}</span>
                             <span className="shrink-0 text-[11px] font-semibold text-[#fbbf24] font-mono">{notif.createdAt ? new Date(notif.createdAt).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" }) : "Hoje"}</span>

@@ -294,7 +294,7 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
                         type="button"
                         onClick={() => onEdit(prop)}
                         title="Imóvel seu: fotos, valor e condição de parceria se mudam em Imóveis › Meus imóveis."
-                        className="flex items-center justify-center gap-2 rounded-xl border border-[#083858] bg-[#ffffff] px-3 py-2.5 text-xs font-bold text-[#083858] transition hover:bg-[#eef4fa]"
+                        className="flex items-center justify-center gap-2 rounded-xl border border-[#131315] bg-[#ffffff] px-3 py-2.5 text-xs font-bold text-[#131315] transition hover:bg-[#f3f3f5]"
                       ><Pencil className="h-4 w-4" />Editar em Meus imóveis</button> : <button type="button" disabled className="flex cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-xs font-semibold text-slate-500" title={prop.broker.id === currentUserId ? "Esta é uma captação sua; escolha um imóvel de outro corretor para iniciar uma parceria." : "Este imóvel não está aceitando parcerias."}><Stamp className="h-4 w-4" />{prop.broker.id === currentUserId ? "Imóvel da sua carteira" : "Parceria indisponível"}</button>}
                     </div>
                   </div>

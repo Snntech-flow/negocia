@@ -34,7 +34,7 @@ export function whiteLabelHtml(property: Listing, broker: SharingBroker) {
     if (url.protocol === "https:" && !url.username && !url.password) image = `<img src="${escapeHtml(url.href)}" alt="${escapeHtml(property.title)}">`;
   } catch { /* The printable sheet also works without an image. */ }
   return `<!doctype html><html lang="pt-BR"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>${escapeHtml(property.title)}</title>
-    <style>body{font:16px system-ui,sans-serif;color:#16384e;max-width:760px;margin:32px auto;padding:24px}header{border-bottom:2px solid #d49b25;padding-bottom:16px}h1{font-size:28px}img{width:100%;max-height:360px;object-fit:cover;margin:24px 0}.price{font-size:24px;font-weight:700}a{color:#146548;overflow-wrap:anywhere}@media print{body{margin:0;padding:12mm}img{max-height:85mm}a{text-decoration:none}}</style>
+    <style>body{font:16px system-ui,sans-serif;color:#141416;max-width:760px;margin:32px auto;padding:24px}header{border-bottom:2px solid #d49b25;padding-bottom:16px}h1{font-size:28px}img{width:100%;max-height:360px;object-fit:cover;margin:24px 0}.price{font-size:24px;font-weight:700}a{color:#146548;overflow-wrap:anywhere}@media print{body{margin:0;padding:12mm}img{max-height:85mm}a{text-decoration:none}}</style>
     </head><body><header><strong>${escapeHtml(broker.name)}</strong><p>CRECI ${escapeHtml(broker.creci)}</p></header>${image}
     <h1>${escapeHtml(property.title)}</h1><p>${escapeHtml(property.neighborhood)}, ${escapeHtml(property.city)}</p><p class="price">${escapeHtml(money(property.salePrice))}</p>
     <p>${escapeHtml(property.propertyType)} · ${features(property)} · ${escapeHtml(formatArea(property.areaM2))} m²</p>

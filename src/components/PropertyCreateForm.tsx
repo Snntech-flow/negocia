@@ -323,10 +323,10 @@ export default function PropertyCreateForm({ broker, blockedReason, photoLimit, 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
             {OPCOES_DE_CONDICAO.map((o) => (
               // Cores fixas (não as classes que o tema da área logada reescreve — ver tests/theme.test.ts): a escolhida em azul com ✓.
-              <label key={o.valor} className={`p-3 rounded-xl border-2 cursor-pointer transition ${partnershipModels === o.valor ? "border-[#083858] bg-[#083858] text-[#ffffff]" : "border-[#cbd5e1] bg-[#ffffff] text-[#083858] hover:border-[#083858]"}`}>
+              <label key={o.valor} className={`p-3 rounded-xl border-2 cursor-pointer transition ${partnershipModels === o.valor ? "border-[#131315] bg-[#131315] text-[#ffffff]" : "border-[#d4d4d8] bg-[#ffffff] text-[#131315] hover:border-[#131315]"}`}>
                 <input type="radio" name="partnershipModels" value={o.valor} required checked={partnershipModels === o.valor} onChange={() => setPartnershipModels(o.valor)} className="sr-only" />
                 <span className="block text-xs font-bold">{partnershipModels === o.valor ? "✓ " : ""}{o.rotulo}</span>
-                <span className={`block text-[11px] leading-snug mt-0.5 ${partnershipModels === o.valor ? "text-[#dbeafe]" : "text-[#475569]"}`}>{o.ajuda}</span>
+                <span className={`block text-[11px] leading-snug mt-0.5 ${partnershipModels === o.valor ? "text-[#ececed]" : "text-[#475569]"}`}>{o.ajuda}</span>
               </label>
             ))}
           </div>

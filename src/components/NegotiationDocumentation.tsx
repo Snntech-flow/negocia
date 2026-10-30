@@ -31,7 +31,7 @@ export default function NegotiationDocumentation({ lead, properties, chosenPrope
   async function save() { setBusy(true); setMessage(''); try { const result = unwrap(await saveNegotiationDocuments(lead.id, data)); onSaved(result.documentation); setMessage('Documentação salva.'); } catch (error) { setMessage(error instanceof Error ? error.message : 'Não foi possível salvar.'); } finally { setBusy(false); } }
   function print() {
     const page = window.open('', '_blank'); if (!page) { setMessage('Permita a abertura da janela para imprimir.'); return; }
-    const pre = page.document.createElement('pre'); pre.style.cssText = 'white-space:pre-wrap;font:16px/1.6 Arial;margin:40px;color:#083858'; pre.textContent = `NEGOCIA LAR · LISTA DE DOCUMENTOS\n\n${text}`; page.document.title = 'Lista de documentos'; page.document.body.appendChild(pre); page.print();
+    const pre = page.document.createElement('pre'); pre.style.cssText = 'white-space:pre-wrap;font:16px/1.6 Arial;margin:40px;color:#131315'; pre.textContent = `NEGOCIA LAR · LISTA DE DOCUMENTOS\n\n${text}`; page.document.title = 'Lista de documentos'; page.document.body.appendChild(pre); page.print();
   }
   return <section className="space-y-4 rounded-xl border border-sky-800 bg-slate-900 p-4">
     <h4 className="font-bold text-white">Documentação da negociação</h4>

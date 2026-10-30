@@ -76,7 +76,7 @@ export default function RepassesDosSocios({ faixasMensais, modo, somenteLeitura,
       <div className="flex flex-wrap items-start justify-between gap-3">
         <div><h3 id="repasses-titulo" className="text-lg font-bold text-white flex items-center gap-2"><Users className="w-5 h-5 text-amber-500" />Repasses aos sócios</h3>
           <p className="text-xs text-slate-400">O % de cada sócio e da empresa sobre o faturamento das assinaturas. Cada mudança vale a partir do mês escolhido; os meses anteriores continuam com o % da época.</p></div>
-        {!somenteLeitura && versoes && !editando && <button type="button" onClick={abrirEdicao} className="rounded-lg bg-[#083858] px-3 py-2 text-xs font-bold text-[#ffffff]">{vigente ? "Mudar os %" : "Definir os %"}</button>}
+        {!somenteLeitura && versoes && !editando && <button type="button" onClick={abrirEdicao} className="rounded-lg bg-[#131315] px-3 py-2 text-xs font-bold text-[#ffffff]">{vigente ? "Mudar os %" : "Definir os %"}</button>}
       </div>
       {vigente ? <p className="text-sm text-slate-300"><strong>Em vigor desde {monthShort(vigente.validFromMonth)}:</strong> {vigente.shares.map((parte) => `${parte.name} ${pct(parte.percent)}`).join(" · ")}</p>
         : versoes && <p className="text-sm text-slate-400">Nenhuma regra de repasse em vigor{versoes.length ? " neste mês" : " ainda"}.</p>}
@@ -103,12 +103,12 @@ export default function RepassesDosSocios({ faixasMensais, modo, somenteLeitura,
         <p className={`text-xs font-semibold ${somaDigitada(linhas) === 100 ? "text-emerald-400" : "text-amber-400"}`}>Soma: {pct(somaDigitada(linhas))} {somaDigitada(linhas) === 100 ? "✓" : "(precisa dar 100%)"}</p>
       </div>
       {problema && <p className="text-xs text-slate-400">{problema}</p>}
-      <button type="button" disabled={!!problema || salvando} onClick={() => void salvar()} className="rounded-lg bg-[#083858] px-4 py-2 text-xs font-bold text-[#ffffff] disabled:opacity-40">{salvando ? "Gravando…" : `Gravar a regra a partir de ${monthShort(mes)}`}</button>
+      <button type="button" disabled={!!problema || salvando} onClick={() => void salvar()} className="rounded-lg bg-[#131315] px-4 py-2 text-xs font-bold text-[#ffffff] disabled:opacity-40">{salvando ? "Gravando…" : `Gravar a regra a partir de ${monthShort(mes)}`}</button>
     </div>}
 
     {versoes && colunas.length > 0 && <>
       <div role="group" aria-label="Base do repasse" className="flex w-fit rounded-lg border border-slate-700 p-0.5 text-xs font-semibold">
-        {(["pago", "aReceber"] as const).map((opcao) => <button key={opcao} type="button" aria-pressed={base === opcao} onClick={() => setBase(opcao)} className={`rounded-md px-3 py-1.5 ${base === opcao ? "bg-[#083858] text-[#ffffff]" : "text-slate-300"}`}>{opcao === "pago" ? "Do faturado" : "Do a receber"}</button>)}
+        {(["pago", "aReceber"] as const).map((opcao) => <button key={opcao} type="button" aria-pressed={base === opcao} onClick={() => setBase(opcao)} className={`rounded-md px-3 py-1.5 ${base === opcao ? "bg-[#131315] text-[#ffffff]" : "text-slate-300"}`}>{opcao === "pago" ? "Do faturado" : "Do a receber"}</button>)}
       </div>
       <div className="overflow-x-auto">
         <table className="w-full text-left text-xs">

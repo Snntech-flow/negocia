@@ -3,8 +3,8 @@
 @tailwind utilities;
 
 :root {
-  --background: #f8fafc;
-  --foreground: #083858;
+  --background: #fafafa;
+  --foreground: #131315;
 }
 
 body {
@@ -15,19 +15,19 @@ body {
 
 /* Workspace surfaces follow the white and dark blue landing page palette. */
 .negocialar-interior {
-  background-color: #e8edf2;
-  color: #083858;
+  background-color: #ececee;
+  color: #131315;
 }
 .negocialar-interior [class*="bg-slate-950"] { background-color: #ffffff; }
 .negocialar-interior [class*="bg-slate-900"] { background-color: #ffffff; }
-.negocialar-interior [class*="bg-slate-800"] { background-color: #f1f5f9; }
-.negocialar-interior [class*="bg-slate-700"] { background-color: #e2e8f0; }
+.negocialar-interior [class*="bg-slate-800"] { background-color: #f4f4f5; }
+.negocialar-interior [class*="bg-slate-700"] { background-color: #e8e8ea; }
 .negocialar-interior [class*="text-slate-"],
 .negocialar-interior .text-white,
-.negocialar-interior [class*="hover:text-white"]:hover { color: #083858; }
-.negocialar-interior [class*="border-slate-"] { border-color: #cbd5e1; }
+.negocialar-interior [class*="hover:text-white"]:hover { color: #131315; }
+.negocialar-interior [class*="border-slate-"] { border-color: #d4d4d8; }
 .negocialar-interior [class*="placeholder-slate-"]::placeholder { color: #64748b; }
-.negocialar-interior [class*="hover:bg-slate-"]:hover { background-color: #e2e8f0; }
+.negocialar-interior [class*="hover:bg-slate-"]:hover { background-color: #e8e8ea; }
 .negocialar-interior input,
 .negocialar-interior select,
 .negocialar-interior textarea { color-scheme: light; }
@@ -36,43 +36,43 @@ body {
 .negocialar-interior .text-slate-500,
 .negocialar-interior .text-slate-600 { color: #475569; }
 .negocialar-interior [class*="rounded-"][class*="bg-slate-900"] {
-  box-shadow: 0 2px 8px rgb(8 56 88 / 6%);
+  box-shadow: 0 2px 8px rgb(19 19 21 / 6%);
 }
 .negocialar-interior > header[class] {
-  background-color: #083858;
-  border-color: #16486b;
+  background-color: #131315;
+  border-color: #1a1a1c;
   color: #ffffff;
 }
 .negocialar-interior > header [class*="text-slate-"],
 .negocialar-interior > header .text-white { color: #ffffff; }
 .negocialar-interior > header .text-slate-400,
-.negocialar-interior > header .text-slate-500 { color: #cbd5e1; }
+.negocialar-interior > header .text-slate-500 { color: #d4d4d8; }
 .negocialar-interior > header [class*="bg-slate-"] {
-  background-color: #16486b;
+  background-color: #1a1a1c;
   color: #ffffff;
-  border-color: #326480;
+  border-color: #242427;
 }
-.negocialar-interior > header [class*="hover:bg-slate-"]:hover { background-color: #205779; }
-/* A regra geral de hover põe texto azul-marinho (fundo claro); no cabeçalho azul o texto continua branco. */
+.negocialar-interior > header [class*="hover:bg-slate-"]:hover { background-color: #1f1f22; }
+/* A regra geral de hover põe texto escuro (fundo claro); no cabeçalho preto o texto continua branco. */
 .negocialar-interior > header [class*="hover:text-white"]:hover { color: #ffffff; }
-/* Menus do cabeçalho (sino, Minha conta) seguem azul-escuros como o cabeçalho: a regra dos cartões brancos
+/* Menus do cabeçalho (sino, Minha conta) seguem escuros como o cabeçalho: a regra dos cartões brancos
    deixava o texto branco sobre fundo branco. */
-.negocialar-interior > header [class*="rounded-2xl"][class*="bg-slate-900"] { background-color: #083858; }
+.negocialar-interior > header [class*="rounded-2xl"][class*="bg-slate-900"] { background-color: #131315; }
 /* Laranja é só "você está aqui" (28/10/2026, Sidney: "clico em Documentos e a Vitrine continua laranja" — o menu aberto
    também ficava laranja e eram dois botões laranja). O menu aberto de outra seção ganha um contorno laranja, sem
    preencher; o menu da seção atual, aberto, continua laranja. Também com o mouse em cima. */
-.negocialar-interior > header .workspace-navigation details[open]:not([data-ativa]) > summary { background-color: #205779; color: #ffffff; box-shadow: inset 0 0 0 2px #f59e0b; }
+.negocialar-interior > header .workspace-navigation details[open]:not([data-ativa]) > summary { background-color: #1f1f22; color: #ffffff; box-shadow: inset 0 0 0 2px #f59e0b; }
 .negocialar-interior > header [class*="bg-amber-500"],
-.negocialar-interior > header [class*="bg-amber-400"] { color: #083858; }
+.negocialar-interior > header [class*="bg-amber-400"] { color: #131315; }
 .negocialar-interior > header [class*="bg-slate-"] input,
 .negocialar-interior > header [class*="bg-slate-"] select { color: #ffffff; }
 
-.negocialar-interior > header .bg-white.text-slate-900 { color: #083858; }
+.negocialar-interior > header .bg-white.text-slate-900 { color: #131315; }
 .negocialar-interior > header .relative.w-10.h-10 { background-color: #ffffff; flex-shrink: 0; }
 
 /* Finishing details for the broker workspace. */
 .negocialar-interior > header[class] {
-  box-shadow: 0 3px 16px rgb(8 56 88 / 12%);
+  box-shadow: 0 3px 16px rgb(19 19 21 / 12%);
 }
 .negocialar-interior > header .bg-white.text-slate-900 {
   display: inline-block;
@@ -88,11 +88,11 @@ body {
 }
 .negocialar-interior > header .relative.w-10.h-10 img { padding: 4px; }
 .negocialar-interior > header button { transition: background-color 160ms, box-shadow 160ms; }
-.negocialar-interior [class*="border-slate-"] { border-color: #d6dee7; }
+.negocialar-interior [class*="border-slate-"] { border-color: #dddde0; }
 .negocialar-interior [class*="rounded-2xl"][class*="bg-slate-900"],
 .negocialar-interior [class*="rounded-3xl"][class*="bg-slate-900"] {
   background-color: #ffffff;
-  box-shadow: 0 4px 18px rgb(8 56 88 / 5%);
+  box-shadow: 0 4px 18px rgb(19 19 21 / 5%);
 }
 .negocialar-interior input:not([type="checkbox"]):not([type="radio"]),
 .negocialar-interior select,
@@ -105,10 +105,10 @@ body {
   outline: 2px solid #f59e0b;
   outline-offset: 3px;
 }
-.negocialar-interior > header [class*="border-slate-"] { border-color: #326480; }
+.negocialar-interior > header [class*="border-slate-"] { border-color: #242427; }
 .negocialar-interior > header input,
 .negocialar-interior > header select,
-.negocialar-interior > header textarea { background-color: #16486b; color: #ffffff; }
+.negocialar-interior > header textarea { background-color: #1a1a1c; color: #ffffff; }
 
 .negocialar-interior .workspace-navigation > button,
 .negocialar-interior .workspace-navigation > details > summary {
@@ -120,7 +120,7 @@ body {
 .negocialar-interior .mls-guidance-title {
   display: inline-block;
   color: #ffffff;
-  background-color: #083858;
+  background-color: #131315;
   border-radius: 6px;
   padding: 6px 10px;
 }
@@ -155,8 +155,8 @@ body {
 .negocialar-interior [class~="text-red-300"],
 .negocialar-interior [class~="text-red-400"] { color: #9f1239; }
 
-/* No cabeçalho azul-marinho os tons claros continuam claros: as regras acima escurecem para o fundo branco.
-   Sem isto, "Minha assinatura" ficava laranja-escuro sobre azul-marinho (contraste 1,67:1). */
+/* No cabeçalho preto os tons claros continuam claros: as regras acima escurecem para o fundo branco.
+   Sem isto, "Minha assinatura" ficava laranja-escuro sobre o fundo escuro (contraste 1,67:1, medido no azul de antes). */
 .negocialar-interior > header [class~="text-amber-200"],
 .negocialar-interior > header [class~="text-amber-300"],
 .negocialar-interior > header [class~="text-amber-400"],
@@ -169,7 +169,7 @@ body {
 .negocialar-interior > header [class~="text-rose-300"],
 .negocialar-interior > header [class~="text-red-400"] { color: #fda4af; }
 
-/* Texto branco em botão e selo coloridos continua branco: a regra geral troca text-white por azul-marinho
+/* Texto branco em botão e selo coloridos continua branco: a regra geral troca text-white por texto escuro
    porque, no resto da área de trabalho, os fundos escuros viraram brancos. */
 .negocialar-interior .text-white:is([class*="bg-emerald-7"], [class*="bg-red-6"], [class*="bg-sky-8"], [class*="bg-blue-6"], [class*="bg-purple-6"], [class*="bg-amber-7"]) { color: #ffffff; }
 
@@ -178,59 +178,59 @@ input::-ms-reveal { display: none; }
 
 /* Fundo atrás das janelas (Ajuda, cobrança…) translúcido também no claro: a regra que deixa bg-slate-950 branco
    o tornava opaco e escondia a tela. */
-.negocialar-interior .fixed.inset-0:is([class*="bg-slate-950/"], [class*="bg-black/"]) { background-color: rgb(8 56 88 / 55%); }
+.negocialar-interior .fixed.inset-0:is([class*="bg-slate-950/"], [class*="bg-black/"]) { background-color: rgb(19 19 21 / 55%); }
 
 /* Gráficos do Financeiro: cores por papel. Azul = receitas, laranja = despesas (par validado para daltonismo
    e contraste sobre o cartão branco); grade e textos recessivos. O modo escuro troca só estas variáveis. */
 .finance-viz {
   --fin-receita: #2a78d6;
   --fin-despesa: #eb6834;
-  --fin-grid: #e5e9ee;
+  --fin-grid: #e8e8eb;
   --fin-muted: #52606d;
-  --fin-hover: rgb(8 56 88 / 6%);
+  --fin-hover: rgb(19 19 21 / 6%);
 }
 
 /* ===== Modo escuro da área logada =====
    Ativado por data-tema="escuro" no <html> (Minha conta › Tema). As telas usam o vocabulário escuro (slate-900,
    text-white…) e as regras acima as clareiam; aqui cada regra clara ganha uma equivalente escura, um degrau mais
    específica, e as classes claras escritas direto nas telas (bg-white, text-slate-900, bg-emerald-50…) escurecem.
-   Paleta: azul-marinho profundo da marca. Texto #e8f0f7 e secundário #a9bdd0 passam 4,5:1 nos cartões #0c2a3f. */
-[data-tema="escuro"] .negocialar-interior { background-color: #061a2a; color: #e8f0f7; color-scheme: dark; }
-[data-tema="escuro"] .negocialar-interior [class*="bg-slate-950"] { background-color: #08223a; }
-[data-tema="escuro"] .negocialar-interior [class*="bg-slate-900"] { background-color: #0c2a3f; }
-[data-tema="escuro"] .negocialar-interior [class*="bg-slate-800"] { background-color: #133550; }
-[data-tema="escuro"] .negocialar-interior [class*="bg-slate-700"] { background-color: #1a4262; }
+   Paleta: preto da marca (até 29/10/2026, azul-marinho). Texto #efeff0 e secundário #b9b9c0 passam 4,5:1 nos cartões #0f0f11. */
+[data-tema="escuro"] .negocialar-interior { background-color: #0a0a0b; color: #efeff0; color-scheme: dark; }
+[data-tema="escuro"] .negocialar-interior [class*="bg-slate-950"] { background-color: #0d0d0f; }
+[data-tema="escuro"] .negocialar-interior [class*="bg-slate-900"] { background-color: #0f0f11; }
+[data-tema="escuro"] .negocialar-interior [class*="bg-slate-800"] { background-color: #141416; }
+[data-tema="escuro"] .negocialar-interior [class*="bg-slate-700"] { background-color: #19191b; }
 [data-tema="escuro"] .negocialar-interior [class*="text-slate-"],
-[data-tema="escuro"] .negocialar-interior [class*="hover:text-white"]:hover { color: #e8f0f7; }
+[data-tema="escuro"] .negocialar-interior [class*="hover:text-white"]:hover { color: #efeff0; }
 [data-tema="escuro"] .negocialar-interior .text-white { color: #ffffff; }
 [data-tema="escuro"] .negocialar-interior .text-slate-400,
 [data-tema="escuro"] .negocialar-interior .text-slate-500,
-[data-tema="escuro"] .negocialar-interior .text-slate-600 { color: #a9bdd0; }
-[data-tema="escuro"] .negocialar-interior [class*="border-slate-"] { border-color: #24506f; }
-[data-tema="escuro"] .negocialar-interior [class*="placeholder-slate-"]::placeholder { color: #7f97ad; }
-[data-tema="escuro"] .negocialar-interior [class*="hover:bg-slate-"]:hover { background-color: #1a4262; }
+[data-tema="escuro"] .negocialar-interior .text-slate-600 { color: #b9b9c0; }
+[data-tema="escuro"] .negocialar-interior [class*="border-slate-"] { border-color: #1d1d20; }
+[data-tema="escuro"] .negocialar-interior [class*="placeholder-slate-"]::placeholder { color: #91919b; }
+[data-tema="escuro"] .negocialar-interior [class*="hover:bg-slate-"]:hover { background-color: #19191b; }
 [data-tema="escuro"] .negocialar-interior [class*="rounded-"][class*="bg-slate-900"],
 [data-tema="escuro"] .negocialar-interior [class*="rounded-2xl"][class*="bg-slate-900"],
-[data-tema="escuro"] .negocialar-interior [class*="rounded-3xl"][class*="bg-slate-900"] { background-color: #0c2a3f; box-shadow: 0 2px 10px rgb(0 0 0 / 25%); }
+[data-tema="escuro"] .negocialar-interior [class*="rounded-3xl"][class*="bg-slate-900"] { background-color: #0f0f11; box-shadow: 0 2px 10px rgb(0 0 0 / 25%); }
 [data-tema="escuro"] .negocialar-interior input,
 [data-tema="escuro"] .negocialar-interior select,
 [data-tema="escuro"] .negocialar-interior textarea { color-scheme: dark; }
 [data-tema="escuro"] .negocialar-interior input:not([type="checkbox"]):not([type="radio"]),
 [data-tema="escuro"] .negocialar-interior select,
-[data-tema="escuro"] .negocialar-interior textarea { background-color: #08223a; color: #e8f0f7; }
+[data-tema="escuro"] .negocialar-interior textarea { background-color: #0d0d0f; color: #efeff0; }
 
 /* Fundo atrás das janelas (Ajuda, assinatura…) translúcido: a regra de cor acima o deixaria opaco. */
-[data-tema="escuro"] .negocialar-interior .fixed.inset-0:is([class*="bg-slate-950/"], [class*="bg-black/"]) { background-color: rgb(2 12 22 / 78%); }
+[data-tema="escuro"] .negocialar-interior .fixed.inset-0:is([class*="bg-slate-950/"], [class*="bg-black/"]) { background-color: rgb(5 5 5 / 78%); }
 
 /* Cabeçalho um tom acima do fundo; logotipo e selo do nome continuam brancos. */
-[data-tema="escuro"] .negocialar-interior > header[class] { background-color: #082236; border-color: #163a55; box-shadow: 0 3px 16px rgb(0 0 0 / 35%); }
-[data-tema="escuro"] .negocialar-interior > header [class*="rounded-2xl"][class*="bg-slate-900"] { background-color: #0c2a3f; }
+[data-tema="escuro"] .negocialar-interior > header[class] { background-color: #0c0c0e; border-color: #151518; box-shadow: 0 3px 16px rgb(0 0 0 / 35%); }
+[data-tema="escuro"] .negocialar-interior > header [class*="rounded-2xl"][class*="bg-slate-900"] { background-color: #0f0f11; }
 
 /* No escuro, o mesmo: menu aberto de outra seção com contorno laranja, sem preencher, também com o mouse (ou o toque) em cima. */
-[data-tema="escuro"] .negocialar-interior > header .workspace-navigation details[open]:not([data-ativa]) > summary { background-color: #1a4262; color: #ffffff; box-shadow: inset 0 0 0 2px #f59e0b; }
+[data-tema="escuro"] .negocialar-interior > header .workspace-navigation details[open]:not([data-ativa]) > summary { background-color: #19191b; color: #ffffff; box-shadow: inset 0 0 0 2px #f59e0b; }
 
 /* Fundo de cor forte (âmbar, verde, azul-claro) leva texto escuro, como no claro. */
-[data-tema="escuro"] .negocialar-interior :is([class~="bg-amber-400"], [class~="bg-amber-500"], [class~="bg-emerald-400"], [class~="bg-emerald-500"], [class~="bg-sky-400"], [class~="bg-yellow-400"]) { color: #0c2333; }
+[data-tema="escuro"] .negocialar-interior :is([class~="bg-amber-400"], [class~="bg-amber-500"], [class~="bg-emerald-400"], [class~="bg-emerald-500"], [class~="bg-sky-400"], [class~="bg-yellow-400"]) { color: #0d0d0e; }
 
 /* Tons claros de destaque voltam a ser claros (as regras do modo claro os escurecem para o fundo branco). */
 [data-tema="escuro"] .negocialar-interior :is([class~="text-amber-200"], [class~="text-amber-300"], [class~="text-amber-400"], [class~="text-orange-300"], [class~="text-orange-400"]) { color: #fcd34d; }
@@ -241,26 +241,26 @@ input::-ms-reveal { display: none; }
 /* Classes claras escritas direto nas telas (fora do cabeçalho, que mantém o logotipo branco). Fundos pastel pela
    classe exata: "bg-amber-50" por trecho de texto também pegaria bg-amber-500 (botão laranja virava transparente). */
 [data-tema="escuro"] .negocialar-interior > :not(header) [class*="bg-white"],
-[data-tema="escuro"] .negocialar-interior > :not(header)[class*="bg-white"] { background-color: #0c2a3f; }
-[data-tema="escuro"] .negocialar-interior :is([class~="bg-slate-50"], [class*="bg-slate-50/"], [class~="bg-slate-100"], [class*="bg-slate-100/"], [class~="bg-slate-200"], [class*="bg-slate-200/"]) { background-color: #133550; }
+[data-tema="escuro"] .negocialar-interior > :not(header)[class*="bg-white"] { background-color: #0f0f11; }
+[data-tema="escuro"] .negocialar-interior :is([class~="bg-slate-50"], [class*="bg-slate-50/"], [class~="bg-slate-100"], [class*="bg-slate-100/"], [class~="bg-slate-200"], [class*="bg-slate-200/"]) { background-color: #141416; }
 [data-tema="escuro"] .negocialar-interior :is([class*="text-amber-7"], [class*="text-amber-8"], [class*="text-amber-9"], [class*="text-orange-7"], [class*="text-orange-8"]) { color: #fcd34d; }
 [data-tema="escuro"] .negocialar-interior :is([class*="text-emerald-6"], [class*="text-emerald-7"], [class*="text-emerald-8"], [class*="text-emerald-9"], [class*="text-green-7"], [class*="text-green-8"]) { color: #6ee7b7; }
 [data-tema="escuro"] .negocialar-interior :is([class*="text-sky-7"], [class*="text-sky-8"], [class*="text-sky-9"], [class*="text-blue-7"], [class*="text-blue-8"]) { color: #7dd3fc; }
 [data-tema="escuro"] .negocialar-interior :is([class*="text-red-6"], [class*="text-red-7"], [class*="text-red-8"], [class*="text-red-9"], [class*="text-rose-7"], [class*="text-rose-8"]) { color: #fda4af; }
 [data-tema="escuro"] .negocialar-interior :is([class~="bg-emerald-50"], [class*="bg-emerald-50/"], [class~="bg-emerald-100"], [class*="bg-emerald-100/"], [class~="bg-green-50"], [class*="bg-green-50/"]) { background-color: rgb(16 185 129 / 14%); }
-[data-tema="escuro"] .negocialar-interior :is([class~="bg-sky-50"], [class*="bg-sky-50/"], [class~="bg-sky-100"], [class*="bg-sky-100/"], [class~="bg-blue-50"], [class*="bg-blue-50/"]) { background-color: rgb(56 189 248 / 14%); }
+[data-tema="escuro"] .negocialar-interior :is([class~="bg-sky-50"], [class*="bg-sky-50/"], [class~="bg-sky-100"], [class*="bg-sky-100/"], [class~="bg-blue-50"], [class*="bg-blue-50/"]) { background-color: rgb(147 147 157 / 14%); }
 [data-tema="escuro"] .negocialar-interior :is([class~="bg-amber-50"], [class*="bg-amber-50/"], [class~="bg-amber-100"], [class*="bg-amber-100/"], [class~="bg-orange-50"], [class*="bg-orange-50/"], [class~="bg-yellow-50"], [class*="bg-yellow-50/"]) { background-color: rgb(245 158 11 / 14%); }
 [data-tema="escuro"] .negocialar-interior :is([class~="bg-red-50"], [class*="bg-red-50/"], [class~="bg-red-100"], [class*="bg-red-100/"], [class~="bg-rose-50"], [class*="bg-rose-50/"]) { background-color: rgb(244 63 94 / 14%); }
 [data-tema="escuro"] .negocialar-interior :is([class*="border-emerald-2"], [class*="border-green-2"]) { border-color: rgb(110 231 183 / 35%); }
-[data-tema="escuro"] .negocialar-interior :is([class*="border-sky-2"], [class*="border-blue-2"]) { border-color: rgb(125 211 252 / 35%); }
+[data-tema="escuro"] .negocialar-interior :is([class*="border-sky-2"], [class*="border-blue-2"]) { border-color: rgb(185 185 192 / 35%); }
 [data-tema="escuro"] .negocialar-interior :is([class*="border-amber-2"], [class*="border-orange-2"]) { border-color: rgb(252 211 77 / 35%); }
 [data-tema="escuro"] .negocialar-interior :is([class*="border-red-2"], [class*="border-rose-2"]) { border-color: rgb(253 164 175 / 35%); }
 
-/* Gráficos do Financeiro no escuro: mesmos papéis, tons da paleta escura validados no cartão #0c2a3f. */
+/* Gráficos do Financeiro no escuro: mesmos papéis, tons da paleta escura validados no cartão #0f0f11. */
 [data-tema="escuro"] .negocialar-interior .finance-viz {
   --fin-receita: #3987e5;
   --fin-despesa: #d95926;
-  --fin-grid: #1f4560;
-  --fin-muted: #a9bdd0;
+  --fin-grid: #19191c;
+  --fin-muted: #b9b9c0;
   --fin-hover: rgb(255 255 255 / 6%);
 }
