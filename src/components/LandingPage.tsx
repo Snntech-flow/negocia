@@ -162,7 +162,7 @@ export default function LandingPage({
             {/* Exemplo de Match (ilustrativo) */}
             <div className="w-full min-w-0 rounded-[22px] bg-white p-[18px] text-[color:var(--nl-texto)] shadow-[0_30px_80px_rgba(0,0,0,.35)] md:p-[22px] lg:max-w-[440px] lg:justify-self-end">
               <div className="mb-4 flex items-center justify-between gap-2.5">
-                <strong className="flex items-center gap-2.5 whitespace-nowrap text-[15px] md:text-base"><span aria-hidden="true" className="h-[9px] w-[9px] rounded-full bg-emerald-600" />Novo Match no Radar</strong>
+                <strong className="flex items-center gap-2.5 whitespace-nowrap text-[15px] md:text-base"><Radar className="h-[18px] w-[18px] shrink-0 text-[color:var(--nl-laranja)]" aria-hidden="true" />Novo Match no Radar</strong>
                 <span className="whitespace-nowrap rounded-full border border-[color:var(--nl-linha)] bg-[color:var(--nl-claro)] px-2 py-[3px] text-[11px] font-bold text-[color:var(--nl-suave)] md:px-2.5 md:text-xs">Exemplo ilustrativo</span>
               </div>
               <img src="https://images.unsplash.com/photo-1600585154340-be6161a56a0c?w=900" alt="Imagem ilustrativa de imóvel" className="block h-[190px] w-full rounded-[14px] object-cover md:h-[230px]" />
