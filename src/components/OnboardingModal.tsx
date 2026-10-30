@@ -26,7 +26,7 @@ interface OnboardingModalProps {
   initialMode?: "register" | "login";
 }
 
-const inputClass = "w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-slate-900 focus:outline-none focus:border-amber-600 focus:bg-white";
+const inputClass = "w-full bg-slate-50 border border-slate-200 rounded-xl px-3 py-2 text-sm text-[#121214] focus:outline-none focus:border-amber-600 focus:bg-white";
 const money = (value: string) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value));
 
 export default function OnboardingModal({ isOpen, onClose, onComplete, initialPlan = "20", initialMode = "register" }: OnboardingModalProps) {
@@ -112,22 +112,22 @@ export default function OnboardingModal({ isOpen, onClose, onComplete, initialPl
   const bulletClass = (target: number) => step === target ? "bg-amber-700 text-white" : step > target ? "bg-emerald-700 text-white" : "bg-slate-200";
 
   return (
-    <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
-      <div className="bg-white text-slate-900 rounded-3xl max-w-xl w-full shadow-2xl border border-slate-200 overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-200">
-        <div className="bg-slate-900 text-white p-5 flex items-center justify-between border-b border-slate-800">
+    <div className="fixed inset-0 z-50 bg-[#0a0a0b]/70 backdrop-blur-sm flex items-center justify-center p-3 sm:p-4 overflow-y-auto" role="dialog" aria-modal="true" aria-labelledby="onboarding-title">
+      <div className="bg-white text-[#1d1d1f] rounded-3xl max-w-xl w-full shadow-2xl border border-slate-200 overflow-hidden my-auto animate-in fade-in zoom-in-95 duration-200">
+        <div className="bg-[#121214] text-white p-5 flex items-center justify-between border-b border-white/10">
           <div className="flex items-center gap-3">
-            <div className="relative w-8 h-8 rounded-lg overflow-hidden border border-amber-500/40">
+            <div className="relative w-8 h-8 rounded-lg overflow-hidden bg-white">
               <Image src="/logo-negocialar.png" alt="Negocia Lar" fill sizes="32px" className="object-contain" />
             </div>
             <div>
               <div className="text-sm font-extrabold flex items-center gap-1.5">
-                <span className="rounded-md bg-white px-2 py-0.5 text-slate-900">Negocia<span className="text-amber-600">lar</span></span>
-                <span className="text-[10px] bg-slate-800 text-slate-300 font-mono px-1.5 rounded">SNNtech</span>
+                <span>Negocia<span className="text-[#f08a3c]">lar</span></span>
+                <span className="text-[10px] bg-white/10 text-white/70 font-mono px-1.5 rounded">SNNtech</span>
               </div>
-              <div id="onboarding-title" className="text-[11px] text-slate-400">{mode === "login" ? "Entrar na sua conta" : mode === "recovery" ? "Recuperar senha" : "Cadastro do corretor"}</div>
+              <div id="onboarding-title" className="text-[11px] text-white/60">{mode === "login" ? "Entrar na sua conta" : mode === "recovery" ? "Recuperar senha" : "Cadastro do corretor"}</div>
             </div>
           </div>
-          <BotaoFechar onClick={fechar} />
+          <BotaoFechar onClick={fechar} className="!border-white/20 !text-[#121214] hover:!bg-[#f0f0f1]" />
         </div>
 
         {step < 4 && mode === "register" && (
@@ -146,7 +146,7 @@ export default function OnboardingModal({ isOpen, onClose, onComplete, initialPl
         {step === 1 && mode === "login" && (
           <form onSubmit={handleLogin} className="p-6 space-y-4">
             <div>
-              <h3 className="text-lg font-extrabold text-slate-900">Entrar no Negocia <span className="text-amber-600">Lar</span></h3>
+              <h3 className="text-lg font-extrabold text-[#121214]">Entrar no Negocia <span className="text-amber-600">Lar</span></h3>
               <p className="text-xs text-slate-500">Use o e-mail e a senha do seu cadastro.</p>
             </div>
             <label className="block text-xs font-bold text-slate-700">E-mail
@@ -157,7 +157,7 @@ export default function OnboardingModal({ isOpen, onClose, onComplete, initialPl
               <PasswordInput id="login-password" required autoComplete="current-password" value={formData.password} onChange={(e) => setFormData({ ...formData, password: e.target.value })} className={inputClass} wrapperClassName="mt-1" />
             </div>
             {actionError && <p role="alert" className="text-xs text-red-700">{actionError}</p>}
-            <button disabled={busyLogin} className="w-full bg-slate-900 text-white font-bold py-3 rounded-xl disabled:opacity-60">{busyLogin ? "Entrando…" : "Entrar"}</button>
+            <button disabled={busyLogin} className="w-full bg-[#e4610f] hover:bg-[#c9530a] text-white font-bold py-3 rounded-xl transition disabled:opacity-60">{busyLogin ? "Entrando…" : "Entrar"}</button>
             <button type="button" onClick={() => { setMode("recovery"); setActionError(null); }} className="w-full text-xs text-amber-700 font-semibold">Esqueci minha senha</button>
             <button type="button" onClick={() => { setMode("register"); setActionError(null); }} className="w-full text-xs text-amber-700 font-semibold">Criar uma conta</button>
           </form>
@@ -166,7 +166,7 @@ export default function OnboardingModal({ isOpen, onClose, onComplete, initialPl
         {step === 1 && mode === "register" && (
           <form onSubmit={handleVerifyCreciAndProceed} className="p-6 space-y-4">
             <div>
-              <h3 className="text-lg font-extrabold text-slate-900">Seus dados profissionais</h3>
+              <h3 className="text-lg font-extrabold text-[#121214]">Seus dados profissionais</h3>
               <p className="text-xs text-slate-500">Conferimos o formato do CRECI agora; a situação no conselho é conferida pela equipe e o cadastro fica pendente até lá.</p>
             </div>
 
@@ -184,7 +184,7 @@ export default function OnboardingModal({ isOpen, onClose, onComplete, initialPl
                 <label htmlFor="onboarding-creci" className="block text-xs font-bold text-slate-700 mb-1">CRECI e UF</label>
                 <div className="flex gap-2">
                   <input id="onboarding-creci" required type="text" maxLength={10} value={formData.creci} onChange={(e) => setFormData({ ...formData, creci: e.target.value })} placeholder="Número do CRECI" aria-describedby="onboarding-creci-help" className={inputClass} />
-                  <select aria-label="UF do CRECI" value={formData.state} onChange={(e) => setFormData({ ...formData, state: e.target.value, city: "" })} className="bg-slate-50 border border-slate-200 rounded-xl px-2 py-2 text-xs font-semibold text-slate-800">
+                  <select aria-label="UF do CRECI" value={formData.state} onChange={(e) => setFormData({ ...formData, state: e.target.value, city: "" })} className="bg-slate-50 border border-slate-200 rounded-xl px-2 py-2 text-xs font-semibold text-[#121214]">
                     {BRAZILIAN_STATES.map((uf) => <option key={uf} value={uf}>{uf}</option>)}
                   </select>
                 </div>
@@ -217,10 +217,10 @@ export default function OnboardingModal({ isOpen, onClose, onComplete, initialPl
               </div>
             )}
 
-            <button type="submit" disabled={checkingFormat} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 px-4 rounded-xl transition flex items-center justify-center gap-2 shadow-md disabled:opacity-70 text-xs sm:text-sm">
-              <ShieldCheck className="w-4 h-4 text-emerald-400" />
+            <button type="submit" disabled={checkingFormat} className="w-full bg-[#e4610f] hover:bg-[#c9530a] text-white font-bold py-3.5 px-4 rounded-xl transition flex items-center justify-center gap-2 shadow-md disabled:opacity-70 text-xs sm:text-sm">
+              <ShieldCheck className="w-4 h-4" />
               <span>{checkingFormat ? "Conferindo o formato…" : "Continuar para escolher o plano"}</span>
-              {!checkingFormat && <ArrowRight className="w-4 h-4 text-amber-400" />}
+              {!checkingFormat && <ArrowRight className="w-4 h-4" />}
             </button>
             <button type="button" onClick={() => setMode("login")} className="w-full text-xs text-amber-700 font-semibold">Já tem conta? Entrar</button>
           </form>
@@ -229,14 +229,14 @@ export default function OnboardingModal({ isOpen, onClose, onComplete, initialPl
         {step === 2 && (
           <div className="p-6 space-y-5">
             <div>
-              <h3 className="text-lg font-extrabold text-slate-900">Escolha a capacidade de anúncios</h3>
+              <h3 className="text-lg font-extrabold text-[#121214]">Escolha a capacidade de anúncios</h3>
               <p className="text-xs text-slate-500">Os 30 primeiros dias são grátis em qualquer plano. O plano define quantos anúncios você mantém ativos ao mesmo tempo.</p>
             </div>
 
             <div className="bg-slate-100 p-1 rounded-xl flex items-center text-xs font-semibold" role="radiogroup" aria-label="Ciclo de cobrança">
               {(["monthly", "annual"] as const).map((cycle) => (
                 <button key={cycle} type="button" role="radio" aria-checked={formData.billingCycle === cycle} onClick={() => setFormData({ ...formData, billingCycle: cycle })}
-                  className={`flex-1 py-1.5 rounded-lg text-center transition flex items-center justify-center gap-1 ${formData.billingCycle === cycle ? "bg-white text-slate-900 shadow-sm" : "text-slate-500"}`}>
+                  className={`flex-1 py-1.5 rounded-lg text-center transition flex items-center justify-center gap-1 ${formData.billingCycle === cycle ? "bg-white text-[#121214] shadow-sm" : "text-slate-500"}`}>
                   <span>{cycle === "monthly" ? "Mensal" : "Anual"}</span>
                   {cycle === "annual" && <span className="text-[10px] bg-emerald-100 text-emerald-800 font-bold px-1.5 rounded">use 12, pague 11</span>}
                 </button>
@@ -253,11 +253,11 @@ export default function OnboardingModal({ isOpen, onClose, onComplete, initialPl
                     <span className="flex items-center gap-3">
                       <span className={`w-4 h-4 rounded-full border flex items-center justify-center ${isSelected ? "border-amber-600 bg-amber-600" : "border-slate-300"}`}>{isSelected && <span className="w-1.5 h-1.5 rounded-full bg-white" />}</span>
                       <span>
-                        <span className="block text-xs font-bold text-slate-900">{plan.name}</span>
+                        <span className="block text-xs font-bold text-[#121214]">{plan.name}</span>
                         <span className="block text-[11px] text-slate-500">{plan.photos} fotos por anúncio · {formData.billingCycle === "annual" ? `${money(plan.annualTotal)} por ano` : plan.description}</span>
                       </span>
                     </span>
-                    <span className="text-sm font-extrabold text-slate-900">{money(planMonthlyEquivalent(id, formData.billingCycle))}<span className="text-[10px] text-slate-500 font-normal">/mês</span></span>
+                    <span className="text-sm font-extrabold text-[#121214]">{money(planMonthlyEquivalent(id, formData.billingCycle))}<span className="text-[10px] text-slate-500 font-normal">/mês</span></span>
                   </button>
                 );
               })}
@@ -274,9 +274,9 @@ export default function OnboardingModal({ isOpen, onClose, onComplete, initialPl
 
             <div className="flex items-center gap-3 pt-2">
               <button type="button" onClick={() => setStep(1)} className="py-3 px-4 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition">Voltar</button>
-              <button type="button" onClick={() => setStep(3)} className="flex-1 bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 px-4 rounded-xl transition flex items-center justify-center gap-2 shadow-md text-xs sm:text-sm">
+              <button type="button" onClick={() => setStep(3)} className="flex-1 bg-[#e4610f] hover:bg-[#c9530a] text-white font-bold py-3.5 px-4 rounded-xl transition flex items-center justify-center gap-2 shadow-md text-xs sm:text-sm">
                 <span>Continuar com {selectedPlan.name}</span>
-                <ArrowRight className="w-4 h-4 text-amber-400" />
+                <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           </div>
@@ -285,7 +285,7 @@ export default function OnboardingModal({ isOpen, onClose, onComplete, initialPl
         {step === 3 && (
           <div className="p-6 space-y-5 text-center">
             <div>
-              <h3 className="text-xl font-extrabold text-slate-900">Comece seus 30 dias grátis</h3>
+              <h3 className="text-xl font-extrabold text-[#121214]">Comece seus 30 dias grátis</h3>
               <p className="text-xs text-slate-500">Plano {selectedPlan.name} · depois do período grátis, {formData.billingCycle === "annual" ? `${paymentAmount} por ano` : `${paymentAmount} por mês`}</p>
             </div>
             <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4 text-left text-sm text-emerald-900">
@@ -299,7 +299,7 @@ export default function OnboardingModal({ isOpen, onClose, onComplete, initialPl
             {actionError && <p role="alert" className="text-xs text-red-700">{actionError}</p>}
             <div className="pt-2 flex items-center gap-3">
               <button type="button" onClick={() => setStep(2)} className="py-3 px-4 rounded-xl border border-slate-200 text-slate-600 font-bold text-xs hover:bg-slate-50 transition">Voltar</button>
-              <button type="button" onClick={handleFinishRegistration} disabled={registering} className="flex-1 bg-emerald-700 hover:bg-emerald-800 text-white font-bold py-3.5 px-4 rounded-xl transition flex items-center justify-center gap-2 shadow-md text-xs sm:text-sm disabled:opacity-70">
+              <button type="button" onClick={handleFinishRegistration} disabled={registering} className="flex-1 bg-[#e4610f] hover:bg-[#c9530a] text-white font-bold py-3.5 px-4 rounded-xl transition flex items-center justify-center gap-2 shadow-md text-xs sm:text-sm disabled:opacity-70">
                 <CheckCircle2 className="w-4 h-4" />
                 <span>{registering ? "Criando cadastro…" : "Criar cadastro e começar grátis"}</span>
               </button>
@@ -311,15 +311,15 @@ export default function OnboardingModal({ isOpen, onClose, onComplete, initialPl
           <div className="p-8 text-center space-y-6">
             <div className="w-16 h-16 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center mx-auto shadow-inner"><CheckCircle2 className="w-10 h-10" /></div>
             <div className="space-y-1">
-              <h3 className="text-2xl font-black text-slate-900">Bem-vindo ao Negocia <span className="text-amber-600">Lar</span>!</h3>
+              <h3 className="text-2xl font-black text-[#121214]">Bem-vindo ao Negocia <span className="text-amber-600">Lar</span>!</h3>
               <p className="text-xs text-slate-500 max-w-sm mx-auto">Seu cadastro no plano <strong>{selectedPlan.name}</strong> foi criado e os 30 dias grátis já começaram. A equipe confere o CRECI para liberar o uso da rede.</p>
             </div>
             <div className="bg-slate-50 border border-slate-200 p-3 rounded-xl text-xs text-slate-600 text-left flex items-center gap-2.5">
               <Clock className="w-4 h-4 text-emerald-600 shrink-0" />
               <span>CRECI em análise. Os dias restantes ficam em Minha assinatura.</span>
             </div>
-            <button type="button" onClick={() => { if (!registeredUser) return; onComplete(registeredUser); onClose(); }} className="w-full bg-slate-900 hover:bg-slate-800 text-white font-bold py-3.5 px-4 rounded-xl transition flex items-center justify-center gap-2 shadow-lg text-sm">
-              <Building2 className="w-4 h-4 text-amber-400" />
+            <button type="button" onClick={() => { if (!registeredUser) return; onComplete(registeredUser); onClose(); }} className="w-full bg-[#e4610f] hover:bg-[#c9530a] text-white font-bold py-3.5 px-4 rounded-xl transition flex items-center justify-center gap-2 shadow-lg text-sm">
+              <Building2 className="w-4 h-4" />
               <span>Acessar a plataforma</span>
               <ArrowRight className="w-4 h-4" />
             </button>

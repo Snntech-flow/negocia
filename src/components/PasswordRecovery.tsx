@@ -20,14 +20,14 @@ export function RequestPasswordRecovery({ onBack }: { onBack: () => void }) {
     finally { setBusy(false); }
   }
   return <form onSubmit={submit} className="space-y-4">
-    <h3 className="text-lg font-extrabold text-slate-900">Recuperar senha</h3>
+    <h3 className="text-lg font-extrabold text-[#121214]">Recuperar senha</h3>
     <p className="text-sm text-slate-600">Informe o e-mail do seu cadastro. O link para criar uma nova senha vale por 30 minutos.</p>
     <label className="block text-sm font-semibold text-slate-700">E-mail
-      <input required type="email" autoComplete="email" maxLength={254} value={email} onChange={event => setEmail(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-slate-900" />
+      <input required type="email" autoComplete="email" maxLength={254} value={email} onChange={event => setEmail(event.target.value)} className="mt-1 w-full rounded-xl border border-slate-300 bg-white p-3 text-[#121214]" />
     </label>
     {message && <p role="status" className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-800">{message}</p>}
     {error && <p role="alert" className="text-sm text-red-700">{error}</p>}
-    <button disabled={busy} className="w-full rounded-xl bg-slate-900 p-3 font-bold text-white disabled:opacity-60">{busy ? "Solicitando…" : "Enviar link de recuperação"}</button>
+    <button disabled={busy} className="w-full rounded-xl bg-[#e4610f] p-3 font-bold text-white transition hover:bg-[#c9530a] disabled:opacity-60">{busy ? "Solicitando…" : "Enviar link de recuperação"}</button>
     <button type="button" onClick={onBack} className="w-full text-sm font-semibold text-amber-700">Voltar para entrar</button>
   </form>;
 }

@@ -56,6 +56,11 @@ const RECURSOS_DO_PLANO = [
 // Quantas dúvidas aparecem antes de "Ver todas as dúvidas".
 const DUVIDAS_A_MOSTRAR = 6;
 
+// ⚖️ Sidney 29/10/2026: a palavra "Match" em laranja nos títulos.
+function destaqueDoMatch(texto: string) {
+  return texto.split(/(Match)/).map((parte, i) => parte === "Match" ? <span key={i} className="text-[color:var(--nl-laranja)]">Match</span> : parte);
+}
+
 export default function LandingPage({
   onAccessPlatform,
 }: {
@@ -143,7 +148,7 @@ export default function LandingPage({
 
           <div className="grid items-center gap-11 pb-[72px] pt-9 lg:grid-cols-[1.15fr_.85fr] lg:gap-16 lg:pb-28 lg:pt-[72px]">
             <div className="min-w-0">
-              <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-3.5 py-[7px] text-sm font-bold text-[color:var(--nl-laranja-claro)]">
+              <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-4 py-2 text-[15px] font-bold md:text-base text-[color:var(--nl-laranja-claro)]">
                 <span aria-hidden="true" className="h-[7px] w-[7px] rounded-full bg-[color:var(--nl-laranja-claro)]" />
                 Match automático entre corretores
               </span>
@@ -217,7 +222,7 @@ export default function LandingPage({
             ].map((passo, i) => (
               <li key={passo.titulo} className="min-w-0 rounded-[20px] border border-[color:var(--nl-linha)] bg-white p-8">
                 <span className="grid h-[38px] w-[38px] place-items-center rounded-full bg-[color:var(--nl-escuro)] text-[15px] font-extrabold text-white">{i + 1}</span>
-                <h3 className="mb-2.5 mt-[22px] text-[22px] font-extrabold tracking-[-0.01em] text-[color:var(--nl-escuro)]">{passo.titulo}</h3>
+                <h3 className="mb-2.5 mt-[22px] text-[22px] font-extrabold tracking-[-0.01em] text-[color:var(--nl-escuro)]">{destaqueDoMatch(passo.titulo)}</h3>
                 <p className="text-base leading-relaxed text-[color:var(--nl-suave)]">{passo.texto}</p>
               </li>
             ))}
@@ -231,8 +236,7 @@ export default function LandingPage({
         <div className="mx-auto grid max-w-[1160px] items-start gap-9 px-5 lg:grid-cols-[.9fr_1.1fr] lg:gap-20">
           <div className="min-w-0">
             <p className={sobretitulo}>Muito além de uma vitrine</p>
-            {/* ⚖️ Sidney 29/10/2026: "o Match" em laranja. */}
-            <h2 className={`mt-3.5 ${titulo}`}>O <span className="text-[color:var(--nl-laranja)]">Match</span>, o CRM e a documentação no mesmo lugar.</h2>
+            <h2 className={`mt-3.5 ${titulo}`}>{destaqueDoMatch("O Match, o CRM e a documentação no mesmo lugar.")}</h2>
             <p className={apoio}>Encontre oportunidades de parceria, organize seus clientes e prepare a documentação da negociação sem sair da plataforma.</p>
           </div>
           <div className="grid min-w-0 gap-3.5">
