@@ -19,7 +19,7 @@ import {
   UserX,
 } from "lucide-react";
 import OnboardingModal from "./OnboardingModal";
-import { PLAN_IDS, PLANS, planCharge, planMonthlyEquivalent, type PlanId } from "@/lib/plans";
+import { PLAN_IDS, PLANS, planCharge, planMonthlyEquivalent } from "@/lib/plans";
 import { manrope } from "@/lib/fonte-landing";
 
 // Página inicial (29/10/2026, ⚖️ Sidney: "o preto ficou melhor"): uma cor escura, laranja só nos botões, fundo branco.
@@ -35,8 +35,6 @@ const CORES = {
   "--nl-linha": "#e6e6e9",
   "--nl-claro": "#f6f6f7",
   "--nl-tinta": "#eeeeef",
-  // Branco por variável no botão de escolha: o guard de tema (tests/theme.test.ts) barra text-white com aria-pressed.
-  "--nl-branco": "#ffffff",
 } as React.CSSProperties;
 
 const DESTAQUES_DA_PARCERIA = [
@@ -68,7 +66,6 @@ export default function LandingPage({
   onAccessPlatform: (userData?: Parameters<React.ComponentProps<typeof OnboardingModal>["onComplete"]>[0]) => void;
 }) {
   const [billingCycle, setBillingCycle] = useState<"monthly" | "annual">("monthly");
-  const [planoEscolhido, setPlanoEscolhido] = useState<PlanId>("20");
   const [openFaq, setOpenFaq] = useState<number | null>(0);
   const [todasAsDuvidas, setTodasAsDuvidas] = useState(false);
   const [isOnboardingOpen, setIsOnboardingOpen] = useState(false);
@@ -87,11 +84,6 @@ export default function LandingPage({
     { href: "#planos", label: "Planos" },
     { href: "#duvidas", label: "Dúvidas" },
   ];
-  const plano = PLANS[planoEscolhido];
-  // Preços da tabela vigente (a de quem se cadastra agora).
-  const mensalCheio = planCharge(planoEscolhido, "monthly");
-  const totalAnual = planCharge(planoEscolhido, "annual");
-  const economiaNoAno = (Number(mensalCheio) * 12 - Number(totalAnual)).toFixed(2);
 
   // As 6 primeiras são as que aparecem de cara; as outras abrem em "Ver todas as dúvidas".
   const duvidas = [
@@ -276,29 +268,14 @@ export default function LandingPage({
         </div>
       </section>
 
-      {/* Planos: escolhe a quantidade de anúncios e vê um cartão só */}
+      {/* Planos: os 5 lado a lado (⚖️ Sidney 29/10/2026: "tem povo que é disperso" — o seletor escondia 4 dos 5) */}
       <section id="planos" className="py-[72px] md:py-[104px]">
-        <div className="mx-auto max-w-[1160px] px-5 text-center">
+        <div className="mx-auto max-w-[1240px] px-5 text-center">
           <p className={sobretitulo}>Planos</p>
           <h2 className={`mt-3.5 ${titulo}`}>Quantos imóveis você anuncia?</h2>
           <p className={`${apoio} mx-auto`}>Para corretores com CRECI verificado pela equipe. O plano define quantos anúncios ficam ativos ao mesmo tempo; vendidos, alugados e arquivados não contam.</p>
 
-          <div role="group" aria-label="Quantidade de anúncios" className="mt-9 grid w-full grid-cols-5 gap-1 rounded-[14px] border border-[color:var(--nl-linha)] bg-[color:var(--nl-claro)] p-[5px] sm:inline-grid sm:w-auto">
-            {PLAN_IDS.map((id) => (
-              <button
-                key={id}
-                type="button"
-                aria-pressed={planoEscolhido === id}
-                aria-label={PLANS[id].name}
-                onClick={() => setPlanoEscolhido(id)}
-                className={`rounded-[10px] py-[11px] text-base font-bold tabular-nums transition sm:px-[22px] ${planoEscolhido === id ? "bg-[color:var(--nl-escuro)] text-[color:var(--nl-branco)]" :"text-[color:var(--nl-suave)] hover:text-[color:var(--nl-escuro)]"}`}
-              >
-                {PLANS[id].listings}
-              </button>
-            ))}
-          </div>
-
-          <div className="mt-5 flex flex-wrap items-center justify-center gap-3 text-[15px] font-semibold text-[color:var(--nl-suave)]">
+          <div className="mt-9 flex flex-wrap items-center justify-center gap-3 text-[15px] font-semibold text-[color:var(--nl-suave)]">
             <span className={billingCycle === "monthly" ? "text-[color:var(--nl-escuro)]" : ""}>Mensal</span>
             <button
               type="button"
@@ -314,35 +291,58 @@ export default function LandingPage({
             <span className="rounded-full bg-emerald-50 px-2.5 py-[3px] text-[13px] font-bold text-emerald-800">use 12, pague 11</span>
           </div>
 
-          <div className="mx-auto mt-9 grid max-w-[760px] overflow-hidden rounded-[22px] border border-[color:var(--nl-linha)] text-left shadow-[0_20px_50px_rgba(0,0,0,.06)] md:grid-cols-2">
-            <div className="min-w-0 p-7 md:p-9">
-              <h3 className="text-[26px] font-extrabold text-[color:var(--nl-escuro)]">{plano.name}</h3>
-              <p className="text-sm font-bold text-[color:var(--nl-suave)]">{plano.photos} fotos por anúncio</p>
-              <p className="mt-2.5 text-base leading-relaxed text-[color:var(--nl-suave)]">{plano.description}</p>
-              {/* ⚖️ Sidney 29/10/2026: no anual, o mês muda e o preço cheio aparece riscado — o corretor vê a diferença. */}
-              <p className="mt-[22px] flex flex-wrap items-baseline gap-x-3 font-extrabold tabular-nums tracking-[-0.02em] text-[color:var(--nl-escuro)]">
-                {billingCycle === "annual" && (
-                  <span className="text-2xl font-bold text-[color:var(--nl-suave)]"><span className="sr-only">De </span><s>{money(mensalCheio)}</s><span className="sr-only"> por</span></span>
-                )}
-                <span className="text-[44px]">{money(planMonthlyEquivalent(planoEscolhido, billingCycle))}</span>
-                <span className="text-base font-semibold tracking-normal text-[color:var(--nl-suave)]">/mês</span>
-              </p>
-              <p className="min-h-[22px] text-sm text-[color:var(--nl-suave)]">
-                {billingCycle === "annual"
-                  ? <>Cobrado no ano: {money(totalAnual)}. <strong className="font-bold text-emerald-800">Você economiza {money(economiaNoAno)} no ano.</strong></>
-                  : <>No anual, sai por {money(planMonthlyEquivalent(planoEscolhido, "annual"))}/mês.</>}
-              </p>
-              <button type="button" onClick={() => abrir("register", planoEscolhido)} className={`${botao} mt-[22px] w-full`}>Começar 30 dias grátis</button>
-              <p className="mt-2.5 text-center text-sm text-[color:var(--nl-suave)]">Sem cartão. Depois, renovação via Pix.</p>
-            </div>
-            <div className="min-w-0 bg-[color:var(--nl-claro)] p-7 md:p-9">
-              <h4 className="mb-4 text-[13px] font-bold uppercase tracking-[0.1em] text-[color:var(--nl-suave)]">Em todos os planos</h4>
-              <ul className="grid gap-3 text-base">
-                {RECURSOS_DO_PLANO.map((recurso) => (
-                  <li key={recurso} className="grid grid-cols-[22px_1fr] gap-2.5"><Check className="mt-1 h-4 w-4 text-[color:var(--nl-escuro)]" strokeWidth={3} aria-hidden="true" /><span>{recurso}</span></li>
-                ))}
-              </ul>
-            </div>
+          {/* 1 por linha no celular, 2 no tablet (o de 100 na linha inteira), os 5 numa linha no computador */}
+          <div className="mt-12 grid gap-5 text-left sm:grid-cols-2 lg:grid-cols-5 lg:gap-4">
+            {PLAN_IDS.map((id) => {
+              const plan = PLANS[id];
+              const destaque = id === "100";
+              // Preços da tabela vigente (a de quem se cadastra agora).
+              const mensalCheio = planCharge(id, "monthly");
+              const totalAnual = planCharge(id, "annual");
+              const economiaNoAno = (Number(mensalCheio) * 12 - Number(totalAnual)).toFixed(2);
+              return (
+                <article key={id} className={`relative flex min-w-0 flex-col rounded-[20px] bg-white p-6 lg:p-5 ${destaque ? "border-2 border-[color:var(--nl-escuro)] shadow-[0_20px_50px_rgba(0,0,0,.10)] sm:col-span-2 lg:col-span-1" : "border border-[color:var(--nl-linha)]"}`}>
+                  {destaque && <span className="absolute -top-3 left-6 rounded-full bg-[color:var(--nl-escuro)] px-3 py-1 text-xs font-bold text-white">Maior capacidade</span>}
+                  <h3 className="text-xl font-extrabold text-[color:var(--nl-escuro)]">{plan.name}</h3>
+                  <p className="text-[13px] font-bold text-[color:var(--nl-suave)]">{plan.photos} fotos por anúncio</p>
+                  <p className="mt-2 text-sm leading-snug text-[color:var(--nl-suave)] sm:min-h-[40px] lg:min-h-[60px]">{plan.description}</p>
+                  {/* ⚖️ Sidney 29/10/2026: no anual, o mês muda e o preço cheio aparece riscado — o corretor vê a diferença. */}
+                  <div className="mt-5 border-t border-[color:var(--nl-linha)] pt-5">
+                    <p className="min-h-[20px] text-sm font-bold text-[color:var(--nl-suave)]">
+                      {billingCycle === "annual" && <><span className="sr-only">De </span><s>{money(mensalCheio)}</s><span className="sr-only"> por</span></>}
+                    </p>
+                    <p className="flex items-baseline gap-x-1 whitespace-nowrap tabular-nums">
+                      <span className="text-[30px] font-extrabold lg:text-[22px] xl:text-[26px] tracking-[-0.02em] text-[color:var(--nl-escuro)]">{money(planMonthlyEquivalent(id, billingCycle))}</span>
+                      <span className="text-sm font-semibold text-[color:var(--nl-suave)]">/mês</span>
+                    </p>
+                    <p className="mt-1 text-[13px] leading-snug text-[color:var(--nl-suave)] lg:min-h-[36px]">
+                      {billingCycle === "annual"
+                        ? <>No ano: {money(totalAnual)}. <strong className="font-bold text-emerald-800">Economiza {money(economiaNoAno)}.</strong></>
+                        : <>No anual, {money(planMonthlyEquivalent(id, "annual"))}/mês.</>}
+                    </p>
+                  </div>
+                  <div className="mt-auto pt-6">
+                    <button
+                      type="button"
+                      onClick={() => abrir("register", id)}
+                      className={`w-full rounded-xl px-3 py-3.5 text-[15px] font-bold text-white transition ${destaque ? "bg-[color:var(--nl-laranja)] hover:bg-[color:var(--nl-laranja-forte)]" : "bg-[color:var(--nl-escuro)] hover:bg-[#2a2a2e]"}`}
+                    >
+                      Começar grátis
+                    </button>
+                  </div>
+                </article>
+              );
+            })}
+          </div>
+
+          <div className="mx-auto mt-10 max-w-[900px] rounded-[18px] bg-[color:var(--nl-claro)] px-6 py-5">
+            <p className="text-[13px] font-bold uppercase tracking-[0.1em] text-[color:var(--nl-suave)]">Em todos os planos</p>
+            <ul className="mt-3 flex flex-wrap justify-center gap-x-6 gap-y-2 text-[15px]">
+              {RECURSOS_DO_PLANO.map((recurso) => (
+                <li key={recurso} className="flex items-center gap-2"><Check className="h-4 w-4 shrink-0 text-[color:var(--nl-escuro)]" strokeWidth={3} aria-hidden="true" />{recurso}</li>
+              ))}
+            </ul>
+            <p className="mt-3 text-sm text-[color:var(--nl-suave)]">30 dias grátis em qualquer plano, sem cartão. Depois, renovação via Pix.</p>
           </div>
         </div>
       </section>
