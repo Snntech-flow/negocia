@@ -140,7 +140,18 @@ export default function LandingPage({
           {menuOpen && <nav id="menu-celular" aria-label="Seções" className="border-t border-white/10 py-2 md:hidden">
             {navLinks.map((link) => <a key={link.href} href={link.href} onClick={() => setMenuOpen(false)} className="block py-2.5 text-[15px] font-semibold text-white/80">{link.label}</a>)}
           </nav>}
+        </div>
 
+        {/* Banner de abertura, de ponta a ponta (31/10/2026, Sidney: "tem como colocar essa imagem no Negocialar"). O texto está
+            DENTRO da imagem: no celular ela é cortada à esquerda, no lado do texto, numa altura em que a letra dá para ler. O alt
+            repete o texto para leitor de tela e buscadores. */}
+        <div className="mx-auto max-w-[1600px]">
+          <Image src="/banner-parcerias.webp" width={1600} height={639} priority sizes="(min-width: 1600px) 1600px, 100vw"
+            alt="Encontre o imóvel ideal para seu cliente. Mais do que uma rede de parcerias, uma decolagem em suas vendas. Venda muito mais! Com experiência, segurança e total transparência, te ajudamos a encontrar o imóvel perfeito para seu cliente."
+            className="h-[260px] w-full object-cover object-left sm:h-auto" />
+        </div>
+
+        <div className="mx-auto max-w-[1160px] px-5">
           <div className="grid items-center gap-11 pb-[72px] pt-9 lg:grid-cols-[1.15fr_.85fr] lg:gap-16 lg:pb-28 lg:pt-[72px]">
             <div className="min-w-0">
               <span className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/[0.06] px-4 py-2 text-[15px] font-bold md:text-base text-[color:var(--nl-laranja-claro)]">
