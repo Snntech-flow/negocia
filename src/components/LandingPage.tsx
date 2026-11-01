@@ -144,9 +144,10 @@ export default function LandingPage({
 
         {/* Banner de abertura, de ponta a ponta (31/10/2026, Sidney: "tem como colocar essa imagem no Negocialar"). O texto está
             DENTRO da imagem: no celular ela é cortada à esquerda, no lado do texto, numa altura em que a letra dá para ler. O alt
-            repete o texto para leitor de tela e buscadores. */}
+            repete o texto para leitor de tela e buscadores. 01/11/2026: a imagem trocou pela versão com a letra mais legível
+            ("a letra ficou melhor assim") — com OUTRO nome, para nenhum cache servir a antiga. */}
         <div className="mx-auto max-w-[1600px]">
-          <Image src="/banner-parcerias.webp" width={1600} height={639} priority sizes="(min-width: 1600px) 1600px, 100vw"
+          <Image src="/banner-parcerias-v2.webp" width={1600} height={639} priority sizes="(min-width: 1600px) 1600px, 100vw"
             alt="Encontre o imóvel ideal para seu cliente. Mais do que uma rede de parcerias, uma decolagem em suas vendas. Venda muito mais! Com experiência, segurança e total transparência, te ajudamos a encontrar o imóvel perfeito para seu cliente."
             className="h-[260px] w-full object-cover object-left sm:h-auto" />
         </div>
