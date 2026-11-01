@@ -2,7 +2,7 @@
 import { ActionError } from "../action-result";
 import { db, properties, buyerProfiles } from "../db";
 import { revalidatePath } from "next/cache";
-import { ehCondicaoValida, percentualDoCaptador } from "../partnership-models";
+import { conferirParceriaDoCadastro, percentualDoCaptador } from "../partnership-models";
 import { capaDasFotos } from "../photo-order";
 import { fotosParaGravar } from "../photo-sign";
 import { requireCurrentUser, requireActiveBroker } from "../auth";
@@ -26,12 +26,9 @@ export async function createPropertyImpl(formData: PropertyInput) {
   const state = formData.state.toUpperCase();
   const condition = formData.condition;
   const acceptsFinancing = formData.acceptsFinancing;
-  // Condição de parceria (14/10/2026): na rede, o captador escolhe e confirma — nada presumido. Na carteira não se aplica.
-  if (formData.acceptsPartnership) {
-    if (!ehCondicaoValida(formData.partnershipModels)) throw new ActionError("Escolha a condição de parceria deste imóvel: só 50/50, só 40/40/20 ou as duas.");
-    if (formData.confirmaParceria !== true) throw new ActionError("Para publicar na rede, confirme que este imóvel aceita parceria nas condições informadas.");
-  }
-  const partnershipModels = ehCondicaoValida(formData.partnershipModels) ? formData.partnershipModels : "ambos";
+  // Condição de parceria (14/10/2026): o captador escolhe e confirma — nada presumido. Desde 01/11/2026 todo imóvel aceita
+  // parceria: não existe mais o imóvel "só na carteira" (lib/partnership-models).
+  const partnershipModels = conferirParceriaDoCadastro(formData);
   const targetBrokerId = actor.id;
   // Foto enviada chega como caminho no bucket privado; grava o caminho (lib/photo-sign).
   const photos = fotosParaGravar(formData.photos, actor.id);
@@ -88,10 +85,10 @@ export async function createPropertyImpl(formData: PropertyInput) {
         confidentialAddress: formData.confidentialAddress,
         ownerName: formData.ownerName,
         ownerPhone: formData.ownerPhone,
-        acceptsPartnership: formData.acceptsPartnership,
+        acceptsPartnership: true,
         splitPercentage: percentualDoCaptador(partnershipModels),
         partnershipModels,
-        partnershipConfirmedAt: formData.acceptsPartnership ? new Date() : null,
+        partnershipConfirmedAt: new Date(),
         partnershipReviewPending: false,
         status: "disponivel",
       })

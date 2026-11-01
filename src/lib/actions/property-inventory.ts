@@ -11,6 +11,7 @@ import { isActiveListingStatus, reserveListingSlot } from "../listing-limit";
 import { propertyChanges, PropertyInventoryError, PROPERTY_STATUSES, validatePropertyRevision, type PropertyInput, type PropertyStatus } from "../property-input";
 import { assinarFotosDeImoveis, fotosParaGravar } from "../photo-sign";
 import { capaDasFotos } from "../photo-order";
+import { edicaoPedeConfirmacao } from "../partnership-models";
 
 async function getOwnPropertiesImpl(input: { page?: number; search?: string; status?: string; id?: string } = {}) {
   const actor = await requireCurrentUser();
@@ -46,14 +47,13 @@ async function updateOwnPropertyImpl(id: string, revision: string, input: Proper
     if (current.updatedAt.getTime() !== Date.parse(revision)) throw new PropertyInventoryError("Este imóvel foi alterado em outra sessão. Recarregue antes de salvar.");
     const updatedAt = new Date(Math.max(Date.now(), current.updatedAt.getTime() + 1));
     // Condição de parceria (14/10/2026): entrar na rede, trocar a condição ou revisar o imóvel antigo pede a confirmação
-    // do captador — ela grava a data e encerra a revisão. Na carteira, não se aplica.
-    const naRede = changes.acceptsPartnership === true;
-    const precisaConfirmar = naRede && (!current.acceptsPartnership || current.partnershipReviewPending || current.partnershipModels !== changes.partnershipModels);
+    // do captador — ela grava a data e encerra a revisão. Desde 01/11/2026 todo imóvel aceita parceria: a edição não tira o
+    // imóvel da rede, e o antigo "só na carteira" só salva escolhendo a condição e confirmando (lib/partnership-models).
+    const precisaConfirmar = edicaoPedeConfirmacao(current, changes);
     if (precisaConfirmar && input.confirmaParceria !== true) {
       throw new PropertyInventoryError("Confirme que este imóvel aceita parceria nas condições informadas para mantê-lo na rede.");
     }
-    const parceria = precisaConfirmar ? { partnershipConfirmedAt: new Date(), partnershipReviewPending: false }
-      : naRede ? {} : { partnershipReviewPending: false };
+    const parceria = precisaConfirmar ? { partnershipConfirmedAt: new Date(), partnershipReviewPending: false } : {};
     // A edição volta com as fotos assinadas e as novas como caminho: grava o caminho (lib/photo-sign). As que já estavam
     // no imóvel continuam aceitas mesmo que outro tenha enviado.
     const photos = fotosParaGravar(changes.photos, actor.id, [...(current.photos ?? []), current.coverPhoto]);

@@ -598,7 +598,8 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
     const created = await asUser(otherBroker.id, () => actions.createProperty(form));
     const after = await db.select().from(notifications).where(eq(notifications.userId, admin.id));
     assert.equal(after.length, before.length + 1); assert.ok(after.some(row => row.propertyId === created.property.id));
-    await asUser(otherBroker.id, () => actions.createProperty({...form, acceptsPartnership:false}));
+    // Parceria obrigatória (01/11/2026): imóvel sem parceria não é mais cadastrado.
+    await assert.rejects(asUser(otherBroker.id, () => actions.createProperty({...form, acceptsPartnership:false})), /todo imóvel aceita parceria/);
     await asUser(otherBroker.id, () => actions.createProperty({...form, purpose:"aluguel"}));
     const unchanged = await db.select().from(notifications).where(eq(notifications.userId, admin.id));
     assert.equal(unchanged.length, after.length);
@@ -637,8 +638,8 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
       const so40 = (await asUser(otherBroker.id, () => actions.createProperty({...form, title:"Imóvel de outro corretor", partnershipModels:"40_40_20", confirmaParceria:true}))).property;
       assert.equal(so40.partnershipModels, "40_40_20"); assert.ok(so40.partnershipConfirmedAt); assert.equal(so40.partnershipReviewPending, false);
       assert.equal(so40.splitPercentage, "40.00", "o percentual do captador acompanha a condição");
-      const carteira = (await asUser(otherBroker.id, () => actions.createProperty({...form, title:"Só na carteira", acceptsPartnership:false}))).property;
-      assert.equal(carteira.partnershipConfirmedAt, null, "na carteira não se pede confirmação");
+      // Parceria obrigatória (01/11/2026): não existe mais o imóvel "só na carteira".
+      await assert.rejects(asUser(otherBroker.id, () => actions.createProperty({...form, title:"Só na carteira", acceptsPartnership:false, partnershipModels:"50_50", confirmaParceria:true})), /todo imóvel aceita parceria/);
 
       // registro de visita e revisão: só a divisão que o imóvel aceita
       const [so50] = await db.insert(properties).values({...form, brokerId:admin.id, title:"Só 50/50", partnershipModels:"50_50", partnershipConfirmedAt:new Date(), partnershipReviewPending:false}).returning();

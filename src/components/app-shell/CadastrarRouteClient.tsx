@@ -29,8 +29,8 @@ export default function CadastrarRouteClient({ broker, blockedReason, photoLimit
         <p className="text-sm text-slate-400">Endereço completo e dados do proprietário ficam visíveis só para você. Campos com * são obrigatórios.</p>
       </div>
       <PropertyCreateForm key={reloadKey} broker={broker} blockedReason={blockedReason} photoLimit={photoLimit} onMessage={showToast}
-        onCreated={(property) => {
-          showToast(property.acceptsPartnership ? "Imóvel publicado na vitrine da rede." : "Imóvel salvo na sua carteira.");
+        onCreated={() => {
+          showToast("Imóvel publicado na vitrine da rede.");
           router.push("/vitrine");
         }} />
       {toastNode}

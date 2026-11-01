@@ -101,7 +101,7 @@ export default function LandingPage({
     { q: "O que é a ficha para o cliente?", a: "É uma apresentação do imóvel com o seu nome, CRECI e WhatsApp, para enviar ao seu cliente. Mostra bairro e cidade, sem o endereço completo e sem os dados do captador. Confira antes de enviar." },
     { q: "O que posso fazer no CRM?", a: "Cadastrar clientes, organizar oportunidades no funil, registrar contatos, agendar retornos, filtrar a carteira e importar ou exportar contatos em CSV. Acesse CRM → Minha carteira." },
     { q: "O que é importar CSV?", a: "É trazer contatos de uma planilha para o CRM. CSV é um formato de arquivo que você pode salvar no Excel ou Google Planilhas. Na opção Importar contatos de uma planilha, confira as instruções e o modelo antes de enviar." },
-    { q: "Posso cadastrar um imóvel que não aceita parceria?", a: "Pode, mas ele fica só na sua carteira, sem aparecer para a rede. Na vitrine, todo imóvel aceita parceria: ao publicar, você confirma isso e informa a condição daquele imóvel. Por isso não cadastre na rede um imóvel em que você não vai fazer parceria." },
+    { q: "Posso cadastrar um imóvel que não aceita parceria?", a: "Não. No Negocia Lar todo imóvel aceita parceria: ao cadastrar, você informa a condição daquele imóvel (só 50/50, só 40/40/20 ou as duas) e confirma. Por isso não cadastre um imóvel em que você não vai fazer parceria." },
     { q: "O Bartolomeu pode ajudar com financiamento?", a: "Sim. Ele ajuda com atendimento, organização do CRM e dúvidas sobre MCMV, SBPE, FGTS e financiamento. Pode pesquisar e apresentar fontes consultadas. Confirme regras e valores com o banco; a IA não aprova crédito nem garante subsídio. Não envie documentos ou dados pessoais de clientes." },
     { q: "A simulação de amortização é uma proposta do banco?", a: "Não. É uma estimativa matemática em SAC ou Price para comparar aportes que reduzem o prazo ou a parcela. Não inclui seguros, tarifas, TR/IPCA ou regras específicas da instituição. Confirme as condições no contrato e no banco." },
     { q: "O que é DVP? Ele vale como contrato assinado?", a: "DVP significa Documento de Visita Presencial. Na plataforma, ele registra os dados da visita como rascunho para acompanhamento. Esse registro não é assinatura eletrônica nem garante comissão; formalize os acordos entre as partes." },
@@ -220,8 +220,9 @@ export default function LandingPage({
         <div className="mx-auto max-w-[1160px] px-5 text-center">
           <p className={sobretitulo}>Como funciona</p>
           <h2 className={`mt-3.5 ${titulo}`}>Quem tem o imóvel encontra quem tem o cliente.</h2>
-          {/* Pedido da corretora piloto (14/10/2026): deixar claro que a rede é de imóveis que ACEITAM parceria. */}
-          <p className={`${apoio} mx-auto`}>Na vitrine só entra imóvel que aceita parceria. Quem publica informa a condição daquele imóvel (só 50/50, só 40/40/20 ou as duas) e quem busca vê antes de entrar em contato. Imóvel sem parceria fica só na carteira de quem cadastrou.</p>
+          {/* Pedido da corretora piloto (14/10/2026): deixar claro que a rede é de imóveis que ACEITAM parceria. 01/11/2026 (Sidney:
+              "tirar esse texto e obrigar a pôr a parceria"): saiu "imóvel sem parceria fica só na carteira" — todo imóvel aceita. */}
+          <p className={`${apoio} mx-auto`}>Todo imóvel do Negocia Lar aceita parceria. Quem publica informa a condição daquele imóvel (só 50/50, só 40/40/20 ou as duas) e quem busca vê antes de entrar em contato.</p>
           <ol className="mt-14 grid gap-7 text-left md:grid-cols-3">
             {[
               { titulo: "Cadastre o que seu cliente procura", texto: "Cidade, tipo, bairros, orçamento, quartos e vagas. A busca fica no Radar; o nome e as observações do seu cliente continuam só com você." },

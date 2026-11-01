@@ -161,7 +161,7 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
                         /></button> : <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-slate-400"><ImageIcon className="h-10 w-10" /><span className="text-xs">Sem fotos cadastradas</span></div>}
                         <div className="absolute top-3 left-3 flex flex-wrap gap-1.5 max-w-[85%]">
                           <span className="bg-amber-500 text-slate-950 text-xs font-black px-2.5 py-1 rounded-md shadow-lg flex items-center gap-1">
-                            {prop.acceptsPartnership ? rotuloDaCondicao(prop.partnershipModels) : "Só na sua carteira"}
+                            {prop.acceptsPartnership ? rotuloDaCondicao(prop.partnershipModels) : "Fora da rede"}
                           </span>
                           <span className="bg-slate-900/90 backdrop-blur text-white text-xs font-medium px-2.5 py-1 rounded-md border border-slate-700">
                             {prop.propertyType}
