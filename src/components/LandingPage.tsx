@@ -41,7 +41,7 @@ const CORES = {
 
 const DESTAQUES_DA_PARCERIA = [
   { icone: Lock, titulo: "Endereço e proprietário só com você", texto: "O endereço completo e o telefone do proprietário ficam visíveis apenas para quem cadastrou." },
-  { icone: FileText, titulo: "Ficha para o cliente", texto: "O parceiro envia ao cliente dele uma ficha com o próprio WhatsApp e CRECI, sem o seu contato e sem o endereço." },
+  { icone: FileText, titulo: "Ficha para o cliente", texto: "O corretor parceiro poderá enviar uma ficha diretamente para seu cliente, com seu próprio WhatsApp e CRECI, sem nenhuma informação do corretor captador do imóvel." },
   { icone: Clock, titulo: "Registro de visita (DVP)", texto: "Quem visitou o imóvel, quando e com qual corretor. Nesta versão fica em rascunho: não coleta assinatura nem é garantia jurídica." },
   { icone: Check, titulo: "Termo de Parceria", texto: "A divisão confirmada pelos dois vira termo com cláusula de não atravessamento, com data, hora e IP. É só imprimir ou salvar em PDF." },
 ];
@@ -226,7 +226,7 @@ export default function LandingPage({
           <ol className="mt-14 grid gap-7 text-left md:grid-cols-3">
             {[
               { titulo: "Cadastre o que seu cliente procura", texto: "Cidade, tipo, bairros, orçamento, quartos e vagas. A busca fica no Radar; o nome e as observações do seu cliente continuam só com você." },
-              { titulo: "O Match avisa você", texto: "Quando há um imóvel compatível para parceria, o sistema cruza os critérios e avisa o corretor que procura. O Match indica a compatibilidade; os corretores confirmam os detalhes." },
+              { titulo: "O Match avisa você", texto: "Quando há um imóvel compatível para parceria, o sistema cruza os critérios e avisa ao corretor que procura. O Match indica a compatibilidade." },
               { titulo: "A parceria fecha com documento", texto: "Os dois confirmam a divisão da comissão e a plataforma gera o Termo de Parceria, com cláusula de não atravessamento." },
             ].map((passo, i) => (
               <li key={passo.titulo} className="min-w-0 rounded-[20px] border border-[color:var(--nl-linha)] bg-white p-8">
