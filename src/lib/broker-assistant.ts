@@ -1,6 +1,7 @@
+import { isLocale, type Locale } from "./i18n";
 import { ActionError } from "./action-result";
 export type BrokerChatTurn = {role:"user"|"assistant";text:string};
-export type BrokerAssistantInput = {question:string;history:BrokerChatTurn[]};
+export type BrokerAssistantInput = {question:string;history:BrokerChatTurn[];locale?:Locale};
 export type BrokerAnswer = {text:string;sources:{title:string;url:string}[];searchSuggestions:string|null};
 
 function redact(value:string) {
@@ -9,12 +10,12 @@ function redact(value:string) {
     .replace(/(?:\+55\s*)?\(?\d{2}\)?[\s-]*\d{4,5}[\s-]*\d{4}\b/g,"[telefone omitido]");
 }
 export function validateBrokerAssistantInput(input:BrokerAssistantInput):BrokerAssistantInput {
-  if(!input || typeof input.question!=="string" || input.question.trim().length<3 || input.question.length>2000
+  if(!input || (input.locale !== undefined && !isLocale(input.locale)) || typeof input.question!=="string" || input.question.trim().length<3 || input.question.length>2000
     || !Array.isArray(input.history) || input.history.length>12
     || input.history.some(turn=>!turn || !["user","assistant"].includes(turn.role) || typeof turn.text!=="string" || turn.text.length>6000)) {
     throw new ActionError("Escreva uma pergunta de 3 a 2.000 caracteres e mantenha o histórico dentro do limite.");
   }
-  return {question:redact(input.question.trim()),history:input.history.map(turn=>({role:turn.role,text:redact(turn.text)}))};
+  return {...(input.locale ? {locale: input.locale} : {}),question:redact(input.question.trim()),history:input.history.map(turn=>({role:turn.role,text:redact(turn.text)}))};
 }
 type GeminiCandidate = {
  content?:{parts?:{text?:string;thought?:boolean}[]};finishReason?:string;
@@ -27,7 +28,8 @@ export async function generateBrokerAnswer(input:BrokerAssistantInput, summary:s
   const model=process.env.BARTOLOMEU_MODEL || "gemini-3.8-flash";
   if(!/^[a-zA-Z0-9.-]+$/.test(model))throw new ActionError("Modelo da IA não configurado corretamente.");
   const date=new Intl.DateTimeFormat("pt-BR",{timeZone:"America/Sao_Paulo"}).format(new Date());
-  const system=`Você é Bartolomeu, assistente imobiliário do NegociaLar/SNNtech. Responda em português brasileiro, de forma cordial, prática e clara, sem jargão desnecessário. Data de hoje: ${date}.
+  const language = { "pt-BR": "português brasileiro", en: "inglês", es: "espanhol", "pt-PT": "português de Portugal" }[validated.locale ?? "pt-BR"];
+  const system=`Você é Bartolomeu, assistente imobiliário do NegociaLar/SNNtech. Responda em ${language}, de forma cordial, prática e clara, sem jargão desnecessário. Data de hoje: ${date}.
 Ajude com atendimento, organização do CRM, textos de divulgação, SAC/Price, FGTS, MCMV e SBPE.
 Para regras, taxas, limites ou notícias atuais, pesquise na web e priorize fontes oficiais (gov.br, caixa.gov.br, bcb.gov.br e sites dos bancos). Cite as fontes consultadas e a data aplicável. Sem fonte atual, não invente valores, não apresente conhecimento antigo como vigente e indique onde confirmar.
 Não aprove nem rejeite crédito, não prometa subsídio, taxa, aprovação, comissão ou efeito jurídico. Nunca afirme que CPF foi consultado, que documentos foram validados ou que executou alguma ação. Não é uma consulta ao banco nem uma proposta de financiamento.

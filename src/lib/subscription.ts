@@ -1,3 +1,4 @@
+import { translate, type Locale } from "./i18n";
 import { isPlanId, planCharge } from "./plans";
 
 export const TRIAL_DAYS = 30;
@@ -25,7 +26,7 @@ export type BillingNotice = { tone: "aviso" | "vencido"; title: string; message:
 type BillingAccount = {
   role: string; subscriptionStatus: string; nextBillingDate: Date | null; billingExemptAt: Date | null;
   plan: string; billingCycle: string; hasPaid: boolean; pendingPix: boolean;
-  /** Tabela de preços da conta (users.price_table) — quem já assinava cobra pela v1. */
+  /** Keep the account’s original price table when localizing billing notices. */
   priceTable?: string;
 };
 const TIME_ZONE = "America/Sao_Paulo";
@@ -34,36 +35,38 @@ const brasiliaDayNumber = (date: Date) => {
   const [year, month, day] = new Intl.DateTimeFormat("en-CA", { timeZone: TIME_ZONE }).format(date).split("-").map(Number);
   return Date.UTC(year, month - 1, day) / 86400000;
 };
-const brl = (value: string) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value));
+const brl = (value: string, locale: Locale) => new Intl.NumberFormat(locale, { style: "currency", currency: "BRL" }).format(Number(value));
 
 // Primeira cobrança: o corretor escolhe mensal ou anual. Depois, cobra só o ciclo escolhido.
-export function billingPrice(account: Pick<BillingAccount, "plan" | "billingCycle" | "hasPaid" | "priceTable">) {
+export function billingPrice(account: Pick<BillingAccount, "plan" | "billingCycle" | "hasPaid" | "priceTable">, locale: Locale = "pt-BR") {
+  const t = (source: string, parameters?: readonly (string | number)[]) => translate(locale, source, parameters);
   if (!isPlanId(account.plan)) return null;
-  const monthly = brl(planCharge(account.plan, "monthly", account.priceTable));
-  const annual = brl(planCharge(account.plan, "annual", account.priceTable));
-  if (!account.hasPaid) return `mensal ${monthly} ou anual ${annual}`;
-  return account.billingCycle === "annual" ? `anuidade ${annual}` : `mensalidade ${monthly}`;
+  const monthly = brl(planCharge(account.plan, "monthly", account.priceTable), locale);
+  const annual = brl(planCharge(account.plan, "annual", account.priceTable), locale);
+  if (!account.hasPaid) return t("mensal {0} ou anual {1}", [monthly, annual]);
+  return account.billingCycle === "annual" ? t("anuidade {0}", [annual]) : t("mensalidade {0}", [monthly]);
 }
 
-export function billingNotice(account: BillingAccount, now = new Date()): BillingNotice | null {
+export function billingNotice(account: BillingAccount, now = new Date(), locale: Locale = "pt-BR"): BillingNotice | null {
+  const t = (source: string, parameters?: readonly (string | number)[]) => translate(locale, source, parameters);
   const expiresAt = account.nextBillingDate;
   if (account.role === "admin" || account.billingExemptAt || !expiresAt) return null;
   const expired = !hasSubscriptionAccess(account.subscriptionStatus, expiresAt, now);
   const daysLeft = brasiliaDayNumber(expiresAt) - brasiliaDayNumber(now);
   if (!expired && daysLeft > BILLING_NOTICE_DAYS) return null;
-  const date = expiresAt.toLocaleDateString("pt-BR", { timeZone: TIME_ZONE });
+  const date = expiresAt.toLocaleDateString(locale, { timeZone: TIME_ZONE });
   if (account.pendingPix) {
-    return { tone: expired ? "vencido" : "aviso", title: "Pix aguardando confirmação", message: `${expired ? `Seu acesso venceu em ${date}. ` : ""}A equipe confere o pagamento no extrato e libera o acesso.` };
+    return { tone: expired ? "vencido" : "aviso", title: t("Pix aguardando confirmação"), message: (expired ? t("Seu acesso venceu em {0}. ", [date]) : "") + t("A equipe confere o pagamento no extrato e libera o acesso.") };
   }
-  const price = billingPrice(account);
-  const pay = price ? `Pague via Pix em Minha assinatura: ${price}.` : "Fale com a equipe para renovar.";
+  const price = billingPrice(account, locale);
+  const pay = price ? t("Pague via Pix em Minha assinatura: {0}.", [price]) : t("Fale com a equipe para renovar.");
   const trial = account.subscriptionStatus === "teste";
   if (expired) {
-    return { tone: "vencido", title: trial ? "Seu período grátis terminou" : "Sua assinatura venceu", message: `Venceu em ${date}. Para voltar a usar a rede, ${pay.charAt(0).toLowerCase()}${pay.slice(1)}` };
+    return { tone: "vencido", title: trial ? t("Seu período grátis terminou") : t("Sua assinatura venceu"), message: t("Venceu em {0}. Para voltar a usar a rede, {1}{2}", [date, pay.charAt(0).toLowerCase(), pay.slice(1)]) };
   }
-  const when = daysLeft <= 0 ? "hoje" : daysLeft === 1 ? "amanhã" : `em ${daysLeft} dias`;
-  const what = trial ? "Seu período grátis termina" : account.billingCycle === "annual" && account.hasPaid ? "Sua anuidade vence" : "Sua mensalidade vence";
-  return { tone: "aviso", title: `${what} ${when}`, message: `Acesso até ${date}. ${pay}` };
+  const when = daysLeft <= 0 ? t("hoje") : daysLeft === 1 ? t("amanhã") : t("em {0} dias", [daysLeft]);
+  const what = trial ? t("Seu período grátis termina") : account.billingCycle === "annual" && account.hasPaid ? t("Sua anuidade vence") : t("Sua mensalidade vence");
+  return { tone: "aviso", title: `${what} ${when}`, message: t("Acesso até {0}. {1}", [date, pay]) };
 }
 
 // Pop-up da cobrança (como no ModernaDental: o sino sozinho não é visto). Aviso amarelo 1× por dia; vencido

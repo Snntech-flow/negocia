@@ -1,4 +1,7 @@
 "use client";
+
+import { useI18n } from "./I18nProvider";
+
 // Controle de visita a imóvel: o corretor escolhe o percentual da comissão e imprime a declaração já preenchida para o
 // cliente assinar no papel (src/lib/visit-control.ts). Imprime por um iframe escondido — sem janela nova, que o bloqueador
 // de pop-up barra — e monta a folha por textContent (nada do cadastro vira HTML).
@@ -62,6 +65,8 @@ function imprimir(c: ControleDeVisita) {
 }
 
 export default function VisitControlPrint({ dvpId }: { dvpId: string }) {
+  const { t } = useI18n();
+
   const [aberto, setAberto] = useState(false);
   // Texto digitado ("2,5"): aceita vírgula ou ponto, com uma casa decimal (14/10/2026).
   const [digitado, setDigitado] = useState(String(PERCENTUAL_PADRAO));
@@ -85,26 +90,24 @@ export default function VisitControlPrint({ dvpId }: { dvpId: string }) {
     return (
       <button type="button" onClick={() => { setDigitado(String(lerPercentual()).replace(".", ",")); setAberto(true); }}
         className="inline-flex items-center gap-1.5 rounded-lg border border-slate-600 px-3 py-1.5 text-[11px] font-semibold text-slate-300">
-        <Printer className="h-3.5 w-3.5" />Controle de visita para o cliente assinar
-      </button>
+        <Printer className="h-3.5 w-3.5" />{t("Controle de visita para o cliente assinar")}</button>
     );
   }
   return (
     <div className="space-y-2 rounded-lg border border-slate-700 p-3">
-      <p className="text-[11px] text-slate-400">Sai preenchido com você, seu CRECI, o imóvel (bairro, cidade e código — o endereço protegido não sai), o nome do cliente e a data da visita. O cliente completa CPF, endereços e assina no papel.</p>
+      <p className="text-[11px] text-slate-400">{t("Sai preenchido com você, seu CRECI, o imóvel (bairro, cidade e código — o endereço protegido não sai), o nome do cliente e a data da visita. O cliente completa CPF, endereços e assina no papel.")}</p>
       {/* 28/10/2026, Sidney: "como assim, comissão se comprar por fora?" — o rótulo era jargão; a frase diz o que a declaração diz. */}
-      <p className="text-[11px] text-slate-300">Na declaração, o cliente diz que conheceu o imóvel por você e se compromete a pagar esta comissão, sobre o valor do imóvel, se comprar sem você (direto com o dono ou por outro corretor).</p>
+      <p className="text-[11px] text-slate-300">{t("Na declaração, o cliente diz que conheceu o imóvel por você e se compromete a pagar esta comissão, sobre o valor do imóvel, se comprar sem você (direto com o dono ou por outro corretor).")}</p>
       <div className="flex flex-wrap items-end gap-2">
-        <label className="text-[11px] text-slate-300">Comissão da declaração (%)
-          <input type="text" inputMode="decimal" value={digitado} onChange={(e) => { setDigitado(e.target.value); setMensagem(""); }} placeholder="Ex.: 2,5"
+        <label className="text-[11px] text-slate-300">{t("Comissão da declaração (%)")}<input type="text" inputMode="decimal" value={digitado} onChange={(e) => { setDigitado(e.target.value); setMensagem(""); }} placeholder={t("Ex.: 2,5")}
             className="mt-1 block w-24 rounded-lg border border-slate-700 bg-slate-900 p-1.5 text-sm text-white" />
         </label>
         <button type="button" disabled={ocupado} onClick={() => void gerar()} className="rounded-lg bg-amber-500 px-3 py-2 text-xs font-bold text-slate-950 disabled:opacity-50">
-          {ocupado ? "Preparando…" : "Imprimir / salvar PDF"}
+          {ocupado ? t("Preparando…") : t("Imprimir / salvar PDF")}
         </button>
-        <button type="button" onClick={() => { setAberto(false); setMensagem(""); }} className="px-2 py-2 text-[11px] text-slate-400">Fechar</button>
+        <button type="button" onClick={() => { setAberto(false); setMensagem(""); }} className="px-2 py-2 text-[11px] text-slate-400">{t("Fechar")}</button>
       </div>
-      {mensagem && <p role="status" className="text-[11px] text-amber-300">{mensagem}</p>}
+      {mensagem && <p role="status" className="text-[11px] text-amber-300">{t(mensagem)}</p>}
     </div>
   );
 }

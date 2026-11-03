@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "../I18nProvider";
+
 // Rota /radar (Radar de Compradores): cadastro de procura + matches + lista de procuras na rede.
 // onShareProperty abre a ficha aqui mesmo (como o monólito); onOpenProperty navega para a vitrine.
 import { useState } from "react";
@@ -27,6 +29,8 @@ export default function RadarRouteClient({ broker, properties, initialRadar, cur
   brokerState: string;
   blockedReason: string | null;
 }) {
+  const { t } = useI18n();
+
   const router = useRouter();
   const [radarList, setRadarList] = useState<BuyerProfile[]>(initialRadar);
   const [selectedForWhiteLabel, setSelectedForWhiteLabel] = useState<Property | null>(null);
@@ -35,8 +39,8 @@ export default function RadarRouteClient({ broker, properties, initialRadar, cur
   return (
     <div className="space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-white flex items-center gap-2"><Radar className="w-5 h-5 text-orange-700" />Radar de compradores</h2>
-        <p className="text-sm text-slate-400">Cadastre o que seu cliente procura. O Radar compara os critérios com os imóveis de venda oferecidos para parceria e avisa no sino quando algum atende a todos.</p>
+        <h2 className="text-xl font-bold text-white flex items-center gap-2"><Radar className="w-5 h-5 text-orange-700" />{t("Radar de compradores")}</h2>
+        <p className="text-sm text-slate-400">{t("Cadastre o que seu cliente procura. O Radar compara os critérios com os imóveis de venda oferecidos para parceria e avisa no sino quando algum atende a todos.")}</p>
       </div>
 
       <BuyerProfileForm brokerState={brokerState} blockedReason={blockedReason}
@@ -55,26 +59,26 @@ export default function RadarRouteClient({ broker, properties, initialRadar, cur
         <div className="flex items-center justify-between pb-3 border-b border-slate-800">
           <div className="flex items-center gap-2">
             <Users className="w-4 h-4 text-amber-500" />
-            <h3 className="text-sm font-bold text-white uppercase tracking-wider">Procuras na rede ({radarList.length})</h3>
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider">{t("Procuras na rede (")}{radarList.length})</h3>
           </div>
-          <span className="text-xs text-slate-400">Suas procuras e as de corretores aprovados</span>
+          <span className="text-xs text-slate-400">{t("Suas procuras e as de corretores aprovados")}</span>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           {radarList.map((bp) => (
             <div key={bp.id} className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-2">
               <div className="flex items-center justify-between">
                 <span className="text-xs font-bold text-white">{bp.clientInternalName}</span>
-                <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full">No Radar</span>
+                <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full">{t("No Radar")}</span>
               </div>
               <div className="text-xs text-slate-400 space-y-1">
-                <div><strong className="text-slate-300">Tipo:</strong> {bp.propertyType} • {bp.city}</div>
-                <div><strong className="text-slate-300">Orçamento:</strong> <span className="text-amber-400 font-mono font-bold">{formatBRL(bp.maxBudget)}</span></div>
-                <div><strong className="text-slate-300">Mínimo:</strong> {bp.minBedrooms} {bp.minBedrooms === 1 ? "quarto" : "quartos"}, {bp.minParkingSpots} {bp.minParkingSpots === 1 ? "vaga" : "vagas"}</div>
+                <div><strong className="text-slate-300">{t("Tipo:")}</strong> {t(bp.propertyType)} • {bp.city}</div>
+                <div><strong className="text-slate-300">{t("Orçamento:")}</strong> <span className="text-amber-400 font-mono font-bold">{formatBRL(bp.maxBudget)}</span></div>
+                <div><strong className="text-slate-300">{t("Mínimo:")}</strong> {bp.minBedrooms} {bp.minBedrooms === 1 ? t("quarto") : t("quartos")}, {bp.minParkingSpots} {bp.minParkingSpots === 1 ? t("vaga") : t("vagas")}</div>
                 {bp.notes && <div className="text-[11px] text-slate-400 italic bg-slate-900/60 p-2 rounded-lg border border-slate-800/60">&ldquo;{bp.notes}&rdquo;</div>}
               </div>
               <div className="pt-2 border-t border-slate-800 flex items-center justify-between text-[11px] text-slate-400">
-                <span>Corretor: <span className="text-white font-medium">{bp.broker.name}</span></span>
-                <span className="font-mono text-amber-400">CRECI {bp.broker.creci}</span>
+                <span>{t("Corretor:")}{" "}<span className="text-white font-medium">{bp.broker.name}</span></span>
+                <span className="font-mono text-amber-400">{t("CRECI")}{" "}{bp.broker.creci}</span>
               </div>
             </div>
           ))}

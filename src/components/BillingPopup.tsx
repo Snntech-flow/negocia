@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "./I18nProvider";
+
 import { useEffect, useState } from "react";
 import { AlertTriangle, CreditCard } from "lucide-react";
 import BotaoFechar from "./BotaoFechar";
@@ -10,13 +12,15 @@ import { billingPopupSlot, type BillingNotice } from "@/lib/subscription";
 
 // Pop-up da cobrança (como no ModernaDental): o mesmo aviso do sino, na frente da tela, porque o sino sozinho
 // não é visto. Aviso 1× por dia; vencido de manhã e à tarde. A "vez" fechada fica no navegador (conveniência).
-const money = (value: string) => new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(Number(value));
+const money = (value: string, locale = "pt-BR") => new Intl.NumberFormat(locale, { style: "currency", currency: "BRL" }).format(Number(value));
 const storageKey = (userId: string) => `negocialar-aviso-cobranca:${userId}`;
 
 export default function BillingPopup({ userId, notice, pendingPix, now, plan, priceTable, hasPaid, billingCycle, onRegistered, onOpenSubscription, onMessage }: {
   userId: string; notice: BillingNotice; pendingPix: boolean; now: Date; plan: string; priceTable?: string; hasPaid: boolean; billingCycle: string;
   onRegistered: () => void; onOpenSubscription: () => void; onMessage: (text: string) => void;
 }) {
+  const { t, locale } = useI18n();
+
   const slot = billingPopupSlot(notice, pendingPix, now);
   const [closedSlot, setClosedSlot] = useState<string | null | undefined>(undefined);
   const [cycle, setCycle] = useState<BillingCycle>(billingCycle === "annual" ? "annual" : "monthly");
@@ -70,16 +74,16 @@ export default function BillingPopup({ userId, notice, pendingPix, now, plan, pr
         </div>
       </div>
       {choose && isPlanId(plan) && <fieldset className="space-y-2 text-sm">
-        <legend className="text-xs font-bold text-slate-300">Como você quer pagar? Depois do primeiro pagamento, a cobrança segue o mesmo ciclo.</legend>
+        <legend className="text-xs font-bold text-slate-300">{t("Como você quer pagar? Depois do primeiro pagamento, a cobrança segue o mesmo ciclo.")}</legend>
         {(["monthly", "annual"] as const).map((option) => <label key={option} className={`flex cursor-pointer items-center gap-2 rounded-lg border p-3 ${cycle === option ? "border-amber-500" : "border-slate-700"}`}>
           <input type="radio" name="billing-popup-cycle" value={option} checked={cycle === option} onChange={() => setCycle(option)} />
-          <span className="text-slate-200">{option === "annual" ? `Anual: ${money(planCharge(plan, "annual", priceTable))} (paga 11 meses e usa 12)` : `Mensal: ${money(planCharge(plan, "monthly", priceTable))} por mês`}</span>
+          <span className="text-slate-200">{option === "annual" ? t("Anual: {0} (paga 11 meses e usa 12)", [money(planCharge(plan, "annual", priceTable), locale)]) : t("Mensal: {0} por mês", [money(planCharge(plan, "monthly", priceTable), locale)])}</span>
         </label>)}
       </fieldset>}
       <div className="flex flex-col gap-2 sm:flex-row-reverse">
-        <button type="button" disabled={busy} onClick={() => void register(true)} className="rounded-lg bg-amber-500 px-4 py-2.5 text-sm font-bold text-slate-950 disabled:opacity-50">{busy ? "Aguarde…" : "Pagar via Pix"}</button>
-        <button type="button" disabled={busy} onClick={() => void register(false)} className="rounded-lg border border-slate-700 px-4 py-2.5 text-sm font-semibold text-slate-200 hover:bg-slate-800 disabled:opacity-50">Já paguei</button>
-        <button type="button" disabled={busy} onClick={remindLater} className="rounded-lg px-4 py-2.5 text-sm text-slate-400 hover:bg-slate-800 sm:mr-auto">Lembrar depois</button>
+        <button type="button" disabled={busy} onClick={() => void register(true)} className="rounded-lg bg-amber-500 px-4 py-2.5 text-sm font-bold text-slate-950 disabled:opacity-50">{busy ? t("Aguarde…") : t("Pagar via Pix")}</button>
+        <button type="button" disabled={busy} onClick={() => void register(false)} className="rounded-lg border border-slate-700 px-4 py-2.5 text-sm font-semibold text-slate-200 hover:bg-slate-800 disabled:opacity-50">{t("Já paguei")}</button>
+        <button type="button" disabled={busy} onClick={remindLater} className="rounded-lg px-4 py-2.5 text-sm text-slate-400 hover:bg-slate-800 sm:mr-auto">{t("Lembrar depois")}</button>
       </div>
     </section>
   </div>;

@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "./I18nProvider";
+
 import { useState } from "react";
 import PhotoViewer from "./PhotoViewer";
 
@@ -9,18 +11,20 @@ import PhotoViewer from "./PhotoViewer";
 // A mesma peça serve à janela "Ficha para o cliente" da Vitrine (variante "janela", 28/10/2026 — Sidney: "nas fotos só abre
 // a 1ª foto"): lá só ia a capa, sem clique. Na janela as miniaturas vão numa fileira que rola de lado, para não esticar a ficha.
 export default function FichaFotos({ fotos, titulo, variante = "pagina" }: { fotos: string[]; titulo: string; variante?: "pagina" | "janela" }) {
+  const { t } = useI18n();
+
   const [indice, setIndice] = useState<number | null>(null);
   if (fotos.length === 0) return null;
   const [capa, ...resto] = fotos;
   const janela = variante === "janela";
   return <>
-    <button type="button" onClick={() => setIndice(0)} aria-label={`Ver as fotos de ${titulo}`} className="relative block w-full">
+    <button type="button" onClick={() => setIndice(0)} aria-label={t("Ver as fotos de {0}", [titulo])} className="relative block w-full">
       <img src={capa} alt={titulo} className={janela ? "h-48 w-full rounded-xl object-cover" : "h-56 w-full object-cover"} />
-      {fotos.length > 1 && <span className="absolute bottom-3 right-3 rounded-lg bg-[#000000]/70 px-2.5 py-1 text-xs font-semibold text-[#ffffff]">{fotos.length} fotos</span>}
+      {fotos.length > 1 && <span className="absolute bottom-3 right-3 rounded-lg bg-[#000000]/70 px-2.5 py-1 text-xs font-semibold text-[#ffffff]">{fotos.length} {" "}{t("fotos")}</span>}
     </button>
     {resto.length > 0 && <div className={janela ? "flex gap-2 overflow-x-auto pb-1" : "grid grid-cols-4 gap-2 p-3"}>
-      {resto.map((url, i) => <button key={url} type="button" onClick={() => setIndice(i + 1)} aria-label={`Ver a foto ${i + 2} de ${fotos.length}`} className={janela ? "shrink-0" : undefined}>
-        <img src={url} alt={`${titulo} — foto ${i + 2}`} className={janela ? "h-16 w-24 rounded-lg object-cover" : "h-20 w-full rounded-lg object-cover"} />
+      {resto.map((url, i) => <button key={url} type="button" onClick={() => setIndice(i + 1)} aria-label={t("Ver a foto {0} de {1}", [i + 2, fotos.length])} className={janela ? "shrink-0" : undefined}>
+        <img src={url} alt={t("{0} — foto {1}", [titulo, i + 2])} className={janela ? "h-16 w-24 rounded-lg object-cover" : "h-20 w-full rounded-lg object-cover"} />
       </button>)}
     </div>}
     {indice !== null && <PhotoViewer fotos={fotos} indice={indice} titulo={titulo} onIndice={setIndice} onFechar={() => setIndice(null)} />}

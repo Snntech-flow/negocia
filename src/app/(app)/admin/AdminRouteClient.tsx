@@ -3,6 +3,7 @@
 // Wrapper client da rota /admin: segura as listas em estado local (semeadas pelo servidor), dá os
 // callbacks que o AdminPanel usa pra atualizar otimista (on*Change) e um toast simples (onMessage) —
 // o mesmo contrato que o NegociaLarApp dá hoje. Header, abas e modais vêm do (app)/layout (AppShell).
+import { useI18n } from "@/components/I18nProvider";
 import { useState } from "react";
 import AdminPanel from "@/components/AdminPanel";
 import type { WorkspaceUser, WorkspaceTransaction, WorkspaceFeedback } from "@/lib/workspace-types";
@@ -20,6 +21,8 @@ export default function AdminRouteClient({
   currentUserId: string;
   somenteLeitura: boolean;
 }) {
+  const { t } = useI18n();
+
   const [users, setUsers] = useState(usuariosIniciais);
   const [transactions, setTransactions] = useState(transacoesIniciais);
   const [feedback, setFeedback] = useState(feedbackInicial);

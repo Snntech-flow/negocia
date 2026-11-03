@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "../I18nProvider";
+
 // Rota /cadastrar (Meus imóveis): a carteira (PropertyInventory) + o cadastro de imóvel (PropertyCreateForm).
 // ?imovel=<id> abre a edição daquele imóvel (veio do "Editar" da vitrine). Ao cadastrar, vai pra vitrine.
 import { useState } from "react";
@@ -14,6 +16,8 @@ export default function CadastrarRouteClient({ broker, blockedReason, photoLimit
   blockedReason: string | null;
   photoLimit: number;
 }) {
+  const { t } = useI18n();
+
   const router = useRouter();
   const searchParams = useSearchParams();
   const abrirImovelId = searchParams.get("imovel");
@@ -25,8 +29,8 @@ export default function CadastrarRouteClient({ broker, blockedReason, photoLimit
       <PropertyInventory reloadKey={reloadKey} onChanged={() => setReloadKey((v) => v + 1)}
         abrirImovelId={abrirImovelId} aoAbrir={() => { if (abrirImovelId) router.replace("/cadastrar"); }} />
       <div>
-        <h2 className="text-xl font-bold text-white flex items-center gap-2"><PlusCircle className="w-5 h-5 text-amber-500" />Cadastrar imóvel</h2>
-        <p className="text-sm text-slate-400">Endereço completo e dados do proprietário ficam visíveis só para você. Campos com * são obrigatórios.</p>
+        <h2 className="text-xl font-bold text-white flex items-center gap-2"><PlusCircle className="w-5 h-5 text-amber-500" />{t("Cadastrar imóvel")}</h2>
+        <p className="text-sm text-slate-400">{t("Endereço completo e dados do proprietário ficam visíveis só para você. Campos com * são obrigatórios.")}</p>
       </div>
       <PropertyCreateForm key={reloadKey} broker={broker} blockedReason={blockedReason} photoLimit={photoLimit} onMessage={showToast}
         onCreated={() => {

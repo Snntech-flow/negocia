@@ -1,3 +1,5 @@
+"use client";
+import { useI18n } from "../I18nProvider";
 // Guia da tela (banner no topo de cada rota), extraído do NegociaLarApp. Texto por tela, mesma aparência do monólito.
 import { Info } from "lucide-react";
 
@@ -12,6 +14,7 @@ export const SCREEN_GUIDANCE: Record<string, { title: string; description: strin
 };
 
 export default function ScreenGuidance({ screen }: { screen: keyof typeof SCREEN_GUIDANCE }) {
+  const { t } = useI18n();
   const guia = SCREEN_GUIDANCE[screen];
   if (!guia) return null;
   const isDvp = screen === "dvp";
@@ -19,8 +22,8 @@ export default function ScreenGuidance({ screen }: { screen: keyof typeof SCREEN
     <div className={`mb-6 flex items-start gap-3 rounded-xl border px-4 py-3 ${isDvp ? "border-amber-500/40 bg-amber-950/25" : "border-sky-200 bg-sky-50"}`}>
       <Info className={`mt-0.5 h-4 w-4 shrink-0 ${isDvp ? "text-amber-300" : "text-sky-700"}`} />
       <div>
-        <h2 className={`text-xs font-bold ${screen === "vitrine" ? "mls-guidance-title" : isDvp ? "text-amber-200" : "text-sky-900"}`}>{guia.title}</h2>
-        <p className="mt-1 text-xs leading-relaxed text-slate-300">{guia.description}</p>
+        <h2 className={`text-xs font-bold ${screen === "vitrine" ? "mls-guidance-title" : isDvp ? "text-amber-200" : "text-sky-900"}`}>{t(guia.title)}</h2>
+        <p className="mt-1 text-xs leading-relaxed text-slate-300">{t(guia.description)}</p>
       </div>
     </div>
   );
