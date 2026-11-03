@@ -39,7 +39,7 @@ export default function LanguageSwitch() {
       {LOCALES.map((language) => <li key={language}>
         <button type="button" lang={language} aria-pressed={locale === language}
           onClick={() => { setLocale(language); if (dropdown.current) dropdown.current.open = false; trigger.current?.focus(); }}
-          className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-amber-400 ${locale === language ? "font-bold text-amber-300" : "text-white"}`}>
+          className={`flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm hover:bg-[#242427] focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#f59e0b] ${locale === language ? "bg-[#242427] font-bold text-[#f59e0b]" : "text-[#ffffff]"}`}>
           <span aria-hidden="true" className="text-xl">{LANGUAGE_FLAGS[language]}</span>
           <span>{LANGUAGE_NAMES[language]}</span>
         </button>
