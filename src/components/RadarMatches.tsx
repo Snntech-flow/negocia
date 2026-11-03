@@ -22,7 +22,7 @@ export default function RadarMatches({ properties, profiles, currentUserId, onOp
     <div className="grid gap-4 md:grid-cols-2">{matches.slice(0, visible).map(({ profile, property, criteria }) => <article key={`${profile.id}:${property.id}`} className="space-y-3 rounded-xl border border-slate-700 bg-slate-950 p-4">
       <p className="text-xs text-amber-300">{profile.broker.id === currentUserId ? t("Sua procura") : t("Procura de {0}", [profile.broker.name])} · {profile.clientInternalName}</p>
       <h4 className="font-bold text-white">{property.title}</h4>
-      <p className="text-xs text-slate-300">{property.neighborhood}, {property.city} · {money(property.salePrice)} {" "}{t("· até")}{" "}{money(profile.maxBudget)}</p>
+      <p className="text-xs text-slate-300">{property.neighborhood}, {property.city} · {money(property.salePrice)} {t("· até")}{" "}{money(profile.maxBudget)}</p>
       <div className="flex flex-wrap gap-2">{criteria.map(criterion => <span key={t(criterion.label)} className="flex items-center gap-1 rounded-full bg-emerald-950 px-2 py-1 text-[11px] text-emerald-300"><CheckCircle2 className="h-3 w-3" />{t(criterion.label)}</span>)}</div>
       <p className="text-xs text-slate-400">{t("Captador:")}{" "}{property.broker.name}</p>
       <div className="flex flex-wrap gap-2"><button type="button" onClick={() => onOpenProperty(property.id)} className="rounded-lg bg-amber-500 px-3 py-2 text-xs font-bold text-slate-950">{t("Ver imóvel")}</button><button type="button" onClick={() => onShareProperty(property.id)} className="flex items-center gap-1 rounded-lg border border-slate-600 px-3 py-2 text-xs text-white"><Share2 className="h-3 w-3" />{t("Gerar ficha")}</button></div>

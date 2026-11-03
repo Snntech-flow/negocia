@@ -24,7 +24,7 @@ export default function BuyerProfileForm({ brokerState, blockedReason, onCreated
   const [error, setError] = useState("");
   const [message, setMessage] = useState("");
   useEffect(() => {
-    if (!uf) { setCities([]); return; }
+    if (!uf) { const frame = requestAnimationFrame(() => setCities([])); return () => cancelAnimationFrame(frame); }
     let cancelled = false;
     void loadStateCities(uf).then((list) => { if (!cancelled) setCities(list); });
     return () => { cancelled = true; };

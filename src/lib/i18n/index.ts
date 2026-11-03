@@ -15,12 +15,12 @@ const catalog: Record<string, readonly string[]> = messages;
 const templates = Object.keys(catalog).filter((key) => /\{\d+\}/.test(key) && key.replace(/\{\d+\}/g, "").length >= 12).map((key) => ({
   key,
   positions: [...key.matchAll(/\{(\d+)\}/g)].map((match) => Number(match[1])),
-  pattern: new RegExp("^" + key.split(/(\{\d+\})/).map((part) => /^\{\d+\}$/.test(part) ? "([\\s\\S]+?)" : part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("") + "$"),
+  pattern: new RegExp("^" + key.split(/(\{\d+\})/).map((part) => /^\{\d+\}$/.test(part) ? "([\\s\\S]*?)" : part.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("") + "$"),
 }));
 /** Source strings are stable keys. Values and persisted business codes are never rewritten. */
-export function translate(locale: Locale, source: string, parameters?: readonly (string | number)[]): string;
-export function translate(locale: Locale, source: string | null | undefined, parameters?: readonly (string | number)[]): string | null | undefined;
-export function translate(locale: Locale, source: string | null | undefined, parameters: readonly (string | number)[] = []): string | null | undefined {
+export function translate(locale: Locale, source: string, parameters?: readonly (string | number | null | undefined)[]): string;
+export function translate(locale: Locale, source: string | null | undefined, parameters?: readonly (string | number | null | undefined)[]): string | null | undefined;
+export function translate(locale: Locale, source: string | null | undefined, parameters: readonly (string | number | null | undefined)[] = []): string | null | undefined {
   if (typeof source !== "string") return source;
   const index = locale === "en" ? 0 : locale === "es" ? 1 : 2;
   let translated = locale === DEFAULT_LOCALE ? source : catalog[source]?.[index];
@@ -35,9 +35,9 @@ export function translate(locale: Locale, source: string | null | undefined, par
     }
   }
   translated ??= source;
-  return translated.replace(/\{(\d+)\}/g, (token, position: string) => String(parameters[Number(position)] ?? token));
+  return translated.replace(/\{(\d+)\}/g, (token, position: string) => Number(position) < parameters.length ? String(parameters[Number(position)] ?? "") : token);
 }
 export type Translate = {
-  (source: string, parameters?: readonly (string | number)[]): string;
-  (source: string | null | undefined, parameters?: readonly (string | number)[]): string | null | undefined;
+  (source: string, parameters?: readonly (string | number | null | undefined)[]): string;
+  (source: string | null | undefined, parameters?: readonly (string | number | null | undefined)[]): string | null | undefined;
 };

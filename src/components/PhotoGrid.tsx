@@ -21,7 +21,7 @@ export default function PhotoGrid({ fotos, onChange, nome = "Foto", capa = true 
   const item = nome.toLowerCase();
   const seta = "flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-[#131315]/85 text-[#ffffff] disabled:opacity-30";
   return <div className="space-y-1 pt-1">
-    {fotos.length > 1 && <p className="text-[11px] text-slate-500">{t("Para mudar a ordem, use as setas")}{capa ? t(" ou “Tornar capa”") : ""} {" "}{t("em cada")}{" "}{item} {" "}{t("— no computador, também dá para arrastar.")}</p>}
+    {fotos.length > 1 && <p className="text-[11px] text-slate-500">{t("Para mudar a ordem, use as setas")}{capa ? t(" ou “Tornar capa”") : ""} {t("em cada")}{" "}{item} {t("— no computador, também dá para arrastar.")}</p>}
     <ol className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-6">
       {fotos.map((url, index) => <li key={`${index}:${url}`} draggable
         onDragStart={(event) => { setArrastando(index); event.dataTransfer.effectAllowed = "move"; }}

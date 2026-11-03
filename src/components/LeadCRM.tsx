@@ -250,7 +250,7 @@ export default function LeadCRM({
   const [formState, setFormState] = useState(currentUserState || "");
   const [stateCities, setStateCities] = useState<string[]>([]);
   useEffect(() => {
-    if (!formState) { setStateCities([]); return; }
+    if (!formState) { const frame = requestAnimationFrame(() => setStateCities([])); return () => cancelAnimationFrame(frame); }
     let cancelled = false;
     void loadStateCities(formState).then((cities) => { if (!cancelled) setStateCities(cities); });
     return () => { cancelled = true; };
@@ -283,7 +283,7 @@ export default function LeadCRM({
   const [editingLead, setEditingLead] = useState<LeadItem | null>(null);
   // Ao abrir o cadastro/edição, a UF da cidade volta para a do corretor.
   const leadFormOpen = isCreateOpen || !!editingLead;
-  useEffect(() => { if (leadFormOpen) setFormState(currentUserState || ""); }, [leadFormOpen, currentUserState]);
+  useEffect(() => { if (!leadFormOpen) return; const frame = requestAnimationFrame(() => setFormState(currentUserState || "")); return () => cancelAnimationFrame(frame); }, [leadFormOpen, currentUserState]);
   const [visitProperty, setVisitProperty] = useState<LeadMatchProperty | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -369,7 +369,7 @@ export default function LeadCRM({
       })
       .sort((a, b) => b.score - a.score || Number(a.property.salePrice) - Number(b.property.salePrice))
       .slice(0, 5);
-  }, [properties, selectedLead]);
+  }, [properties, selectedLead, locale, t]);
   const visibleLeads = useMemo(() => {
     const query = search.trim().toLocaleLowerCase(locale);
     return leads.filter((lead) => {
@@ -390,7 +390,7 @@ export default function LeadCRM({
       return [lead.fullName, lead.phone, lead.email || "", lead.city || "", ...(lead.neighborhoods || [])]
         .some((value) => value.toLocaleLowerCase(locale).includes(query));
     });
-  }, [leads, search, stageFilter, typeFilter, sourceFilter, cityFilter, followUpFilter, monthFilter, now]);
+  }, [leads, search, stageFilter, typeFilter, sourceFilter, cityFilter, followUpFilter, monthFilter, now, locale]);
 
   const filterKey = JSON.stringify([search, stageFilter, typeFilter, sourceFilter, cityFilter, followUpFilter, monthFilter]);
   const clientPage = pagination.key === filterKey ? Math.min(pagination.page, Math.max(1, Math.ceil(visibleLeads.length / 15))) : 1;
@@ -676,13 +676,13 @@ export default function LeadCRM({
     <section className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <div className="flex items-center gap-2 text-amber-400 text-xs font-bold uppercase tracking-wider"><UserRound className="w-4 h-4" /> {" "}{t("CRM do corretor")}</div>
+          <div className="flex items-center gap-2 text-amber-400 text-xs font-bold uppercase tracking-wider"><UserRound className="w-4 h-4" /> {t("CRM do corretor")}</div>
           <h2 className="mt-2 text-2xl font-extrabold text-white">{t("Sua carteira, seu próximo negócio")}</h2>
           <p className="mt-1 text-sm text-slate-400">{t("Seus contatos e histórico ficam privados na sua carteira.")}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button type="button" disabled={!!blockedReason} title={t(blockedReason) || undefined} onClick={() => { setError(null); setCsvImportOpen(true); }} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 px-4 py-2.5 text-sm font-bold text-slate-200 hover:border-slate-500 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"><FileUp className="h-4 w-4" /> {" "}{t("Importar contatos de uma planilha")}</button>
-          <button type="button" disabled={!!blockedReason} title={t(blockedReason) || undefined} onClick={() => { setError(null); setEditingLead(null); setIsCreateOpen(true); }} className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-bold text-slate-950 hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"><Plus className="w-4 h-4" /> {" "}{t("Novo cliente")}</button>
+          <button type="button" disabled={!!blockedReason} title={t(blockedReason) || undefined} onClick={() => { setError(null); setCsvImportOpen(true); }} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 px-4 py-2.5 text-sm font-bold text-slate-200 hover:border-slate-500 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"><FileUp className="h-4 w-4" /> {t("Importar contatos de uma planilha")}</button>
+          <button type="button" disabled={!!blockedReason} title={t(blockedReason) || undefined} onClick={() => { setError(null); setEditingLead(null); setIsCreateOpen(true); }} className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-bold text-slate-950 hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"><Plus className="w-4 h-4" /> {t("Novo cliente")}</button>
         </div>
       </div>
       {blockedReason && <p role="note" className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs text-sky-900">{t(blockedReason)}</p>}
@@ -698,13 +698,13 @@ export default function LeadCRM({
         <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="text-xs text-slate-500">{t("Em andamento")}</div><div className="mt-1 text-2xl font-bold text-amber-700">{leads.filter((lead) => !["fechado", "perdido"].includes(lead.stage)).length}</div></div>
         <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="text-xs text-slate-500">{t("Visitas")}</div><div className="mt-1 text-2xl font-bold text-sky-700">{leads.filter((lead) => lead.stage === "visita").length}</div></div>
         <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="text-xs text-slate-500">{t("Fechados")}</div><div className="mt-1 text-2xl font-bold text-emerald-700">{closedCount}</div></div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="text-xs text-slate-500">{t("Vendas entre atendimentos encerrados")}</div><div className="mt-1 text-2xl font-bold text-emerald-700">{closeRate}%</div><div className="mt-1 text-[10px] text-slate-500">{closedCount} {" "}{t("ganhos ·")}{" "}{lostCount} {" "}{t("perdidos")}</div><p className="mt-1 text-[10px] leading-relaxed text-slate-500">{t("Vendas fechadas ÷ (fechadas + perdidas). Exemplo: 3 vendas e 2 perdas = 60%. Não é uma cobrança.")}</p></div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="text-xs text-slate-500">{t("Vendas entre atendimentos encerrados")}</div><div className="mt-1 text-2xl font-bold text-emerald-700">{closeRate}%</div><div className="mt-1 text-[10px] text-slate-500">{closedCount} {t("ganhos ·")}{" "}{lostCount} {t("perdidos")}</div><p className="mt-1 text-[10px] leading-relaxed text-slate-500">{t("Vendas fechadas ÷ (fechadas + perdidas). Exemplo: 3 vendas e 2 perdas = 60%. Não é uma cobrança.")}</p></div>
         <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="text-xs text-slate-500">{t("Retornos atrasados")}</div><div className={`mt-1 text-2xl font-bold ${overdueCount ? "text-rose-700" : "text-emerald-700"}`}>{overdueCount}</div></div>
       </div>
 
       <BrokerCrmOverview leads={leads} activities={activities} stages={stages} now={now} onOpen={openClient} onAgenda={() => setCrmView("agenda")} onStage={(stage) => { setSearch(""); setTypeFilter("todos"); setSourceFilter("todos"); setCityFilter("todas"); setFollowUpFilter("todos"); setMonthFilter(""); setStageFilter(stage); setCrmView("pipeline"); }} />
       <section className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 sm:p-5">
-        <div className="flex items-center justify-between gap-3"><div><h3 className="text-sm font-bold text-white">{t("Leads por origem")}</h3><p className="mt-1 text-[11px] text-slate-500">{t("Veja de onde vieram seus contatos: WhatsApp, indicação e outras origens. O percentual mostra a participação de cada origem no total da carteira. Exemplo: 5 de 20 contatos = 25%. Esses percentuais não são cobranças.")}</p></div><span className="text-[11px] text-slate-500">{leads.length} {" "}{t("leads")}</span></div>
+        <div className="flex items-center justify-between gap-3"><div><h3 className="text-sm font-bold text-white">{t("Leads por origem")}</h3><p className="mt-1 text-[11px] text-slate-500">{t("Veja de onde vieram seus contatos: WhatsApp, indicação e outras origens. O percentual mostra a participação de cada origem no total da carteira. Exemplo: 5 de 20 contatos = 25%. Esses percentuais não são cobranças.")}</p></div><span className="text-[11px] text-slate-500">{leads.length} {t("leads")}</span></div>
         {sourceDistribution.length ? (
           <div className="mt-4 grid gap-x-8 gap-y-3 sm:grid-cols-2">
             {sourceDistribution.map((source) => (
@@ -722,7 +722,7 @@ export default function LeadCRM({
       {(crmView === "clients" || crmView === "pipeline") && (
       <div className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-3 sm:p-4">
         {/* Vídeo da corretora piloto (11/10/2026): ela escolhia etapa/tipo/origem achando que gravava no cliente. */}
-        <p className="text-xs text-slate-500"><span className="font-bold text-slate-300">{t("Filtros da lista")}</span> {" "}{t("— servem para encontrar clientes e ficam lembrados neste aparelho; não alteram o cadastro. Para mudar a etapa de um cliente, abra o cliente.")}</p>
+        <p className="text-xs text-slate-500"><span className="font-bold text-slate-300">{t("Filtros da lista")}</span> {t("— servem para encontrar clientes e ficam lembrados neste aparelho; não alteram o cadastro. Para mudar a etapa de um cliente, abra o cliente.")}</p>
         <label className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
           <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("Buscar nome, telefone, e-mail ou bairro")} className={`${inputClass} pl-9`} />
@@ -761,7 +761,7 @@ export default function LeadCRM({
           </select>
         </div>
         <div className="flex items-center justify-between gap-3 text-[11px] text-slate-500">
-          <span>{t("Exibindo")}{" "}{visibleLeads.length} {" "}{t("de")}{" "}{leads.length} {" "}{t("leads")}</span>
+          <span>{t("Exibindo")}{" "}{visibleLeads.length} {t("de")}{" "}{leads.length} {t("leads")}</span>
           <div className="flex flex-wrap items-center justify-end gap-3">
             {visibleLeads.length > 0 && <button type="button" onClick={exportVisibleLeads} className="font-semibold text-emerald-300 hover:text-emerald-200">{t("Exportar seleção CSV")}</button>}
             {(monthFilter || search || stageFilter !== "todos" || typeFilter !== "todos" || sourceFilter !== "todos" || cityFilter !== "todas" || followUpFilter !== "todos") && <button type="button" onClick={() => { setSearch(""); setStageFilter("todos"); setTypeFilter("todos"); setSourceFilter("todos"); setCityFilter("todas"); setFollowUpFilter("todos"); setMonthFilter(""); }} className="font-semibold text-amber-300 hover:text-amber-200">{t("Limpar filtros")}</button>}
@@ -779,7 +779,7 @@ export default function LeadCRM({
       {csvImportOpen && <div className="fixed inset-0 z-[65] flex items-center justify-center bg-black/70 p-4">
         <div className="w-full max-w-lg space-y-4 rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
           <div className="flex items-start justify-between gap-3"><div><div className="text-xs font-bold uppercase tracking-wide text-amber-400">{t("CRM · Importação")}</div><h3 className="mt-1 text-lg font-extrabold text-white">{t("Trazer contatos de uma planilha")}</h3></div><BotaoFechar onClick={fecharImportacao} /></div>
-          <p className="text-xs leading-relaxed text-slate-400">{t("Já tem uma lista de clientes em uma planilha? No Excel ou Google Planilhas, salve ou baixe a lista no formato CSV e selecione o arquivo aqui. CSV é um arquivo de tabela que permite trazer vários contatos de uma vez, sem cadastrar um por um. Use vírgula ou ponto e vírgula como separador. Colunas obrigatórias:")}{" "}<b className="text-slate-200">{t("Nome")}</b> {" "}{t("e")}{" "}<b className="text-slate-200">{t("Telefone")}</b>{t(". Aceita também e-mail, tipo, origem, tipo de imóvel, cidade, bairros, orçamento, quartos e observações. Até 100 linhas; contatos repetidos pelo telefone serão ignorados.")}</p>
+          <p className="text-xs leading-relaxed text-slate-400">{t("Já tem uma lista de clientes em uma planilha? No Excel ou Google Planilhas, salve ou baixe a lista no formato CSV e selecione o arquivo aqui. CSV é um arquivo de tabela que permite trazer vários contatos de uma vez, sem cadastrar um por um. Use vírgula ou ponto e vírgula como separador. Colunas obrigatórias:")}{" "}<b className="text-slate-200">{t("Nome")}</b> {t("e")}{" "}<b className="text-slate-200">{t("Telefone")}</b>{t(". Aceita também e-mail, tipo, origem, tipo de imóvel, cidade, bairros, orçamento, quartos e observações. Até 100 linhas; contatos repetidos pelo telefone serão ignorados.")}</p>
           <button type="button" onClick={() => { const content = '\uFEFFNome;Telefone;E-mail;Tipo;Origem;Tipo de imóvel;Cidade;Bairros;Orçamento máximo;Quartos mínimos;Observações\r\nMaria Exemplo;(11) 99999-0000;maria@email.com;Comprador;Indicação;Apartamento;São Paulo;Moema|Pinheiros;850000;2;Prefere andar alto'; const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' })); const a = document.createElement('a'); a.href = url; a.download = 'modelo-importacao-negocia-lar.csv'; a.click(); URL.revokeObjectURL(url); }} className="text-xs font-semibold text-emerald-300 hover:text-emerald-200">{t("Baixar modelo CSV")}</button>
           <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-600 px-4 py-5 text-sm font-bold text-white hover:border-amber-400 hover:bg-slate-800 ${busy ? "pointer-events-none opacity-50" : ""}`}><FileUp className="h-4 w-4" />{busy ? t("Importando e validando…") : t("Selecionar arquivo .csv")}<input type="file" accept=".csv,text/csv" className="sr-only" disabled={busy} onChange={(event) => { void handleCsvFile(event.target.files?.[0]); event.currentTarget.value = ""; }} /></label>
           {error && <p role="alert" className="rounded-lg border border-rose-500/30 bg-rose-950/40 p-3 text-xs text-rose-200">{t(error)}</p>}
@@ -792,7 +792,7 @@ export default function LeadCRM({
           <UserRound className="mx-auto h-10 w-10 text-slate-900" />
           <h3 className="mt-4 text-lg font-bold text-white">{t("Sua carteira começa aqui")}</h3>
           <p className="mx-auto mt-2 max-w-md text-sm text-slate-900">{t("Cadastre um contato, defina a próxima ação e acompanhe cada etapa até a conclusão.")}</p>
-          <button type="button" disabled={!!blockedReason} title={t(blockedReason) || undefined} onClick={() => setIsCreateOpen(true)} className="mt-5 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-bold text-slate-950 hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"><Plus className="mr-1 inline h-4 w-4" /> {" "}{t("Cadastrar primeiro lead")}</button>
+          <button type="button" disabled={!!blockedReason} title={t(blockedReason) || undefined} onClick={() => setIsCreateOpen(true)} className="mt-5 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-bold text-slate-950 hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"><Plus className="mr-1 inline h-4 w-4" /> {t("Cadastrar primeiro lead")}</button>
         </div>
       ) : (
         <>
@@ -949,7 +949,7 @@ export default function LeadCRM({
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-xs font-bold text-white">{property.title}</div>
                         <div className="mt-1 flex items-center gap-1 text-[11px] text-slate-400"><MapPin className="h-3 w-3" />{property.neighborhood} · {property.city}</div>
-                        <div className="mt-1 text-[11px] font-semibold text-emerald-300">{money(property.salePrice, locale)} · {property.bedrooms} {property.bedrooms === 1 ? t("quarto") : t("quartos")} {" "}{t("· critérios atendidos")}{" "}{score}%</div>
+                        <div className="mt-1 text-[11px] font-semibold text-emerald-300">{money(property.salePrice, locale)} · {property.bedrooms} {property.bedrooms === 1 ? t("quarto") : t("quartos")} {t("· critérios atendidos")}{" "}{score}%</div>
                         <details className="mt-1.5 text-[10px] text-slate-400"><summary className="cursor-pointer font-semibold text-sky-300">{t("Ver como calculamos")}</summary><ul className="mt-1 list-inside list-disc space-y-0.5">{reasons.map((reason) => <li key={reason}>{reason}</li>)}{selectedLead.propertyType && !typeMatches && <li>{t("Tipo diferente do informado (")}{t(property.propertyType)})</li>}{selectedLead.neighborhoods.length && !neighborhoodMatches ? <li>{t("Fora dos bairros preferidos; cidade e demais critérios coincidem")}</li> : null}</ul><p className="mt-1">{t("Compatibilidade é uma comparação simples das preferências preenchidas; confirme detalhes com o captador.")}</p></details>
                       </div>
                       <div className="flex shrink-0 flex-col gap-1.5 self-center">
@@ -979,7 +979,7 @@ export default function LeadCRM({
               </form>
 
               <div>
-                <h4 className="mb-3 flex items-center gap-2 text-sm font-bold text-white"><Clock3 className="h-4 w-4 text-amber-400" /> {" "}{t("Histórico")}</h4>
+                <h4 className="mb-3 flex items-center gap-2 text-sm font-bold text-white"><Clock3 className="h-4 w-4 text-amber-400" /> {t("Histórico")}</h4>
                 <div className="space-y-3">
                   {activities.filter((activity) => activity.leadId === selectedLead.id).map((activity) => (
                     <div key={activity.id} className="relative border-l border-slate-700 pl-4">
@@ -992,7 +992,7 @@ export default function LeadCRM({
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2 border-t border-slate-800 p-4 text-xs text-slate-500"><CheckCircle2 className="h-4 w-4 text-emerald-500" /> {" "}{t("Dados privados da sua carteira")}</div>
+            <div className="flex items-center gap-2 border-t border-slate-800 p-4 text-xs text-slate-500"><CheckCircle2 className="h-4 w-4 text-emerald-500" /> {t("Dados privados da sua carteira")}</div>
           </aside>
         </div>
       )}

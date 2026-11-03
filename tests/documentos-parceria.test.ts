@@ -15,7 +15,7 @@ test("🔴 os três passos do Registro de Visita ficam cada um no seu quadro", (
 
 test("🔴 no termo sem divisão confirmada, um botão leva à parceria certa no Registro de Visita", () => {
   const termo = ler("src/components/PartnershipTerms.tsx");
-  assert.match(termo, /\{item\.status !== "recusado" && <Link href=\{`\/dvp#parceria-\$\{item\.id\}`\}[^>]*>Ver e confirmar a divisão da comissão<\/Link>\}/);
+  assert.match(termo, /\{item\.status !== "recusado" && <Link href=\{`\/dvp#parceria-\$\{item\.id\}`\}[^>]*>\{t\("Ver e confirmar a divisão da comissão"\)\}<\/Link>\}/);
   const dvp = ler("src/components/app-shell/DvpRouteClient.tsx");
   assert.match(dvp, /<article key=\{partnership\.id\} id=\{`parceria-\$\{partnership\.id\}`\} className="scroll-mt-28 /, "a parceria tem a âncora que o botão usa");
 });
@@ -23,6 +23,6 @@ test("🔴 no termo sem divisão confirmada, um botão leva à parceria certa no
 test("🔴 o campo da comissão no controle de visita diz o que é", () => {
   const controle = ler("src/components/VisitControlPrint.tsx");
   assert.doesNotMatch(controle, />Comissão se comprar por fora/);
-  assert.match(controle, />Comissão da declaração \(%\)/);
+  assert.match(controle, />\{t\("Comissão da declaração \(%\)"\)\}/);
   assert.match(controle, /se compromete a pagar esta comissão, sobre o valor do imóvel, se comprar sem você/);
 });

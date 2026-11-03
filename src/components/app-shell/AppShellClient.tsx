@@ -72,7 +72,7 @@ function AppShellWorkspace({ currentUser, initialNotifications, propertyTotal, n
   }, [pathname, abasPermitidas]);
 
   const [notifications, setNotifications] = useState(initialNotifications);
-  useEffect(() => { setNotifications(initialNotifications); }, [initialNotifications]);
+  useEffect(() => { const frame = requestAnimationFrame(() => setNotifications(initialNotifications)); return () => cancelAnimationFrame(frame); }, [initialNotifications]);
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isUserSwitcherOpen, setIsUserSwitcherOpen] = useState(false);
   const [isSubscriptionOpen, setIsSubscriptionOpen] = useState(false);
@@ -106,8 +106,9 @@ function AppShellWorkspace({ currentUser, initialNotifications, propertyTotal, n
   }, []);
   // Ao trocar de rota, fecha os menus e popovers abertos.
   useEffect(() => {
-    setIsNotificationsOpen(false); setIsUserSwitcherOpen(false);
+    const frame = requestAnimationFrame(() => { setIsNotificationsOpen(false); setIsUserSwitcherOpen(false); });
     document.querySelectorAll<HTMLDetailsElement>(".workspace-navigation details[open]").forEach((menu) => { menu.open = false; });
+    return () => cancelAnimationFrame(frame);
   }, [pathname]);
 
   const handleLogout = async () => {

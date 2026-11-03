@@ -20,7 +20,7 @@ export default function FichaFotos({ fotos, titulo, variante = "pagina" }: { fot
   return <>
     <button type="button" onClick={() => setIndice(0)} aria-label={t("Ver as fotos de {0}", [titulo])} className="relative block w-full">
       <img src={capa} alt={titulo} className={janela ? "h-48 w-full rounded-xl object-cover" : "h-56 w-full object-cover"} />
-      {fotos.length > 1 && <span className="absolute bottom-3 right-3 rounded-lg bg-[#000000]/70 px-2.5 py-1 text-xs font-semibold text-[#ffffff]">{fotos.length} {" "}{t("fotos")}</span>}
+      {fotos.length > 1 && <span className="absolute bottom-3 right-3 rounded-lg bg-[#000000]/70 px-2.5 py-1 text-xs font-semibold text-[#ffffff]">{fotos.length} {t("fotos")}</span>}
     </button>
     {resto.length > 0 && <div className={janela ? "flex gap-2 overflow-x-auto pb-1" : "grid grid-cols-4 gap-2 p-3"}>
       {resto.map((url, i) => <button key={url} type="button" onClick={() => setIndice(i + 1)} aria-label={t("Ver a foto {0} de {1}", [i + 2, fotos.length])} className={janela ? "shrink-0" : undefined}>

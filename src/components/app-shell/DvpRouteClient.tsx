@@ -59,8 +59,8 @@ function PartnershipClosingForm({ partnership, value, onChange, onSubmit, onCanc
     <label className="text-[10px] text-slate-300">{t("Valor total da comissão (R$) *")}<input required type="number" inputMode="decimal" min="0.01" step="0.01" value={value.total} onChange={(event) => onChange({ ...value, total: event.target.value })} className={field} /></label>
     <label className="text-[10px] text-slate-300">{t("Data prevista para receber *")}<input required type="date" value={value.date} onChange={(event) => onChange({ ...value, date: event.target.value })} className={field} /></label>
     <div className="rounded-md bg-slate-950/70 p-2 text-[11px] text-slate-300 sm:col-span-2" aria-live="polite">
-      {t("Captador (")}{partnership.captorName}): {Number(partnership.captorCommissionPercent)}% = <strong>{share(partnership.captorCommissionPercent)}</strong> {" "}{t("· Parceiro (")}{partnership.partnerName}): {Number(partnership.partnerCommissionPercent)}% = <strong>{share(partnership.partnerCommissionPercent)}</strong>
-      {Number(partnership.referrerCommissionPercent) > 0 && <> {" "}{t("· Indicador externo:")}{" "}{Number(partnership.referrerCommissionPercent)}% = {share(partnership.referrerCommissionPercent)} {" "}{t("(fora do Financeiro)")}</>}
+      {t("Captador (")}{partnership.captorName}): {Number(partnership.captorCommissionPercent)}% = <strong>{share(partnership.captorCommissionPercent)}</strong> {t("· Parceiro (")}{partnership.partnerName}): {Number(partnership.partnerCommissionPercent)}% = <strong>{share(partnership.partnerCommissionPercent)}</strong>
+      {Number(partnership.referrerCommissionPercent) > 0 && <> {t("· Indicador externo:")}{" "}{Number(partnership.referrerCommissionPercent)}% = {share(partnership.referrerCommissionPercent)} {t("(fora do Financeiro)")}</>}
     </div>
     <label className="text-[10px] text-slate-300 sm:col-span-2">{t("Observação para a linha do tempo (opcional)")}<textarea maxLength={500} rows={2} value={value.note} onChange={(event) => onChange({ ...value, note: event.target.value })} className={field} /></label>
     <div className="flex flex-wrap gap-2 sm:col-span-2">
@@ -91,7 +91,8 @@ export default function DvpRouteClient({ currentBroker, currentUserId, blockedRe
   const [defaultVisitDate, setDefaultVisitDate] = useState("");
   useEffect(() => {
     const now = new Date();
-    setDefaultVisitDate(new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 16));
+    const frame = requestAnimationFrame(() => setDefaultVisitDate(new Date(now.getTime() - now.getTimezoneOffset() * 60_000).toISOString().slice(0, 16)));
+    return () => cancelAnimationFrame(frame);
   }, []);
 
   const divisoesDoImovel = divisoesPermitidas(activeProperty?.partnershipModels);
@@ -227,12 +228,12 @@ export default function DvpRouteClient({ currentBroker, currentUserId, blockedRe
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
             <div className="text-xs text-slate-400">{t("Imóvel escolhido para a visita")}</div>
-            {activeProperty ? <><div className="text-sm font-bold text-white">{activeProperty.title}</div><div className="text-xs text-amber-400">{activeProperty.neighborhood}, {activeProperty.city}</div><div className="text-[11px] text-slate-500 pt-1">{t("Captador:")}{" "}{activeProperty.broker.name} {" "}{t("(CRECI")}{" "}{activeProperty.broker.creci})</div></> : <><div className="text-sm font-semibold text-amber-200">{t("Nenhum imóvel selecionado")}</div><p className="text-[11px] text-slate-400">{t("Abra a Vitrine e escolha um imóvel de outro corretor.")}</p><button type="button" onClick={irParaVitrine} className="mt-2 rounded-lg bg-amber-500 px-3 py-2 text-[11px] font-bold text-slate-950">{t("Escolher imóvel na Vitrine")}</button></>}
+            {activeProperty ? <><div className="text-sm font-bold text-white">{activeProperty.title}</div><div className="text-xs text-amber-400">{activeProperty.neighborhood}, {activeProperty.city}</div><div className="text-[11px] text-slate-500 pt-1">{t("Captador:")}{" "}{activeProperty.broker.name} {t("(CRECI")}{" "}{activeProperty.broker.creci})</div></> : <><div className="text-sm font-semibold text-amber-200">{t("Nenhum imóvel selecionado")}</div><p className="text-[11px] text-slate-400">{t("Abra a Vitrine e escolha um imóvel de outro corretor.")}</p><button type="button" onClick={irParaVitrine} className="mt-2 rounded-lg bg-amber-500 px-3 py-2 text-[11px] font-bold text-slate-950">{t("Escolher imóvel na Vitrine")}</button></>}
           </div>
           <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-1">
             <div className="text-xs text-slate-400">{t("Corretor Solicitante:")}</div>
             <div className="text-sm font-bold text-white">{currentBroker.name}</div>
-            <div className="text-xs text-emerald-400">{t("CRECI")}{" "}{currentBroker.creci} {" "}{t("• divisão cadastrada no imóvel")}</div>
+            <div className="text-xs text-emerald-400">{t("CRECI")}{" "}{currentBroker.creci} {t("• divisão cadastrada no imóvel")}</div>
           </div>
         </div>
 
@@ -282,7 +283,7 @@ export default function DvpRouteClient({ currentBroker, currentUserId, blockedRe
                   <span className="text-[10px] bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full font-bold">{dvp.status === "rascunho" ? t("Rascunho • nenhum aceite registrado") : dvp.status}</span>
                 </div>
                 <div className="text-xs text-slate-300 grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
-                  <div><strong>{t("Cliente:")}</strong> {dvp.clientName} {" "}{t("(CPF:")}{" "}{dvp.clientCpfPartial})</div>
+                  <div><strong>{t("Cliente:")}</strong> {dvp.clientName} {t("(CPF:")}{" "}{dvp.clientCpfPartial})</div>
                   <div><strong>{t("Data da Visita:")}</strong> {new Date(dvp.visitDate).toLocaleDateString(locale)}</div>
                   <div><strong>{t("Prazo de acompanhamento interno:")}</strong> {new Date(dvp.lockExpirationDate).toLocaleDateString(locale)} <span className="text-slate-500">{t("(não cria uma trava contratual)")}</span></div>
                   <div className="sm:col-span-2"><strong>{t("Divisão informada:")}</strong> {dvp.commissionModel === "three_party_referral_40_40_20" ? t("Captador {0}% · corretor do comprador {1}% · indicador externo {2}% ({3}, CRECI {4}{5})", [dvp.captorCommissionPercent, dvp.partnerCommissionPercent, dvp.referrerCommissionPercent, dvp.externalReferrerName, dvp.externalReferrerCreci, dvp.externalReferrerWhatsapp ? `, WhatsApp ${dvp.externalReferrerWhatsapp}` : ""]) : t("{0}% captador · {1}% corretor do comprador", [dvp.captorCommissionPercent, dvp.partnerCommissionPercent])} <span className="text-slate-500">{dvp.commissionModel === "three_party_referral_40_40_20" ? t("(aguardando confirmação dos dois corretores)") : t("(condição cadastrada, a combinar entre as partes)")}</span></div>
@@ -308,7 +309,7 @@ export default function DvpRouteClient({ currentBroker, currentUserId, blockedRe
               const history = partnershipActivityList.filter((activity) => activity.partnershipId === partnership.id);
               return <article key={partnership.id} id={`parceria-${partnership.id}`} className="scroll-mt-28 rounded-xl border border-slate-800 bg-slate-950 p-4 target:border-amber-500 target:ring-2 target:ring-amber-500/40">
                 <div className="flex flex-wrap items-start justify-between gap-3">
-                  <div className="min-w-0"><h4 className="truncate text-sm font-bold text-white">{partnership.propertyTitle}</h4><p className="mt-1 text-xs text-slate-400">{t("Captador:")}{" "}{partnership.captorName} {" "}{t("· Parceiro:")}{" "}{partnership.partnerName}</p><p className="mt-1 text-[11px] text-slate-500">{t("Visita:")}{" "}{partnership.visitScheduledDate ? new Date(partnership.visitScheduledDate).toLocaleString(locale) : t("não agendada")} {" "}{t("· divisão")}{" "}{partnership.commissionModel === "three_party_referral_40_40_20" ? "40/40/20" : "50/50"} {" "}{t("· versão")}{" "}{partnership.commissionRevision}</p></div>
+                  <div className="min-w-0"><h4 className="truncate text-sm font-bold text-white">{partnership.propertyTitle}</h4><p className="mt-1 text-xs text-slate-400">{t("Captador:")}{" "}{partnership.captorName} {t("· Parceiro:")}{" "}{partnership.partnerName}</p><p className="mt-1 text-[11px] text-slate-500">{t("Visita:")}{" "}{partnership.visitScheduledDate ? new Date(partnership.visitScheduledDate).toLocaleString(locale) : t("não agendada")} {t("· divisão")}{" "}{partnership.commissionModel === "three_party_referral_40_40_20" ? "40/40/20" : "50/50"} {t("· versão")}{" "}{partnership.commissionRevision}</p></div>
                   <span className="rounded-full border border-sky-500/25 bg-sky-500/10 px-2.5 py-1 text-[10px] font-bold text-sky-200">{t(labels[partnership.status]) || partnership.status}</span>
                 </div>
                 <div className="mt-3 rounded-lg border border-amber-500/20 bg-amber-950/15 p-3 space-y-3">

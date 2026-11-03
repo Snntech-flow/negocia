@@ -231,7 +231,7 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
                           </div>
                           <div className="flex items-center gap-1.5 bg-slate-800/40 p-2 rounded-lg">
                             <Maximize2 className="w-3.5 h-3.5 text-orange-700" />
-                            <span>{area(prop.usefulAreaM2 || prop.areaM2)} {" "}{t("m²")}</span>
+                            <span>{area(prop.usefulAreaM2 || prop.areaM2)} {t("m²")}</span>
                           </div>
                         </div>
 
@@ -248,7 +248,7 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
                             ))}
                             {prop.privateAmenities.length > 3 && (
                               <span className="text-[10px] text-orange-700 font-semibold px-1 py-0.5">
-                                +{prop.privateAmenities.length - 3} {" "}{t("itens")}</span>
+                                +{prop.privateAmenities.length - 3} {t("itens")}</span>
                             )}
                           </div>
                         )}
@@ -263,7 +263,7 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
                             </div>
                           </div>
                           <span className="text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
-                            {prop.broker.verificationStatus === "aprovado" ? <><CheckCircle2 className="w-3 h-3" /> {" "}{t("CRECI verificado")}</> : "CRECI em análise"}
+                            {prop.broker.verificationStatus === "aprovado" ? <><CheckCircle2 className="w-3 h-3" /> {t("CRECI verificado")}</> : "CRECI em análise"}
                           </span>
                         </div>
                       </div>
@@ -298,7 +298,7 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
             )}
             {propertyTotal > PROPERTY_PAGE_SIZE && <nav aria-label={t("Páginas da vitrine")} className="flex items-center justify-center gap-4 pt-4">
               <button type="button" disabled={loading || propertyPage <= 1} onClick={() => setPropertyPage(propertyPage - 1)} className="rounded-lg border border-slate-700 px-4 py-2 text-sm disabled:opacity-40">{t("Anterior")}</button>
-              <span className="text-sm">{t("Página")}{" "}{propertyPage} {" "}{t("de")}{" "}{Math.ceil(propertyTotal / PROPERTY_PAGE_SIZE)} · {propertyTotal} {" "}{t("imóveis")}</span>
+              <span className="text-sm">{t("Página")}{" "}{propertyPage} {t("de")}{" "}{Math.ceil(propertyTotal / PROPERTY_PAGE_SIZE)} · {propertyTotal} {t("imóveis")}</span>
               <button type="button" disabled={loading || propertyPage * PROPERTY_PAGE_SIZE >= propertyTotal} onClick={() => setPropertyPage(propertyPage + 1)} className="rounded-lg border border-slate-700 px-4 py-2 text-sm disabled:opacity-40">{t("Próxima")}</button>
             </nav>}
             {galeria && <PhotoViewer fotos={galeria.fotos} indice={galeria.indice} titulo={galeria.titulo} onIndice={mudarFoto} onFechar={fecharGaleria} />}

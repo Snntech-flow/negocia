@@ -22,12 +22,12 @@ export default function BrokerCrmOverview({ leads, activities, stages, now, onOp
   const withoutReturn = active.filter(lead => !lead.nextActionAt);
   return <div className="space-y-5">
     <section className="rounded-2xl border border-slate-200 bg-white p-5 text-slate-900">
-      <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="flex items-center gap-2 font-bold"><Users className="h-4 w-4" />{t("Seu funil de atendimento")}</h3><span className="text-xs text-slate-500">{active.length} {" "}{t("oportunidades em andamento")}</span></div>
+      <div className="flex flex-wrap items-center justify-between gap-2"><h3 className="flex items-center gap-2 font-bold"><Users className="h-4 w-4" />{t("Seu funil de atendimento")}</h3><span className="text-xs text-slate-500">{active.length} {t("oportunidades em andamento")}</span></div>
       <div className="mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4 xl:grid-cols-8">{stages.map(stage => {
         const count = leads.filter(lead => lead.stage === stage.key).length;
         return <button key={stage.key} onClick={() => onStage(stage.key)} className="rounded-xl border border-slate-200 bg-slate-50 p-3 text-left transition hover:border-amber-500 hover:bg-amber-50"><span className="text-xs font-semibold">{t(stage.label)}</span><span className="mt-2 block text-2xl font-extrabold">{count}</span><span className="mt-2 block h-1 rounded-full bg-slate-200"><span className="block h-full rounded-full bg-amber-500" style={{width: `${leads.length ? count / leads.length * 100 : 0}%`}} /></span></button>;
       })}</div>
-      {withoutReturn.length > 0 && <p className="mt-4 flex items-center gap-2 rounded-lg bg-amber-50 p-3 text-xs text-amber-800"><CalendarClock className="h-4 w-4 shrink-0" />{withoutReturn.length} {" "}{t("contatos em andamento estão sem próximo retorno. Abra o cliente para agendar a próxima ação.")}</p>}
+      {withoutReturn.length > 0 && <p className="mt-4 flex items-center gap-2 rounded-lg bg-amber-50 p-3 text-xs text-amber-800"><CalendarClock className="h-4 w-4 shrink-0" />{withoutReturn.length} {t("contatos em andamento estão sem próximo retorno. Abra o cliente para agendar a próxima ação.")}</p>}
     </section>
     <div className="grid gap-5 xl:grid-cols-2">
       <section className="rounded-2xl border border-slate-800 bg-slate-900 p-5">

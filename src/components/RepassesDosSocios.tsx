@@ -143,7 +143,7 @@ export default function RepassesDosSocios({ faixasMensais, modo, somenteLeitura,
       <summary className="cursor-pointer font-semibold">{t("Histórico das regras (")}{versoes.length})</summary>
       <ul className="mt-2 space-y-1.5">{[...versoes].reverse().map((versao) => <li key={versao.id}>
         <strong>{t("A partir de")}{" "}{monthShort(versao.validFromMonth)}:</strong> {versao.shares.map((parte) => `${parte.name} ${pct(parte.percent)}`).join(" · ")}
-        <span className="text-slate-500"> {" "}{t("— gravada por")}{" "}{versao.createdByName ?? t("administração")} {" "}{t("em")}{" "}{new Date(versao.createdAt).toLocaleDateString(locale)}</span>
+        <span className="text-slate-500"> {t("— gravada por")}{" "}{versao.createdByName ?? t("administração")} {t("em")}{" "}{new Date(versao.createdAt).toLocaleDateString(locale)}</span>
       </li>)}</ul>
     </details>}
   </section>;

@@ -141,7 +141,7 @@ export default function BrokerFinance({ blockedReason, onMessage }: { blockedRea
   const despesas = summary ? summary.paid + summary.payable : 0;
   return <div className="space-y-6">
     <div>
-      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-amber-400"><Wallet className="h-4 w-4" aria-hidden="true" /> {" "}{t("Financeiro")}</div>
+      <div className="flex items-center gap-2 text-xs font-semibold uppercase tracking-wider text-amber-400"><Wallet className="h-4 w-4" aria-hidden="true" /> {t("Financeiro")}</div>
       <h1 className="text-2xl font-bold text-white">{t("Receitas e despesas")}</h1>
       <p className="text-sm text-slate-400">{t("Controle o que entra e o que sai. Só você vê os seus lançamentos.")}</p>
     </div>
@@ -161,17 +161,17 @@ export default function BrokerFinance({ blockedReason, onMessage }: { blockedRea
       </span>
     </div>
 
-    {blockedReason && <p role="status" className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">{t(blockedReason)} {" "}{t("Seus lançamentos continuam visíveis.")}</p>}
+    {blockedReason && <p role="status" className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-sm text-sky-900">{t(blockedReason)} {t("Seus lançamentos continuam visíveis.")}</p>}
     {error && <p role="alert" className="rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-800">{t(error)}</p>}
 
     {/* Ao trocar o período, o que já estava na tela fica esmaecido até chegar o novo (sem piscar). */}
     <div className={`space-y-6 transition-opacity ${loading && data ? "opacity-50" : ""}`}>
       {summary && data && <div className="grid gap-3 sm:grid-cols-3">
         <div className={card}><p className="text-xs text-slate-400">{t("Receitas")}</p><p className="mt-1 text-xl font-black text-white">{brl(receitas, locale)}</p>
-          <p className="text-[11px] text-slate-400">{t("Recebido")}{" "}{brl(summary.received, locale)} {" "}{t("· a receber")}{" "}{brl(summary.receivable, locale)}</p>
+          <p className="text-[11px] text-slate-400">{t("Recebido")}{" "}{brl(summary.received, locale)} {t("· a receber")}{" "}{brl(summary.receivable, locale)}</p>
           <Delta current={receitas} previous={previousTotal("receita")} upIsGood /></div>
         <div className={card}><p className="text-xs text-slate-400">{t("Despesas")}</p><p className="mt-1 text-xl font-black text-white">{brl(despesas, locale)}</p>
-          <p className="text-[11px] text-slate-400">{t("Pago")}{" "}{brl(summary.paid, locale)} {" "}{t("· a pagar")}{" "}{brl(summary.payable, locale)}</p>
+          <p className="text-[11px] text-slate-400">{t("Pago")}{" "}{brl(summary.paid, locale)} {t("· a pagar")}{" "}{brl(summary.payable, locale)}</p>
           <Delta current={despesas} previous={previousTotal("despesa")} upIsGood={false} /></div>
         <div className={card}><p className="text-xs text-slate-400">{t("Receitas − despesas")}</p><p className={`mt-1 text-xl font-black ${summary.forecast < 0 ? "text-red-700" : "text-white"}`}>{brl(summary.forecast, locale)}</p>
           <p className="text-[11px] text-slate-400">{t("Já realizado (recebido − pago)")}{" "}{brl(summary.balance, locale)}</p>
@@ -216,7 +216,7 @@ export default function BrokerFinance({ blockedReason, onMessage }: { blockedRea
           </div>
           <label className="text-xs font-semibold text-slate-300 sm:col-span-2 lg:col-span-4">{t("Observações")}<textarea maxLength={1000} rows={2} value={form.notes} onChange={(event) => setForm({ ...form, notes: event.target.value })} className={input} /></label>
         </div>
-        {form.repeatMonths > 1 && <p className="text-xs text-slate-400">{t("Cria")}{" "}{form.repeatMonths} {" "}{t("lançamentos, um por mês, no mesmo dia (")}{dateBR(form.dueDate)} {" "}{t("até")}{" "}{dateBR(addMonthsKeepingDay(form.dueDate, form.repeatMonths - 1))}{t("). Só o primeiro pode nascer pago.")}</p>}
+        {form.repeatMonths > 1 && <p className="text-xs text-slate-400">{t("Cria")}{" "}{form.repeatMonths} {t("lançamentos, um por mês, no mesmo dia (")}{dateBR(form.dueDate)} {t("até")}{" "}{dateBR(addMonthsKeepingDay(form.dueDate, form.repeatMonths - 1))}{t("). Só o primeiro pode nascer pago.")}</p>}
         <div className="flex flex-wrap gap-2">
           <button disabled={busy === "form"} className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold text-slate-950 disabled:opacity-50">{busy === "form" ? t("Salvando…") : t("Salvar")}</button>
           <button type="button" onClick={() => { setForm(null); setEditingId(null); }} className="rounded-lg px-4 py-2 text-sm text-slate-300 hover:bg-slate-800">{t("Cancelar")}</button>

@@ -198,7 +198,7 @@ export default function PropertyCreateForm({ broker, blockedReason, photoLimit, 
       <h3 className={heading}><DollarSign className="w-4 h-4 text-amber-500" />{t("1. Finalidade, valores e condições")}</h3>
       <Choices title={t("Finalidade do imóvel")} options={PURPOSES} value={purpose} onChange={setPurpose} columns="grid-cols-3" />
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-        <div><label htmlFor="pc-price" className={label}>{t("Valor")}{" "}{purpose === "venda" ? t("de venda") : purpose === "aluguel" ? t("do aluguel") : t("da diária")} {" "}{t("(R$) *")}</label><MoneyInput id="pc-price" name="salePrice" required placeholder={t("Ex: 850.000")} className={input} /></div>
+        <div><label htmlFor="pc-price" className={label}>{t("Valor")}{" "}{purpose === "venda" ? t("de venda") : purpose === "aluguel" ? t("do aluguel") : t("da diária")} {t("(R$) *")}</label><MoneyInput id="pc-price" name="salePrice" required placeholder={t("Ex: 850.000")} className={input} /></div>
         <div><label htmlFor="pc-condo" className={label}>{t("Condomínio (R$/mês)")}</label><MoneyInput id="pc-condo" name="condoFee" placeholder={t("Ex: 650")} className={input} /></div>
         <div><label htmlFor="pc-iptu" className={label}>{t("IPTU (R$)")}</label><div className="flex gap-2"><div className="min-w-0 flex-1"><MoneyInput id="pc-iptu" name="iptu" placeholder={t("Ex: 180")} className={input} /></div><select aria-label={t("Período do IPTU")} value={iptuPeriod} onChange={(e) => setIptuPeriod(e.target.value as "anual" | "mensal")} className="bg-slate-950 border border-slate-800 rounded-xl px-2 py-2 text-xs text-white"><option value="anual">{t("Anual")}</option><option value="mensal">{t("Mensal")}</option></select></div></div>
       </div>
@@ -240,7 +240,7 @@ export default function PropertyCreateForm({ broker, blockedReason, photoLimit, 
     <div className={section}>
       <div className="flex items-center justify-between border-b border-slate-800 pb-3">
         <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2"><Home className="w-4 h-4 text-amber-500" />{t("3. Itens do imóvel")}</h3>
-        <span className="text-xs font-bold text-amber-400">{privateAmenities.length} {" "}{t("selecionados")}</span>
+        <span className="text-xs font-bold text-amber-400">{privateAmenities.length} {t("selecionados")}</span>
       </div>
       <p className="text-[11px] text-slate-400">{t("Marque só o que está instalado na unidade.")}</p>
       <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -251,7 +251,7 @@ export default function PropertyCreateForm({ broker, blockedReason, photoLimit, 
     <div className={section}>
       <div className="flex items-center justify-between border-b border-slate-800 pb-3">
         <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center gap-2"><Layers className="w-4 h-4 text-amber-500" />{t("4. Condomínio")}</h3>
-        <span className="text-xs font-bold text-emerald-400">{condoAmenities.length} {" "}{t("selecionados")}</span>
+        <span className="text-xs font-bold text-emerald-400">{condoAmenities.length} {t("selecionados")}</span>
       </div>
       {CONDO_AMENITIES_GROUPS.map((group) => <div key={group.category} className="space-y-2">
         <p className="text-xs font-bold text-slate-300 uppercase tracking-wider">{t(group.category)}</p>
@@ -337,7 +337,7 @@ export default function PropertyCreateForm({ broker, blockedReason, photoLimit, 
       </fieldset>
       <label className="flex items-start gap-3 p-3 rounded-xl border border-amber-500/40 bg-amber-950/20 cursor-pointer">
         <input type="checkbox" required checked={confirmaParceria} onChange={(e) => setConfirmaParceria(e.target.checked)} className="mt-0.5 h-4 w-4 shrink-0 accent-amber-500" />
-        <span className="text-[11px] text-slate-200 leading-relaxed"><strong className="text-white">{t("Confirmo que este imóvel aceita parceria")}</strong> {" "}{t("nas condições acima. Publicar na rede é compromisso com os corretores parceiros — não é para recusar parceria depois.")}</span>
+        <span className="text-[11px] text-slate-200 leading-relaxed"><strong className="text-white">{t("Confirmo que este imóvel aceita parceria")}</strong> {t("nas condições acima. Publicar na rede é compromisso com os corretores parceiros — não é para recusar parceria depois.")}</span>
       </label>
     </div>
 
