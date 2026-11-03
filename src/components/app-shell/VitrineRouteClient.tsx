@@ -66,12 +66,14 @@ export default function VitrineRouteClient({ initialProperties, initialPropertyT
   useEffect(() => {
     if (!fichaParam) return;
     const prop = properties.find((p) => p.id === fichaParam);
-    if (prop) setSelectedForWhiteLabel(prop);
-    else setPendingPropertyId(fichaParam);
+    const frame = requestAnimationFrame(() => { if (prop) setSelectedForWhiteLabel(prop); else setPendingPropertyId(fichaParam); });
+    return () => cancelAnimationFrame(frame);
   }, [fichaParam, properties]);
   // ?imovel=…: só rola até o imóvel (sem abrir a ficha).
   useEffect(() => {
-    if (imovelParam) setPendingPropertyId(imovelParam);
+    if (!imovelParam) return;
+    const frame = requestAnimationFrame(() => setPendingPropertyId(imovelParam));
+    return () => cancelAnimationFrame(frame);
   }, [imovelParam]);
   useEffect(() => {
     if (!loaded || !pendingPropertyId) return;

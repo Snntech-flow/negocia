@@ -8,7 +8,7 @@ import test from "node:test";
 const fonte = readFileSync(new URL("../src/components/NegotiationDocumentation.tsx", import.meta.url), "utf8");
 
 test("🔴 a resposta dos botões do modelo aparece logo abaixo deles, antes do resto do formulário", () => {
-  const botoes = fonte.indexOf(">Salvar como meu modelo</button>");
+  const botoes = fonte.indexOf('>{t("Salvar como meu modelo")}</button>');
   const aviso = fonte.indexOf("{avisoDoModelo && <p role=\"status\"");
   const imovel = fonte.indexOf("Imóvel vinculado");
   assert.ok(botoes > 0 && aviso > 0 && imovel > 0, "achei os botões, o aviso e o campo do imóvel");
@@ -20,7 +20,7 @@ test("🔴 a resposta dos botões do modelo aparece logo abaixo deles, antes do 
 });
 
 test("cada botão do modelo diz o que faz ao passar o mouse e aparece ocupado enquanto trabalha", () => {
-  assert.match(fonte, /title="Carrega a lista e os custos que você salvou como seu modelo"/);
-  assert.match(fonte, /title="Guarda esta lista e os custos para reaproveitar em outros clientes/);
+  assert.match(fonte, /title=\{t\("Carrega a lista e os custos que você salvou como seu modelo"\)\}/);
+  assert.match(fonte, /title=\{t\("Guarda esta lista e os custos para reaproveitar em outros clientes/);
   assert.equal((fonte.match(/onClick=\{\(\) => template\((true|false)\)\} className="[^"]*disabled:opacity-50/g) ?? []).length, 2);
 });

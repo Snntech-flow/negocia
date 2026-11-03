@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "./I18nProvider";
+
 import NegotiationDocumentation from "./NegotiationDocumentation";
 import CpfParcialInput from "./CpfParcialInput";
 import BotaoFechar from "./BotaoFechar";
@@ -125,15 +127,15 @@ const LEAD_SOURCE_LABELS: Record<string, string> = {
   outro: "Outro",
 };
 
-function localDate(value: Date | string | null | undefined) {
+function localDate(value: Date | string | null | undefined, locale = "pt-BR") {
   if (!value) return "Não informado";
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "Não informado" : date.toLocaleDateString("pt-BR");
+  return Number.isNaN(date.getTime()) ? "Não informado" : date.toLocaleDateString(locale);
 }
 
-function money(value: string | null) {
+function money(value: string | null, locale = "pt-BR") {
   if (!value || !Number.isFinite(Number(value))) return null;
-  return new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(Number(value));
+  return new Intl.NumberFormat(locale, { style: "currency", currency: "BRL", maximumFractionDigits: 0 }).format(Number(value));
 }
 
 function normalizeMatchText(value: string) {
@@ -242,11 +244,13 @@ export default function LeadCRM({
   blockedReason?: string | null;
   onCreateProperty?: () => void;
 }) {
+  const { t, locale } = useI18n();
+
   // UF do form de lead: escolhe de qual estado vêm as sugestões de cidade (começa na do corretor). Antes era fixa na UF do corretor.
   const [formState, setFormState] = useState(currentUserState || "");
   const [stateCities, setStateCities] = useState<string[]>([]);
   useEffect(() => {
-    if (!formState) { setStateCities([]); return; }
+    if (!formState) { const frame = requestAnimationFrame(() => setStateCities([])); return () => cancelAnimationFrame(frame); }
     let cancelled = false;
     void loadStateCities(formState).then((cities) => { if (!cancelled) setStateCities(cities); });
     return () => { cancelled = true; };
@@ -279,7 +283,7 @@ export default function LeadCRM({
   const [editingLead, setEditingLead] = useState<LeadItem | null>(null);
   // Ao abrir o cadastro/edição, a UF da cidade volta para a do corretor.
   const leadFormOpen = isCreateOpen || !!editingLead;
-  useEffect(() => { if (leadFormOpen) setFormState(currentUserState || ""); }, [leadFormOpen, currentUserState]);
+  useEffect(() => { if (!leadFormOpen) return; const frame = requestAnimationFrame(() => setFormState(currentUserState || "")); return () => cancelAnimationFrame(frame); }, [leadFormOpen, currentUserState]);
   const [visitProperty, setVisitProperty] = useState<LeadMatchProperty | null>(null);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -351,8 +355,8 @@ export default function LeadCRM({
         let weight = 0;
         const propertyType = normalizeMatchText(property.propertyType);
         const typeMatches = !type || propertyType.includes(type) || type.includes(propertyType);
-        if (type) { weight += 30; if (typeMatches) { score += 30; reasons.push(`Tipo compatível: ${property.propertyType}`); } }
-        if (budget) { weight += 30; score += 30; reasons.push(`Dentro do orçamento: ${money(property.salePrice)} de até ${money(selectedLead.maxBudget)}`); }
+        if (type) { weight += 30; if (typeMatches) { score += 30; reasons.push(`Tipo compatível: ${t(property.propertyType)}`); } }
+        if (budget) { weight += 30; score += 30; reasons.push(`Dentro do orçamento: ${money(property.salePrice, locale)} de até ${money(selectedLead.maxBudget, locale)}`); }
         if (selectedLead.minBedrooms) { weight += 20; score += 20; reasons.push(`${property.bedrooms} ${property.bedrooms === 1 ? "quarto" : "quartos"} (mínimo ${selectedLead.minBedrooms})`); }
         if (city) { weight += 10; score += 10; reasons.push(`Cidade: ${property.city}`); }
         const neighborhoodMatches = neighborhoods.some((area) => normalizeMatchText(property.neighborhood).includes(area) || area.includes(normalizeMatchText(property.neighborhood)));
@@ -365,9 +369,9 @@ export default function LeadCRM({
       })
       .sort((a, b) => b.score - a.score || Number(a.property.salePrice) - Number(b.property.salePrice))
       .slice(0, 5);
-  }, [properties, selectedLead]);
+  }, [properties, selectedLead, locale, t]);
   const visibleLeads = useMemo(() => {
-    const query = search.trim().toLocaleLowerCase("pt-BR");
+    const query = search.trim().toLocaleLowerCase(locale);
     return leads.filter((lead) => {
       if (monthFilter) {
         const parts = new Intl.DateTimeFormat("en", { timeZone: "America/Sao_Paulo", year: "numeric", month: "2-digit" }).formatToParts(new Date(lead.createdAt));
@@ -384,13 +388,13 @@ export default function LeadCRM({
       if (followUpFilter === "sem_agenda" && followUpTime) return false;
       if (!query) return true;
       return [lead.fullName, lead.phone, lead.email || "", lead.city || "", ...(lead.neighborhoods || [])]
-        .some((value) => value.toLocaleLowerCase("pt-BR").includes(query));
+        .some((value) => value.toLocaleLowerCase(locale).includes(query));
     });
-  }, [leads, search, stageFilter, typeFilter, sourceFilter, cityFilter, followUpFilter, monthFilter, now]);
+  }, [leads, search, stageFilter, typeFilter, sourceFilter, cityFilter, followUpFilter, monthFilter, now, locale]);
 
   const filterKey = JSON.stringify([search, stageFilter, typeFilter, sourceFilter, cityFilter, followUpFilter, monthFilter]);
   const clientPage = pagination.key === filterKey ? Math.min(pagination.page, Math.max(1, Math.ceil(visibleLeads.length / 15))) : 1;
-  const ownProperties = properties.filter(property => currentUserId && property.brokerId === currentUserId && `${property.title} ${property.city} ${property.neighborhood}`.toLocaleLowerCase("pt-BR").includes(propertySearch.toLocaleLowerCase("pt-BR")));
+  const ownProperties = properties.filter(property => currentUserId && property.brokerId === currentUserId && `${property.title} ${property.city} ${property.neighborhood}`.toLocaleLowerCase(locale).includes(propertySearch.toLocaleLowerCase(locale)));
   const openClient = (id: string) => { setSelectedLeadId(id); setError(null); };
   const cityOptions = cityFilterOptions(leads.map((lead) => lead.city), filterCitiesLoaded ? filterStateCities.cities : []);
 
@@ -410,7 +414,7 @@ export default function LeadCRM({
     setError(null);
     let lostReason: string | undefined;
     if (stage === "perdido") {
-      lostReason = (await askText({ title: "Marcar como perdido", label: "Qual foi o motivo da perda?", minLength: 1, confirmLabel: "Marcar como perdido", danger: true })) || undefined;
+      lostReason = (await askText({ title: t("Marcar como perdido"), label: t("Qual foi o motivo da perda?"), minLength: 1, confirmLabel: t("Marcar como perdido"), danger: true })) || undefined;
       if (!lostReason) return;
     }
     setBusy(true);
@@ -590,8 +594,8 @@ export default function LeadCRM({
       lead.maxBudget,
       lead.minBedrooms,
       lead.nextAction,
-      lead.nextActionAt ? new Date(lead.nextActionAt).toLocaleString("pt-BR") : "",
-      lead.lastContactAt ? new Date(lead.lastContactAt).toLocaleString("pt-BR") : "",
+      lead.nextActionAt ? new Date(lead.nextActionAt).toLocaleString(locale) : "",
+      lead.lastContactAt ? new Date(lead.lastContactAt).toLocaleString(locale) : "",
       lead.notes,
       lead.lostReason,
     ]);
@@ -672,45 +676,45 @@ export default function LeadCRM({
     <section className="space-y-6">
       <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
         <div>
-          <div className="flex items-center gap-2 text-amber-400 text-xs font-bold uppercase tracking-wider"><UserRound className="w-4 h-4" /> CRM do corretor</div>
-          <h2 className="mt-2 text-2xl font-extrabold text-white">Sua carteira, seu próximo negócio</h2>
-          <p className="mt-1 text-sm text-slate-400">Seus contatos e histórico ficam privados na sua carteira.</p>
+          <div className="flex items-center gap-2 text-amber-400 text-xs font-bold uppercase tracking-wider"><UserRound className="w-4 h-4" /> {t("CRM do corretor")}</div>
+          <h2 className="mt-2 text-2xl font-extrabold text-white">{t("Sua carteira, seu próximo negócio")}</h2>
+          <p className="mt-1 text-sm text-slate-400">{t("Seus contatos e histórico ficam privados na sua carteira.")}</p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <button type="button" disabled={!!blockedReason} title={blockedReason || undefined} onClick={() => { setError(null); setCsvImportOpen(true); }} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 px-4 py-2.5 text-sm font-bold text-slate-200 hover:border-slate-500 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"><FileUp className="h-4 w-4" /> Importar contatos de uma planilha</button>
-          <button type="button" disabled={!!blockedReason} title={blockedReason || undefined} onClick={() => { setError(null); setEditingLead(null); setIsCreateOpen(true); }} className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-bold text-slate-950 hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"><Plus className="w-4 h-4" /> Novo cliente</button>
+          <button type="button" disabled={!!blockedReason} title={t(blockedReason) || undefined} onClick={() => { setError(null); setCsvImportOpen(true); }} className="inline-flex items-center justify-center gap-2 rounded-xl border border-slate-700 px-4 py-2.5 text-sm font-bold text-slate-200 hover:border-slate-500 hover:bg-slate-800 disabled:cursor-not-allowed disabled:opacity-50"><FileUp className="h-4 w-4" /> {t("Importar contatos de uma planilha")}</button>
+          <button type="button" disabled={!!blockedReason} title={t(blockedReason) || undefined} onClick={() => { setError(null); setEditingLead(null); setIsCreateOpen(true); }} className="inline-flex items-center justify-center gap-2 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-bold text-slate-950 hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"><Plus className="w-4 h-4" /> {t("Novo cliente")}</button>
         </div>
       </div>
-      {blockedReason && <p role="note" className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs text-sky-900">{blockedReason}</p>}
+      {blockedReason && <p role="note" className="rounded-xl border border-sky-200 bg-sky-50 px-4 py-3 text-xs text-sky-900">{t(blockedReason)}</p>}
 
       <div className="grid gap-5 lg:grid-cols-[180px_minmax(0,1fr)]">
-        <aside className="self-start rounded-2xl border border-slate-800 bg-slate-900 p-3 lg:sticky lg:top-36"><p className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">Minha área de trabalho</p><nav aria-label="Áreas do CRM" className="flex flex-wrap gap-1 lg:flex-col">{([
+        <aside className="self-start rounded-2xl border border-slate-800 bg-slate-900 p-3 lg:sticky lg:top-36"><p className="px-3 py-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">{t("Minha área de trabalho")}</p><nav aria-label={t("Áreas do CRM")} className="flex flex-wrap gap-1 lg:flex-col">{([
           {key:"overview",label:"Visão geral",icon:LayoutDashboard}, {key:"clients",label:"Clientes",icon:List}, {key:"pipeline",label:"Funil",icon:KanbanSquare}, {key:"agenda",label:"Agenda",icon:CalendarClock}, {key:"properties",label:"Meus imóveis",icon:Building2}, {key:"simulation",label:"Simulação",icon:Calculator}, {key:"assistant",label:"Bartolomeu IA",icon:Bot},
-        ] as const).map(item => <button key={item.key} type="button" onClick={() => setCrmView(item.key)} aria-current={crmView === item.key ? "page" : undefined} className={`flex items-center gap-2 rounded-xl px-3 py-3 text-xs font-semibold transition ${crmView === item.key ? "bg-amber-500 text-slate-950" : "text-slate-300 hover:bg-slate-800 hover:text-white"}`}>{item.key === "assistant" ? <Image src="/bartolomeu.png" alt="" width={24} height={24} className="h-6 w-6 rounded-full object-cover" /> : <item.icon className="h-4 w-4" />}{item.label}</button>)}</nav><p className="hidden border-t border-slate-800 px-3 pb-2 pt-4 text-[10px] leading-relaxed text-slate-400 lg:block">Seus clientes, contatos e histórico são privados. Os dados da carteira pertencem à sua conta.</p></aside>
+        ] as const).map(item => <button key={item.key} type="button" onClick={() => setCrmView(item.key)} aria-current={crmView === item.key ? "page" : undefined} className={`flex items-center gap-2 rounded-xl px-3 py-3 text-xs font-semibold transition ${crmView === item.key ? "bg-amber-500 text-slate-950" : "text-slate-300 hover:bg-slate-800 hover:text-white"}`}>{item.key === "assistant" ? <Image src="/bartolomeu.png" alt="" width={24} height={24} className="h-6 w-6 rounded-full object-cover" /> : <item.icon className="h-4 w-4" />}{t(item.label)}</button>)}</nav><p className="hidden border-t border-slate-800 px-3 pb-2 pt-4 text-[10px] leading-relaxed text-slate-400 lg:block">{t("Seus clientes, contatos e histórico são privados. Os dados da carteira pertencem à sua conta.")}</p></aside>
         <div className="min-w-0 space-y-5">
       {crmView === "overview" && <>
       <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-6">
-        <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="text-xs text-slate-500">Na carteira</div><div className="mt-1 text-2xl font-bold text-slate-900">{leads.length}</div></div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="text-xs text-slate-500">Em andamento</div><div className="mt-1 text-2xl font-bold text-amber-700">{leads.filter((lead) => !["fechado", "perdido"].includes(lead.stage)).length}</div></div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="text-xs text-slate-500">Visitas</div><div className="mt-1 text-2xl font-bold text-sky-700">{leads.filter((lead) => lead.stage === "visita").length}</div></div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="text-xs text-slate-500">Fechados</div><div className="mt-1 text-2xl font-bold text-emerald-700">{closedCount}</div></div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="text-xs text-slate-500">Vendas entre atendimentos encerrados</div><div className="mt-1 text-2xl font-bold text-emerald-700">{closeRate}%</div><div className="mt-1 text-[10px] text-slate-500">{closedCount} ganhos · {lostCount} perdidos</div><p className="mt-1 text-[10px] leading-relaxed text-slate-500">Vendas fechadas ÷ (fechadas + perdidas). Exemplo: 3 vendas e 2 perdas = 60%. Não é uma cobrança.</p></div>
-        <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="text-xs text-slate-500">Retornos atrasados</div><div className={`mt-1 text-2xl font-bold ${overdueCount ? "text-rose-700" : "text-emerald-700"}`}>{overdueCount}</div></div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="text-xs text-slate-500">{t("Na carteira")}</div><div className="mt-1 text-2xl font-bold text-slate-900">{leads.length}</div></div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="text-xs text-slate-500">{t("Em andamento")}</div><div className="mt-1 text-2xl font-bold text-amber-700">{leads.filter((lead) => !["fechado", "perdido"].includes(lead.stage)).length}</div></div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="text-xs text-slate-500">{t("Visitas")}</div><div className="mt-1 text-2xl font-bold text-sky-700">{leads.filter((lead) => lead.stage === "visita").length}</div></div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="text-xs text-slate-500">{t("Fechados")}</div><div className="mt-1 text-2xl font-bold text-emerald-700">{closedCount}</div></div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="text-xs text-slate-500">{t("Vendas entre atendimentos encerrados")}</div><div className="mt-1 text-2xl font-bold text-emerald-700">{closeRate}%</div><div className="mt-1 text-[10px] text-slate-500">{closedCount} {t("ganhos ·")}{" "}{lostCount} {t("perdidos")}</div><p className="mt-1 text-[10px] leading-relaxed text-slate-500">{t("Vendas fechadas ÷ (fechadas + perdidas). Exemplo: 3 vendas e 2 perdas = 60%. Não é uma cobrança.")}</p></div>
+        <div className="rounded-xl border border-slate-200 bg-white p-4"><div className="text-xs text-slate-500">{t("Retornos atrasados")}</div><div className={`mt-1 text-2xl font-bold ${overdueCount ? "text-rose-700" : "text-emerald-700"}`}>{overdueCount}</div></div>
       </div>
 
       <BrokerCrmOverview leads={leads} activities={activities} stages={stages} now={now} onOpen={openClient} onAgenda={() => setCrmView("agenda")} onStage={(stage) => { setSearch(""); setTypeFilter("todos"); setSourceFilter("todos"); setCityFilter("todas"); setFollowUpFilter("todos"); setMonthFilter(""); setStageFilter(stage); setCrmView("pipeline"); }} />
       <section className="rounded-2xl border border-slate-800 bg-slate-900/70 p-4 sm:p-5">
-        <div className="flex items-center justify-between gap-3"><div><h3 className="text-sm font-bold text-white">Leads por origem</h3><p className="mt-1 text-[11px] text-slate-500">Veja de onde vieram seus contatos: WhatsApp, indicação e outras origens. O percentual mostra a participação de cada origem no total da carteira. Exemplo: 5 de 20 contatos = 25%. Esses percentuais não são cobranças.</p></div><span className="text-[11px] text-slate-500">{leads.length} leads</span></div>
+        <div className="flex items-center justify-between gap-3"><div><h3 className="text-sm font-bold text-white">{t("Leads por origem")}</h3><p className="mt-1 text-[11px] text-slate-500">{t("Veja de onde vieram seus contatos: WhatsApp, indicação e outras origens. O percentual mostra a participação de cada origem no total da carteira. Exemplo: 5 de 20 contatos = 25%. Esses percentuais não são cobranças.")}</p></div><span className="text-[11px] text-slate-500">{leads.length} {t("leads")}</span></div>
         {sourceDistribution.length ? (
           <div className="mt-4 grid gap-x-8 gap-y-3 sm:grid-cols-2">
             {sourceDistribution.map((source) => (
               <div key={source.key}>
-                <div className="mb-1 flex items-center justify-between gap-3 text-xs"><span className="text-slate-300">{source.label}</span><span className="text-slate-500">{source.count} · {Math.round((source.count / leads.length) * 100)}%</span></div>
+                <div className="mb-1 flex items-center justify-between gap-3 text-xs"><span className="text-slate-300">{t(source.label)}</span><span className="text-slate-500">{source.count} · {Math.round((source.count / leads.length) * 100)}%</span></div>
                 <div className="h-1.5 overflow-hidden rounded-full bg-slate-800"><div className="h-full rounded-full bg-amber-500" style={{ width: `${Math.max(5, (source.count / leads.length) * 100)}%` }} /></div>
               </div>
             ))}
           </div>
-        ) : <p className="mt-4 text-xs text-slate-500">Cadastre leads para acompanhar quais origens trazem mais oportunidades.</p>}
+        ) : <p className="mt-4 text-xs text-slate-500">{t("Cadastre leads para acompanhar quais origens trazem mais oportunidades.")}</p>}
       </section>
 
       </>}
@@ -718,49 +722,49 @@ export default function LeadCRM({
       {(crmView === "clients" || crmView === "pipeline") && (
       <div className="space-y-3 rounded-2xl border border-slate-800 bg-slate-900/60 p-3 sm:p-4">
         {/* Vídeo da corretora piloto (11/10/2026): ela escolhia etapa/tipo/origem achando que gravava no cliente. */}
-        <p className="text-xs text-slate-500"><span className="font-bold text-slate-300">Filtros da lista</span> — servem para encontrar clientes e ficam lembrados neste aparelho; não alteram o cadastro. Para mudar a etapa de um cliente, abra o cliente.</p>
+        <p className="text-xs text-slate-500"><span className="font-bold text-slate-300">{t("Filtros da lista")}</span> {t("— servem para encontrar clientes e ficam lembrados neste aparelho; não alteram o cadastro. Para mudar a etapa de um cliente, abra o cliente.")}</p>
         <label className="relative flex-1">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
-          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder="Buscar nome, telefone, e-mail ou bairro" className={`${inputClass} pl-9`} />
+          <input value={search} onChange={(event) => setSearch(event.target.value)} placeholder={t("Buscar nome, telefone, e-mail ou bairro")} className={`${inputClass} pl-9`} />
         </label>
-        <label className="flex flex-wrap items-center gap-3 text-xs font-semibold text-orange-700">Mês do cadastro<input type="month" aria-label="Filtrar mês do cadastro" value={monthFilter} onInput={event => setMonthFilter(event.currentTarget.value)} className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white" />{monthFilter && <button type="button" onClick={() => setMonthFilter("")} className="text-amber-300">Todos os meses</button>}</label>
+        <label className="flex flex-wrap items-center gap-3 text-xs font-semibold text-orange-700">{t("Mês do cadastro")}<input type="month" aria-label={t("Filtrar mês do cadastro")} value={monthFilter} onInput={event => setMonthFilter(event.currentTarget.value)} className="rounded-lg border border-slate-700 bg-slate-950 px-3 py-2 text-white" />{monthFilter && <button type="button" onClick={() => setMonthFilter("")} className="text-amber-300">{t("Todos os meses")}</button>}</label>
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
-          <select value={stageFilter} onChange={(event) => setStageFilter(event.target.value)} className={selectClass} aria-label="Filtrar etapa">
-            <option value="todos">Todas as etapas</option>
-            {stages.map((stage) => <option key={stage.key} value={stage.key}>{stage.label}</option>)}
+          <select value={stageFilter} onChange={(event) => setStageFilter(event.target.value)} className={selectClass} aria-label={t("Filtrar etapa")}>
+            <option value="todos">{t("Todas as etapas")}</option>
+            {stages.map((stage) => <option key={stage.key} value={stage.key}>{t(stage.label)}</option>)}
           </select>
-          <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className={selectClass} aria-label="Filtrar tipo de lead">
-            <option value="todos">Todos os tipos</option>
-            {leadTypes.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          <select value={typeFilter} onChange={(event) => setTypeFilter(event.target.value)} className={selectClass} aria-label={t("Filtrar tipo de lead")}>
+            <option value="todos">{t("Todos os tipos")}</option>
+            {leadTypes.map(([value, label]) => <option key={value} value={value}>{t(label)}</option>)}
           </select>
-          <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className={selectClass} aria-label="Filtrar origem">
-            <option value="todos">Todas as origens</option>
-            {sources.map(([value, label]) => <option key={value} value={value}>{label}</option>)}
+          <select value={sourceFilter} onChange={(event) => setSourceFilter(event.target.value)} className={selectClass} aria-label={t("Filtrar origem")}>
+            <option value="todos">{t("Todas as origens")}</option>
+            {sources.map(([value, label]) => <option key={value} value={value}>{t(label)}</option>)}
           </select>
           <div className="flex gap-2">
-          <select value={filterState} onChange={(event) => { setFilterState(event.target.value); setCityFilter("todas"); }} className={`${selectClass} w-20 shrink-0`} aria-label="Estado das cidades do filtro">
-            {!filterState && <option value="">UF</option>}
+          <select value={filterState} onChange={(event) => { setFilterState(event.target.value); setCityFilter("todas"); }} className={`${selectClass} w-20 shrink-0`} aria-label={t("Estado das cidades do filtro")}>
+            {!filterState && <option value="">{t("UF")}</option>}
             {BRAZILIAN_STATES.map((uf) => <option key={uf} value={uf}>{uf}</option>)}
           </select>
-          <select value={cityFilter} onChange={(event) => setCityFilter(event.target.value)} className={`${selectClass} min-w-0 flex-1`} aria-label="Filtrar cidade">
-            <option value="todas">Todas as cidades</option>
-            {cityOptions.withClients.length > 0 && <optgroup label="Com clientes">{cityOptions.withClients.map((city) => <option key={city} value={city}>{city}</option>)}</optgroup>}
+          <select value={cityFilter} onChange={(event) => setCityFilter(event.target.value)} className={`${selectClass} min-w-0 flex-1`} aria-label={t("Filtrar cidade")}>
+            <option value="todas">{t("Todas as cidades")}</option>
+            {cityOptions.withClients.length > 0 && <optgroup label={t("Com clientes")}>{cityOptions.withClients.map((city) => <option key={city} value={city}>{city}</option>)}</optgroup>}
             {cityOptions.others.length > 0 && <optgroup label={`${cityOptions.withClients.length ? "Outras cidades" : "Cidades"} (${filterState})`}>{cityOptions.others.map((city) => <option key={city} value={city}>{city}</option>)}</optgroup>}
-            {!cityOptions.others.length && <option value="" disabled>{!filterState ? "Escolha o estado ao lado" : filterCitiesLoaded ? "Não foi possível carregar as cidades agora" : "Carregando as cidades…"}</option>}
+            {!cityOptions.others.length && <option value="" disabled>{!filterState ? t("Escolha o estado ao lado") : filterCitiesLoaded ? t("Não foi possível carregar as cidades agora") : t("Carregando as cidades…")}</option>}
           </select>
           </div>
-          <select value={followUpFilter} onChange={(event) => setFollowUpFilter(event.target.value)} className={selectClass} aria-label="Filtrar retornos">
-            <option value="todos">Qualquer retorno</option>
-            <option value="atrasados">Retorno atrasado</option>
-            <option value="agendados">Retorno agendado</option>
-            <option value="sem_agenda">Sem retorno</option>
+          <select value={followUpFilter} onChange={(event) => setFollowUpFilter(event.target.value)} className={selectClass} aria-label={t("Filtrar retornos")}>
+            <option value="todos">{t("Qualquer retorno")}</option>
+            <option value="atrasados">{t("Retorno atrasado")}</option>
+            <option value="agendados">{t("Retorno agendado")}</option>
+            <option value="sem_agenda">{t("Sem retorno")}</option>
           </select>
         </div>
         <div className="flex items-center justify-between gap-3 text-[11px] text-slate-500">
-          <span>Exibindo {visibleLeads.length} de {leads.length} leads</span>
+          <span>{t("Exibindo")}{" "}{visibleLeads.length} {t("de")}{" "}{leads.length} {t("leads")}</span>
           <div className="flex flex-wrap items-center justify-end gap-3">
-            {visibleLeads.length > 0 && <button type="button" onClick={exportVisibleLeads} className="font-semibold text-emerald-300 hover:text-emerald-200">Exportar seleção CSV</button>}
-            {(monthFilter || search || stageFilter !== "todos" || typeFilter !== "todos" || sourceFilter !== "todos" || cityFilter !== "todas" || followUpFilter !== "todos") && <button type="button" onClick={() => { setSearch(""); setStageFilter("todos"); setTypeFilter("todos"); setSourceFilter("todos"); setCityFilter("todas"); setFollowUpFilter("todos"); setMonthFilter(""); }} className="font-semibold text-amber-300 hover:text-amber-200">Limpar filtros</button>}
+            {visibleLeads.length > 0 && <button type="button" onClick={exportVisibleLeads} className="font-semibold text-emerald-300 hover:text-emerald-200">{t("Exportar seleção CSV")}</button>}
+            {(monthFilter || search || stageFilter !== "todos" || typeFilter !== "todos" || sourceFilter !== "todos" || cityFilter !== "todas" || followUpFilter !== "todos") && <button type="button" onClick={() => { setSearch(""); setStageFilter("todos"); setTypeFilter("todos"); setSourceFilter("todos"); setCityFilter("todas"); setFollowUpFilter("todos"); setMonthFilter(""); }} className="font-semibold text-amber-300 hover:text-amber-200">{t("Limpar filtros")}</button>}
           </div>
         </div>
       </div>
@@ -769,32 +773,32 @@ export default function LeadCRM({
 
       {crmView === "agenda" && <BrokerWeeklyAgenda leads={leads} now={now} busy={busy} onOpen={openClient} onComplete={lead => void completeFollowUp(lead)} onExport={exportAgendaIcs} onSchedule={(lead,date) => { setEditingLead({...lead,nextAction:lead.nextAction || "Retorno agendado",nextActionAt:new Date(`${date}:00-03:00`)});setIsCreateOpen(false);setError(null); }} />}
 
-      {notice && <div role="status" className="rounded-lg border border-emerald-500/30 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200">{notice}</div>}
-      {error && !isCreateOpen && !editingLead && !visitProperty && !csvImportOpen && <div role="alert" className="rounded-lg border border-rose-500/30 bg-rose-950/40 px-4 py-3 text-sm text-rose-200">{error}</div>}
+      {notice && <div role="status" className="rounded-lg border border-emerald-500/30 bg-emerald-950/30 px-4 py-3 text-sm text-emerald-200">{t(notice)}</div>}
+      {error && !isCreateOpen && !editingLead && !visitProperty && !csvImportOpen && <div role="alert" className="rounded-lg border border-rose-500/30 bg-rose-950/40 px-4 py-3 text-sm text-rose-200">{t(error)}</div>}
 
       {csvImportOpen && <div className="fixed inset-0 z-[65] flex items-center justify-center bg-black/70 p-4">
         <div className="w-full max-w-lg space-y-4 rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
-          <div className="flex items-start justify-between gap-3"><div><div className="text-xs font-bold uppercase tracking-wide text-amber-400">CRM · Importação</div><h3 className="mt-1 text-lg font-extrabold text-white">Trazer contatos de uma planilha</h3></div><BotaoFechar onClick={fecharImportacao} /></div>
-          <p className="text-xs leading-relaxed text-slate-400">Já tem uma lista de clientes em uma planilha? No Excel ou Google Planilhas, salve ou baixe a lista no formato CSV e selecione o arquivo aqui. CSV é um arquivo de tabela que permite trazer vários contatos de uma vez, sem cadastrar um por um. Use vírgula ou ponto e vírgula como separador. Colunas obrigatórias: <b className="text-slate-200">Nome</b> e <b className="text-slate-200">Telefone</b>. Aceita também e-mail, tipo, origem, tipo de imóvel, cidade, bairros, orçamento, quartos e observações. Até 100 linhas; contatos repetidos pelo telefone serão ignorados.</p>
-          <button type="button" onClick={() => { const content = '\uFEFFNome;Telefone;E-mail;Tipo;Origem;Tipo de imóvel;Cidade;Bairros;Orçamento máximo;Quartos mínimos;Observações\r\nMaria Exemplo;(11) 99999-0000;maria@email.com;Comprador;Indicação;Apartamento;São Paulo;Moema|Pinheiros;850000;2;Prefere andar alto'; const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' })); const a = document.createElement('a'); a.href = url; a.download = 'modelo-importacao-negocia-lar.csv'; a.click(); URL.revokeObjectURL(url); }} className="text-xs font-semibold text-emerald-300 hover:text-emerald-200">Baixar modelo CSV</button>
-          <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-600 px-4 py-5 text-sm font-bold text-white hover:border-amber-400 hover:bg-slate-800 ${busy ? "pointer-events-none opacity-50" : ""}`}><FileUp className="h-4 w-4" />{busy ? "Importando e validando…" : "Selecionar arquivo .csv"}<input type="file" accept=".csv,text/csv" className="sr-only" disabled={busy} onChange={(event) => { void handleCsvFile(event.target.files?.[0]); event.currentTarget.value = ""; }} /></label>
-          {error && <p role="alert" className="rounded-lg border border-rose-500/30 bg-rose-950/40 p-3 text-xs text-rose-200">{error}</p>}
-          <div className="flex justify-end border-t border-slate-800 pt-3"><button type="button" onClick={fecharImportacao} className="rounded-lg px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800">Fechar</button></div>
+          <div className="flex items-start justify-between gap-3"><div><div className="text-xs font-bold uppercase tracking-wide text-amber-400">{t("CRM · Importação")}</div><h3 className="mt-1 text-lg font-extrabold text-white">{t("Trazer contatos de uma planilha")}</h3></div><BotaoFechar onClick={fecharImportacao} /></div>
+          <p className="text-xs leading-relaxed text-slate-400">{t("Já tem uma lista de clientes em uma planilha? No Excel ou Google Planilhas, salve ou baixe a lista no formato CSV e selecione o arquivo aqui. CSV é um arquivo de tabela que permite trazer vários contatos de uma vez, sem cadastrar um por um. Use vírgula ou ponto e vírgula como separador. Colunas obrigatórias:")}{" "}<b className="text-slate-200">{t("Nome")}</b> {t("e")}{" "}<b className="text-slate-200">{t("Telefone")}</b>{t(". Aceita também e-mail, tipo, origem, tipo de imóvel, cidade, bairros, orçamento, quartos e observações. Até 100 linhas; contatos repetidos pelo telefone serão ignorados.")}</p>
+          <button type="button" onClick={() => { const content = '\uFEFFNome;Telefone;E-mail;Tipo;Origem;Tipo de imóvel;Cidade;Bairros;Orçamento máximo;Quartos mínimos;Observações\r\nMaria Exemplo;(11) 99999-0000;maria@email.com;Comprador;Indicação;Apartamento;São Paulo;Moema|Pinheiros;850000;2;Prefere andar alto'; const url = URL.createObjectURL(new Blob([content], { type: 'text/csv;charset=utf-8' })); const a = document.createElement('a'); a.href = url; a.download = 'modelo-importacao-negocia-lar.csv'; a.click(); URL.revokeObjectURL(url); }} className="text-xs font-semibold text-emerald-300 hover:text-emerald-200">{t("Baixar modelo CSV")}</button>
+          <label className={`flex cursor-pointer items-center justify-center gap-2 rounded-xl border border-dashed border-slate-600 px-4 py-5 text-sm font-bold text-white hover:border-amber-400 hover:bg-slate-800 ${busy ? "pointer-events-none opacity-50" : ""}`}><FileUp className="h-4 w-4" />{busy ? t("Importando e validando…") : t("Selecionar arquivo .csv")}<input type="file" accept=".csv,text/csv" className="sr-only" disabled={busy} onChange={(event) => { void handleCsvFile(event.target.files?.[0]); event.currentTarget.value = ""; }} /></label>
+          {error && <p role="alert" className="rounded-lg border border-rose-500/30 bg-rose-950/40 p-3 text-xs text-rose-200">{t(error)}</p>}
+          <div className="flex justify-end border-t border-slate-800 pt-3"><button type="button" onClick={fecharImportacao} className="rounded-lg px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800">{t("Fechar")}</button></div>
         </div>
       </div>}
 
       {crmView === "pipeline" && (leads.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-700 bg-slate-900/60 px-6 py-14 text-center">
           <UserRound className="mx-auto h-10 w-10 text-slate-900" />
-          <h3 className="mt-4 text-lg font-bold text-white">Sua carteira começa aqui</h3>
-          <p className="mx-auto mt-2 max-w-md text-sm text-slate-900">Cadastre um contato, defina a próxima ação e acompanhe cada etapa até a conclusão.</p>
-          <button type="button" disabled={!!blockedReason} title={blockedReason || undefined} onClick={() => setIsCreateOpen(true)} className="mt-5 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-bold text-slate-950 hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"><Plus className="mr-1 inline h-4 w-4" /> Cadastrar primeiro lead</button>
+          <h3 className="mt-4 text-lg font-bold text-white">{t("Sua carteira começa aqui")}</h3>
+          <p className="mx-auto mt-2 max-w-md text-sm text-slate-900">{t("Cadastre um contato, defina a próxima ação e acompanhe cada etapa até a conclusão.")}</p>
+          <button type="button" disabled={!!blockedReason} title={t(blockedReason) || undefined} onClick={() => setIsCreateOpen(true)} className="mt-5 rounded-xl bg-amber-500 px-4 py-2.5 text-sm font-bold text-slate-950 hover:bg-amber-400 disabled:cursor-not-allowed disabled:opacity-50"><Plus className="mr-1 inline h-4 w-4" /> {t("Cadastrar primeiro lead")}</button>
         </div>
       ) : (
         <>
         <div className="space-y-2 lg:hidden">
           {visibleLeads.length ? visibleLeads.map((lead) => {
-            const budget = money(lead.maxBudget);
+            const budget = money(lead.maxBudget, locale);
             const isOverdue = lead.nextActionAt && new Date(lead.nextActionAt).getTime() < now && !["fechado", "perdido"].includes(lead.stage);
             return (
               <article key={lead.id} className="rounded-xl border border-slate-800 bg-slate-900 p-3 shadow-sm">
@@ -802,15 +806,15 @@ export default function LeadCRM({
                   <div className="flex items-start justify-between gap-2"><span className="min-w-0 truncate text-sm font-bold text-white">{lead.fullName}</span><span className="shrink-0 rounded bg-slate-800 px-2 py-0.5 text-[10px] text-slate-300">{stages.find((stage) => stage.key === lead.stage)?.label || lead.stage}</span></div>
                   <div className="mt-1 flex items-center gap-1 text-xs text-slate-900"><Phone className="h-3 w-3" />{lead.phone}</div>
                   {(lead.city || lead.neighborhoods?.length > 0) && <div className="mt-1 truncate text-[11px] text-slate-900">{[lead.neighborhoods?.join(", "), lead.city].filter(Boolean).join(" • ")}</div>}
-                  {budget && <div className="mt-1 text-xs font-semibold text-orange-700">Até {budget}</div>}
-                  {lead.nextAction && <div className={`mt-2 flex items-start gap-1.5 border-t border-slate-800 pt-2 text-[11px] ${isOverdue ? "text-rose-800" : "text-orange-700"}`}><CalendarClock className="mt-0.5 h-3 w-3 shrink-0" /><span>{lead.nextAction} · {localDate(lead.nextActionAt)}</span></div>}
+                  {budget && <div className="mt-1 text-xs font-semibold text-orange-700">{t("Até")}{" "}{budget}</div>}
+                  {lead.nextAction && <div className={`mt-2 flex items-start gap-1.5 border-t border-slate-800 pt-2 text-[11px] ${isOverdue ? "text-rose-800" : "text-orange-700"}`}><CalendarClock className="mt-0.5 h-3 w-3 shrink-0" /><span>{lead.nextAction} · {localDate(lead.nextActionAt, locale)}</span></div>}
                 </button>
-                <select value={lead.stage} onChange={(event) => changeStage(lead, event.target.value)} disabled={busy} className="mt-3 w-full rounded-md border border-slate-800 bg-slate-950 px-2 py-2 text-xs text-slate-300 disabled:opacity-50" aria-label={`Etapa de ${lead.fullName}`}>
-                  {stages.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
+                <select value={lead.stage} onChange={(event) => changeStage(lead, event.target.value)} disabled={busy} className="mt-3 w-full rounded-md border border-slate-800 bg-slate-950 px-2 py-2 text-xs text-slate-300 disabled:opacity-50" aria-label={t("Etapa de {0}", [lead.fullName])}>
+                  {stages.map((option) => <option key={option.key} value={option.key}>{t(option.label)}</option>)}
                 </select>
               </article>
             );
-          }) : <p className="rounded-xl border border-dashed border-slate-700 px-4 py-8 text-center text-xs text-slate-900">Nenhum lead corresponde aos filtros selecionados.</p>}
+          }) : <p className="rounded-xl border border-dashed border-slate-700 px-4 py-8 text-center text-xs text-slate-900">{t("Nenhum lead corresponde aos filtros selecionados.")}</p>}
         </div>
         <div className="hidden -mx-4 overflow-x-auto px-4 pb-3 lg:block">
           <div className="grid min-w-[1760px] grid-cols-8 gap-3">
@@ -819,12 +823,12 @@ export default function LeadCRM({
               return (
                 <div key={stage.key} className="min-h-72 rounded-xl border border-slate-800 bg-slate-900/70 p-2.5">
                   <div className="mb-3 flex items-center justify-between border-b border-slate-800 px-1 pb-2">
-                    <h3 className="text-xs font-bold text-slate-200">{stage.label}</h3>
+                    <h3 className="text-xs font-bold text-slate-200">{t(stage.label)}</h3>
                     <span className="rounded-full bg-slate-800 px-2 py-0.5 text-[10px] text-slate-900">{stageLeads.length}</span>
                   </div>
                   <div className="space-y-2">
                     {stageLeads.map((lead) => {
-                      const budget = money(lead.maxBudget);
+                      const budget = money(lead.maxBudget, locale);
                       const isOverdue = lead.nextActionAt && new Date(lead.nextActionAt).getTime() < Date.now() && !["fechado", "perdido"].includes(lead.stage);
                       return (
                         <article key={lead.id} className="rounded-xl border border-slate-800 bg-slate-950 p-3 shadow-sm">
@@ -832,20 +836,20 @@ export default function LeadCRM({
                             <div className="truncate text-sm font-bold text-white">{lead.fullName}</div>
                             <div className="mt-1 flex items-center gap-1 text-xs text-slate-900"><Phone className="h-3 w-3" /> {lead.phone}</div>
                             <div className="mt-2 flex flex-wrap gap-1">
-                              <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300">{LEAD_TYPE_LABELS[lead.leadType] || lead.leadType}</span>
-                              <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-900">{LEAD_SOURCE_LABELS[lead.source] || lead.source}</span>
+                              <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-300">{t(LEAD_TYPE_LABELS[lead.leadType]) || lead.leadType}</span>
+                              <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-900">{t(LEAD_SOURCE_LABELS[lead.source]) || lead.source}</span>
                             </div>
-                            {budget && <div className="mt-2 text-xs font-semibold text-orange-700">Até {budget}</div>}
+                            {budget && <div className="mt-2 text-xs font-semibold text-orange-700">{t("Até")}{" "}{budget}</div>}
                             {(lead.city || lead.neighborhoods?.length > 0) && <div className="mt-1 truncate text-[11px] text-slate-900">{[lead.neighborhoods?.join(", "), lead.city].filter(Boolean).join(" • ")}</div>}
-                            {lead.nextAction && <div className={`mt-2 flex items-start gap-1.5 border-t border-slate-800 pt-2 text-[11px] ${isOverdue ? "text-rose-800" : "text-orange-700"}`}><CalendarClock className="mt-0.5 h-3 w-3 shrink-0" /><span>{lead.nextAction} · {localDate(lead.nextActionAt)}</span></div>}
+                            {lead.nextAction && <div className={`mt-2 flex items-start gap-1.5 border-t border-slate-800 pt-2 text-[11px] ${isOverdue ? "text-rose-800" : "text-orange-700"}`}><CalendarClock className="mt-0.5 h-3 w-3 shrink-0" /><span>{lead.nextAction} · {localDate(lead.nextActionAt, locale)}</span></div>}
                           </button>
-                          <select value={lead.stage} onChange={(event) => changeStage(lead, event.target.value)} disabled={busy} className="mt-3 w-full rounded-md border border-slate-800 bg-slate-900 px-2 py-1.5 text-[10px] text-slate-300 disabled:opacity-50" aria-label={`Etapa de ${lead.fullName}`}>
-                            {stages.map((option) => <option key={option.key} value={option.key}>{option.label}</option>)}
+                          <select value={lead.stage} onChange={(event) => changeStage(lead, event.target.value)} disabled={busy} className="mt-3 w-full rounded-md border border-slate-800 bg-slate-900 px-2 py-1.5 text-[10px] text-slate-300 disabled:opacity-50" aria-label={t("Etapa de {0}", [lead.fullName])}>
+                            {stages.map((option) => <option key={option.key} value={option.key}>{t(option.label)}</option>)}
                           </select>
                         </article>
                       );
                     })}
-                    {stageLeads.length === 0 && <div className="px-1 py-3 text-center text-[10px] text-slate-900">Nenhum lead</div>}
+                    {stageLeads.length === 0 && <div className="px-1 py-3 text-center text-[10px] text-slate-900">{t("Nenhum lead")}</div>}
                   </div>
                 </div>
               );
@@ -860,34 +864,34 @@ export default function LeadCRM({
 
       {crmView === "clients" && <BrokerCrmClients leads={visibleLeads} stages={stages} page={clientPage} onPage={page => setPagination({key:filterKey,page})} onOpen={openClient} onEdit={lead => {setEditingLead(lead);setIsCreateOpen(false);setError(null);}} onStage={(lead,stage) => void changeStage(lead,stage)} busy={busy} />}
 
-      {crmView === "properties" && <section className="space-y-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="text-lg font-bold text-white">Meus imóveis</h3><p className="mt-1 text-xs text-slate-400">Anúncios cadastrados por você. Abra a ficha para conferir os detalhes na Vitrine.</p></div>{onCreateProperty && <button type="button" onClick={onCreateProperty} className="rounded-lg bg-amber-500 px-4 py-2 text-xs font-bold text-slate-950">+ Cadastrar imóvel</button>}</div><input aria-label="Buscar meus imóveis" value={propertySearch} onChange={event => setPropertySearch(event.target.value)} placeholder="Buscar imóvel, bairro ou cidade" className={inputClass} /><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{ownProperties.map(property => <button key={property.id} type="button" onClick={() => onOpenProperty(property.id)} className="overflow-hidden rounded-2xl border border-slate-200 bg-white text-left text-slate-900 transition hover:border-amber-500"><div className="aspect-video bg-slate-100">{property.coverPhoto ? <img src={property.coverPhoto} alt={property.title} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-slate-400"><Building2 className="h-10 w-10" /></div>}</div><div className="space-y-2 p-4"><h4 className="font-bold">{property.title}</h4><p className="text-xs text-slate-500">{property.neighborhood} · {property.city}</p><p className="text-sm font-bold text-orange-700">{money(property.salePrice)}</p><div className="flex flex-wrap gap-2 text-[10px]"><span className="rounded-full bg-slate-100 px-2 py-1">{property.propertyType}</span><span className="rounded-full bg-amber-50 px-2 py-1 text-amber-800">{property.status === "disponivel" ? "Disponível" : property.status === "vendido" ? "Vendido" : property.status === "alugado" ? "Alugado" : property.status}</span></div></div></button>)}</div>{!ownProperties.length && <p className="rounded-xl border border-dashed border-slate-700 p-8 text-center text-sm text-slate-400">Nenhum imóvel próprio encontrado. Cadastre seu primeiro anúncio ou ajuste a busca.</p>}</section>}
+      {crmView === "properties" && <section className="space-y-4"><div className="flex flex-wrap items-center justify-between gap-3"><div><h3 className="text-lg font-bold text-white">{t("Meus imóveis")}</h3><p className="mt-1 text-xs text-slate-400">{t("Anúncios cadastrados por você. Abra a ficha para conferir os detalhes na Vitrine.")}</p></div>{onCreateProperty && <button type="button" onClick={onCreateProperty} className="rounded-lg bg-amber-500 px-4 py-2 text-xs font-bold text-slate-950">{t("+ Cadastrar imóvel")}</button>}</div><input aria-label={t("Buscar meus imóveis")} value={propertySearch} onChange={event => setPropertySearch(event.target.value)} placeholder={t("Buscar imóvel, bairro ou cidade")} className={inputClass} /><div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">{ownProperties.map(property => <button key={property.id} type="button" onClick={() => onOpenProperty(property.id)} className="overflow-hidden rounded-2xl border border-slate-200 bg-white text-left text-slate-900 transition hover:border-amber-500"><div className="aspect-video bg-slate-100">{property.coverPhoto ? <img src={property.coverPhoto} alt={property.title} className="h-full w-full object-cover" /> : <div className="flex h-full items-center justify-center text-slate-400"><Building2 className="h-10 w-10" /></div>}</div><div className="space-y-2 p-4"><h4 className="font-bold">{property.title}</h4><p className="text-xs text-slate-500">{property.neighborhood} · {property.city}</p><p className="text-sm font-bold text-orange-700">{money(property.salePrice, locale)}</p><div className="flex flex-wrap gap-2 text-[10px]"><span className="rounded-full bg-slate-100 px-2 py-1">{t(property.propertyType)}</span><span className="rounded-full bg-amber-50 px-2 py-1 text-amber-800">{property.status === "disponivel" ? t("Disponível") : property.status === "vendido" ? t("Vendido") : property.status === "alugado" ? t("Alugado") : property.status}</span></div></div></button>)}</div>{!ownProperties.length && <p className="rounded-xl border border-dashed border-slate-700 p-8 text-center text-sm text-slate-400">{t("Nenhum imóvel próprio encontrado. Cadastre seu primeiro anúncio ou ajuste a busca.")}</p>}</section>}
 
       {(isCreateOpen || editingLead) && (
         <div className="fixed inset-0 z-[60] flex items-center justify-center overflow-y-auto bg-black/70 p-3 sm:p-6">
           <form key={editingLead?.id || "novo-lead"} onSubmit={submitNewLead} className="my-auto w-full max-w-2xl space-y-5 rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl sm:p-7">
             <div className="flex items-start justify-between gap-4">
-              <div><div className="text-xs font-bold uppercase tracking-wide text-amber-400">{editingLead ? "Atualizar oportunidade" : "Nova oportunidade"}</div><h3 className="mt-1 text-xl font-extrabold text-white">{editingLead ? "Editar lead" : "Cadastrar lead"}</h3></div>
+              <div><div className="text-xs font-bold uppercase tracking-wide text-amber-400">{editingLead ? t("Atualizar oportunidade") : t("Nova oportunidade")}</div><h3 className="mt-1 text-xl font-extrabold text-white">{editingLead ? t("Editar lead") : t("Cadastrar lead")}</h3></div>
               <BotaoFechar onClick={fecharLead} />
             </div>
             <div className="grid gap-3 sm:grid-cols-2">
-              <label className="text-xs font-semibold text-slate-300 sm:col-span-2">Nome *<input name="fullName" required maxLength={120} autoFocus defaultValue={editingLead?.fullName || ""} className={`${inputClass} mt-1`} placeholder="Nome da pessoa" /></label>
-              <label className="text-xs font-semibold text-slate-300">Telefone com DDD *<input name="phone" type="tel" required defaultValue={editingLead?.phone || ""} className={`${inputClass} mt-1`} placeholder="(11) 99999-9999" /></label>
-              <label className="text-xs font-semibold text-slate-300">E-mail<input name="email" type="email" defaultValue={editingLead?.email || ""} className={`${inputClass} mt-1`} placeholder="nome@email.com" /></label>
-              <label className="text-xs font-semibold text-slate-300">Tipo de lead<select name="leadType" defaultValue={editingLead?.leadType || "comprador"} className={`${inputClass} mt-1`}>{leadTypes.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-              <label className="text-xs font-semibold text-slate-300">Como chegou<select name="source" defaultValue={editingLead?.source || "outro"} className={`${inputClass} mt-1`}>{sources.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select></label>
-              <label className="text-xs font-semibold text-slate-300">Tipo de imóvel<select name="propertyType" defaultValue={editingLead?.propertyType || ""} className={`${inputClass} mt-1`}><option value="">Qualquer tipo</option>{PROPERTY_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}{editingLead?.propertyType && !PROPERTY_TYPES.includes(editingLead.propertyType) && <option value={editingLead.propertyType}>{editingLead.propertyType}</option>}</select></label>
-              <label className="text-xs font-semibold text-slate-300">Cidade<div className="mt-1 flex gap-2"><select value={formState} onChange={(event) => setFormState(event.target.value)} aria-label="Estado da cidade" className="w-20 shrink-0 rounded-lg border border-slate-700 bg-slate-950 px-2 py-2.5 text-sm text-white focus:border-amber-500 focus:outline-none">{!formState && <option value="">UF</option>}{BRAZILIAN_STATES.map((uf) => <option key={uf} value={uf}>{uf}</option>)}</select><input name="city" list="lead-city-options" autoComplete="off" defaultValue={editingLead?.city || ""} className={`${inputClass} min-w-0 flex-1`} placeholder={!formState ? "Escolha a UF" : stateCities.length ? `Cidades de ${formState}` : "Digite a cidade"} /></div><datalist id="lead-city-options">{stateCities.map((city) => <option key={city} value={city} />)}</datalist></label>
-              <label className="text-xs font-semibold text-slate-300">Bairros de interesse<input name="neighborhoods" defaultValue={editingLead?.neighborhoods?.join(", ") || ""} className={`${inputClass} mt-1`} placeholder="Moema, Pinheiros" /></label>
-              <label className="text-xs font-semibold text-slate-300">Orçamento máximo (R$)<input name="maxBudget" type="number" min="1" step="0.01" defaultValue={editingLead?.maxBudget || ""} className={`${inputClass} mt-1`} placeholder="Ex.: 850000" /></label>
-              <label className="text-xs font-semibold text-slate-300">Quartos mínimos<input name="minBedrooms" type="number" min="1" max="20" defaultValue={editingLead?.minBedrooms || ""} className={`${inputClass} mt-1`} placeholder="2" /></label>
-              <label className="text-xs font-semibold text-slate-300">Próxima ação<input name="nextAction" maxLength={160} defaultValue={editingLead?.nextAction || ""} className={`${inputClass} mt-1`} placeholder="Ligar para confirmar preferências" /></label>
-              <label className="text-xs font-semibold text-slate-300">Quando retornar<input name="nextActionAt" type="datetime-local" defaultValue={localDateTimeValue(editingLead?.nextActionAt || null)} className={`${inputClass} mt-1`} /></label>
-              <label className="text-xs font-semibold text-slate-300 sm:col-span-2">Observações<textarea name="notes" maxLength={3000} rows={3} defaultValue={editingLead?.notes || ""} className={`${inputClass} mt-1 resize-y`} placeholder="Preferências, prazo de compra, forma de pagamento..." /></label>
+              <label className="text-xs font-semibold text-slate-300 sm:col-span-2">{t("Nome *")}<input name="fullName" required maxLength={120} autoFocus defaultValue={editingLead?.fullName || ""} className={`${inputClass} mt-1`} placeholder={t("Nome da pessoa")} /></label>
+              <label className="text-xs font-semibold text-slate-300">{t("Telefone com DDD *")}<input name="phone" type="tel" required defaultValue={editingLead?.phone || ""} className={`${inputClass} mt-1`} placeholder="(11) 99999-9999" /></label>
+              <label className="text-xs font-semibold text-slate-300">{t("E-mail")}<input name="email" type="email" defaultValue={editingLead?.email || ""} className={`${inputClass} mt-1`} placeholder={t("nome@email.com")} /></label>
+              <label className="text-xs font-semibold text-slate-300">{t("Tipo de lead")}<select name="leadType" defaultValue={editingLead?.leadType || "comprador"} className={`${inputClass} mt-1`}>{leadTypes.map(([value, label]) => <option key={value} value={value}>{t(label)}</option>)}</select></label>
+              <label className="text-xs font-semibold text-slate-300">{t("Como chegou")}<select name="source" defaultValue={editingLead?.source || "outro"} className={`${inputClass} mt-1`}>{sources.map(([value, label]) => <option key={value} value={value}>{t(label)}</option>)}</select></label>
+              <label className="text-xs font-semibold text-slate-300">{t("Tipo de imóvel")}<select name="propertyType" defaultValue={editingLead?.propertyType || ""} className={`${inputClass} mt-1`}><option value="">{t("Qualquer tipo")}</option>{PROPERTY_TYPES.map((type) => <option key={type} value={type}>{type}</option>)}{editingLead?.propertyType && !PROPERTY_TYPES.includes(editingLead.propertyType) && <option value={editingLead.propertyType}>{editingLead.propertyType}</option>}</select></label>
+              <label className="text-xs font-semibold text-slate-300">{t("Cidade")}<div className="mt-1 flex gap-2"><select value={formState} onChange={(event) => setFormState(event.target.value)} aria-label={t("Estado da cidade")} className="w-20 shrink-0 rounded-lg border border-slate-700 bg-slate-950 px-2 py-2.5 text-sm text-white focus:border-amber-500 focus:outline-none">{!formState && <option value="">{t("UF")}</option>}{BRAZILIAN_STATES.map((uf) => <option key={uf} value={uf}>{uf}</option>)}</select><input name="city" list="lead-city-options" autoComplete="off" defaultValue={editingLead?.city || ""} className={`${inputClass} min-w-0 flex-1`} placeholder={!formState ? t("Escolha a UF") : stateCities.length ? t("Cidades de {0}", [formState]) : t("Digite a cidade")} /></div><datalist id="lead-city-options">{stateCities.map((city) => <option key={city} value={city} />)}</datalist></label>
+              <label className="text-xs font-semibold text-slate-300">{t("Bairros de interesse")}<input name="neighborhoods" defaultValue={editingLead?.neighborhoods?.join(", ") || ""} className={`${inputClass} mt-1`} placeholder={t("Moema, Pinheiros")} /></label>
+              <label className="text-xs font-semibold text-slate-300">{t("Orçamento máximo (R$)")}<input name="maxBudget" type="number" min="1" step="0.01" defaultValue={editingLead?.maxBudget || ""} className={`${inputClass} mt-1`} placeholder={t("Ex.: 850000")} /></label>
+              <label className="text-xs font-semibold text-slate-300">{t("Quartos mínimos")}<input name="minBedrooms" type="number" min="1" max="20" defaultValue={editingLead?.minBedrooms || ""} className={`${inputClass} mt-1`} placeholder="2" /></label>
+              <label className="text-xs font-semibold text-slate-300">{t("Próxima ação")}<input name="nextAction" maxLength={160} defaultValue={editingLead?.nextAction || ""} className={`${inputClass} mt-1`} placeholder={t("Ligar para confirmar preferências")} /></label>
+              <label className="text-xs font-semibold text-slate-300">{t("Quando retornar")}<input name="nextActionAt" type="datetime-local" defaultValue={localDateTimeValue(editingLead?.nextActionAt || null)} className={`${inputClass} mt-1`} /></label>
+              <label className="text-xs font-semibold text-slate-300 sm:col-span-2">{t("Observações")}<textarea name="notes" maxLength={3000} rows={3} defaultValue={editingLead?.notes || ""} className={`${inputClass} mt-1 resize-y`} placeholder={t("Preferências, prazo de compra, forma de pagamento...")} /></label>
             </div>
-            {error && <p role="alert" className="rounded-lg border border-rose-500/30 bg-rose-950/40 p-3 text-xs text-rose-200">{error}</p>}
+            {error && <p role="alert" className="rounded-lg border border-rose-500/30 bg-rose-950/40 p-3 text-xs text-rose-200">{t(error)}</p>}
             <div className="flex justify-end gap-2 border-t border-slate-800 pt-4">
-              <button type="button" onClick={fecharLead} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-800">Cancelar</button>
-              <button disabled={busy} className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold text-slate-950 hover:bg-amber-400 disabled:opacity-50">{busy ? "Salvando..." : editingLead ? "Salvar alterações" : "Salvar lead"}</button>
+              <button type="button" onClick={fecharLead} className="rounded-lg px-4 py-2 text-sm font-semibold text-slate-300 hover:bg-slate-800">{t("Cancelar")}</button>
+              <button disabled={busy} className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold text-slate-950 hover:bg-amber-400 disabled:opacity-50">{busy ? t("Salvando...") : editingLead ? t("Salvar alterações") : t("Salvar lead")}</button>
             </div>
           </form>
         </div>
@@ -897,16 +901,16 @@ export default function LeadCRM({
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/80 p-4">
           <form onSubmit={submitVisitDvp} className="w-full max-w-md space-y-4 rounded-2xl border border-slate-700 bg-slate-900 p-5 shadow-2xl">
             <div className="flex items-start justify-between gap-3">
-              <div><div className="text-xs font-bold uppercase tracking-wide text-emerald-300">DVP · registro de visita</div><h3 className="mt-1 text-lg font-extrabold text-white">{selectedLead.fullName}</h3><p className="mt-1 text-xs text-slate-400">{visitProperty.title}</p></div>
+              <div><div className="text-xs font-bold uppercase tracking-wide text-emerald-300">{t("DVP · registro de visita")}</div><h3 className="mt-1 text-lg font-extrabold text-white">{selectedLead.fullName}</h3><p className="mt-1 text-xs text-slate-400">{visitProperty.title}</p></div>
               <BotaoFechar onClick={fecharVisita} />
             </div>
-            <label className="block text-xs font-semibold text-slate-300">Data e horário da visita<input name="visitDate" type="datetime-local" required defaultValue={localDateTimeNow()} className={`${inputClass} mt-1`} /></label>
-            <label htmlFor="crm-visita-cpf" className="block text-xs font-semibold text-slate-300">CPF do cliente (fica mascarado — LGPD)<CpfParcialInput id="crm-visita-cpf" name="clientCpfPartial" className={`${inputClass} mt-1 font-mono`} /></label>
-            <p className="rounded-lg border border-amber-500/20 bg-amber-950/20 p-3 text-[11px] leading-relaxed text-slate-300">O registro fica como rascunho até ser validado e aceito pelas partes. Ele não equivale a assinatura eletrônica nem substitui orientação jurídica.</p>
-            {error && <p role="alert" className="text-xs text-rose-300">{error}</p>}
+            <label className="block text-xs font-semibold text-slate-300">{t("Data e horário da visita")}<input name="visitDate" type="datetime-local" required defaultValue={localDateTimeNow()} className={`${inputClass} mt-1`} /></label>
+            <label htmlFor="crm-visita-cpf" className="block text-xs font-semibold text-slate-300">{t("CPF do cliente (fica mascarado — LGPD)")}<CpfParcialInput id="crm-visita-cpf" name="clientCpfPartial" className={`${inputClass} mt-1 font-mono`} /></label>
+            <p className="rounded-lg border border-amber-500/20 bg-amber-950/20 p-3 text-[11px] leading-relaxed text-slate-300">{t("O registro fica como rascunho até ser validado e aceito pelas partes. Ele não equivale a assinatura eletrônica nem substitui orientação jurídica.")}</p>
+            {error && <p role="alert" className="text-xs text-rose-300">{t(error)}</p>}
             <div className="flex justify-end gap-2 border-t border-slate-800 pt-3">
-              <button type="button" onClick={fecharVisita} className="rounded-lg px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800">Cancelar</button>
-              <button disabled={busy || !!blockedReason} title={blockedReason || undefined} className="rounded-lg bg-emerald-500 px-3 py-2 text-xs font-bold text-slate-950 hover:bg-emerald-400 disabled:opacity-50">{busy ? "Registrando..." : "Criar registro de visita"}</button>
+              <button type="button" onClick={fecharVisita} className="rounded-lg px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800">{t("Cancelar")}</button>
+              <button disabled={busy || !!blockedReason} title={t(blockedReason) || undefined} className="rounded-lg bg-emerald-500 px-3 py-2 text-xs font-bold text-slate-950 hover:bg-emerald-400 disabled:opacity-50">{busy ? t("Registrando...") : t("Criar registro de visita")}</button>
             </div>
           </form>
         </div>
@@ -916,28 +920,28 @@ export default function LeadCRM({
         <div className="fixed inset-0 z-50 flex justify-end bg-black/70" onMouseDown={(event) => { if (event.target === event.currentTarget) fecharFichaDoLead(); }}>
           <aside className="flex h-full w-full max-w-xl flex-col border-l border-slate-700 bg-slate-950 shadow-2xl">
             <div className="flex items-start justify-between border-b border-slate-800 p-5">
-              <div className="min-w-0"><div className="text-xs font-bold uppercase tracking-wide text-amber-400">{LEAD_TYPE_LABELS[selectedLead.leadType] || selectedLead.leadType} · {LEAD_SOURCE_LABELS[selectedLead.source] || selectedLead.source}</div><h3 className="mt-1 truncate text-xl font-extrabold text-white">{selectedLead.fullName}</h3><a className="mt-1 inline-flex items-center gap-1.5 text-sm text-slate-300 hover:text-amber-300" href={`tel:${selectedLead.phone}`}><Phone className="h-3.5 w-3.5" />{selectedLead.phone}</a>{selectedLead.email && <div className="mt-1 text-xs text-slate-400">{selectedLead.email}</div>}</div>
+              <div className="min-w-0"><div className="text-xs font-bold uppercase tracking-wide text-amber-400">{t(LEAD_TYPE_LABELS[selectedLead.leadType]) || selectedLead.leadType} · {t(LEAD_SOURCE_LABELS[selectedLead.source]) || selectedLead.source}</div><h3 className="mt-1 truncate text-xl font-extrabold text-white">{selectedLead.fullName}</h3><a className="mt-1 inline-flex items-center gap-1.5 text-sm text-slate-300 hover:text-amber-300" href={`tel:${selectedLead.phone}`}><Phone className="h-3.5 w-3.5" />{selectedLead.phone}</a>{selectedLead.email && <div className="mt-1 text-xs text-slate-400">{selectedLead.email}</div>}</div>
               <div className="flex shrink-0 items-center gap-1">
-                <button onClick={() => { setEditingLead(selectedLead); setIsCreateOpen(false); setError(null); }} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-2.5 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white" aria-label="Editar lead"><Pencil className="h-3.5 w-3.5" />Editar</button>
+                <button onClick={() => { setEditingLead(selectedLead); setIsCreateOpen(false); setError(null); }} className="inline-flex items-center gap-1.5 rounded-lg border border-slate-700 px-2.5 py-1.5 text-xs font-semibold text-slate-300 hover:bg-slate-800 hover:text-white" aria-label={t("Editar lead")}><Pencil className="h-3.5 w-3.5" />{t("Editar")}</button>
                 <BotaoFechar onClick={fecharFichaDoLead} />
               </div>
             </div>
             <div className="flex-1 space-y-5 overflow-y-auto p-5">
               <div className="grid grid-cols-2 gap-3 rounded-xl border border-slate-800 bg-slate-900 p-4 text-xs">
-                <div><div className="text-slate-500">Orçamento máximo</div><div className="mt-1 font-semibold text-emerald-300">{money(selectedLead.maxBudget) || "Não informado"}</div></div>
-                <div><div className="text-slate-500">Busca</div><div className="mt-1 font-semibold text-slate-200">{[selectedLead.propertyType, selectedLead.city].filter(Boolean).join(" · ") || "Não informada"}</div></div>
-                <div className="col-span-2"><div className="text-slate-500">Bairros</div><div className="mt-1 font-semibold text-slate-200">{selectedLead.neighborhoods?.join(", ") || "Não informados"}</div></div>
-                <div><div className="text-slate-500">Último contato</div><div className="mt-1 font-semibold text-slate-200">{localDate(selectedLead.lastContactAt)}</div></div>
-                <div><div className="text-slate-500">Próximo retorno</div><div className="mt-1 font-semibold text-amber-300">{selectedLead.nextAction ? `${selectedLead.nextAction} · ${localDate(selectedLead.nextActionAt)}` : "Não agendado"}</div></div>
-              {selectedLead.notes && <div className="col-span-2 border-t border-slate-800 pt-3"><div className="text-slate-500">Observações</div><div className="mt-1 whitespace-pre-wrap text-slate-300">{selectedLead.notes}</div></div>}
-                {selectedLead.lostReason && <div className="col-span-2 border-t border-slate-800 pt-3"><div className="text-slate-500">Motivo da perda</div><div className="mt-1 text-slate-300">{selectedLead.lostReason}</div></div>}
+                <div><div className="text-slate-500">{t("Orçamento máximo")}</div><div className="mt-1 font-semibold text-emerald-300">{money(selectedLead.maxBudget, locale) || t("Não informado")}</div></div>
+                <div><div className="text-slate-500">{t("Busca")}</div><div className="mt-1 font-semibold text-slate-200">{[selectedLead.propertyType, selectedLead.city].filter(Boolean).join(" · ") || t("Não informada")}</div></div>
+                <div className="col-span-2"><div className="text-slate-500">{t("Bairros")}</div><div className="mt-1 font-semibold text-slate-200">{selectedLead.neighborhoods?.join(", ") || t("Não informados")}</div></div>
+                <div><div className="text-slate-500">{t("Último contato")}</div><div className="mt-1 font-semibold text-slate-200">{localDate(selectedLead.lastContactAt, locale)}</div></div>
+                <div><div className="text-slate-500">{t("Próximo retorno")}</div><div className="mt-1 font-semibold text-amber-300">{selectedLead.nextAction ? `${selectedLead.nextAction} · ${localDate(selectedLead.nextActionAt, locale)}` : t("Não agendado")}</div></div>
+              {selectedLead.notes && <div className="col-span-2 border-t border-slate-800 pt-3"><div className="text-slate-500">{t("Observações")}</div><div className="mt-1 whitespace-pre-wrap text-slate-300">{selectedLead.notes}</div></div>}
+                {selectedLead.lostReason && <div className="col-span-2 border-t border-slate-800 pt-3"><div className="text-slate-500">{t("Motivo da perda")}</div><div className="mt-1 text-slate-300">{selectedLead.lostReason}</div></div>}
               </div>
 
               {selectedLead.leadType !== "parceiro" && selectedLead.leadType !== "proprietario" && (
                 <section className="space-y-3">
                   <div className="flex items-center justify-between gap-3">
-                    <h4 className="flex items-center gap-2 text-sm font-bold text-white"><Building2 className="h-4 w-4 text-amber-400" />Imóveis compatíveis</h4>
-                    <span className="text-[11px] text-slate-500">Vitrine · até 5 resultados</span>
+                    <h4 className="flex items-center gap-2 text-sm font-bold text-white"><Building2 className="h-4 w-4 text-amber-400" />{t("Imóveis compatíveis")}</h4>
+                    <span className="text-[11px] text-slate-500">{t("Vitrine · até 5 resultados")}</span>
                   </div>
                   {matchedProperties.length ? matchedProperties.map(({ property, score, reasons, typeMatches, neighborhoodMatches }) => (
                     <article key={property.id} className="flex gap-3 rounded-xl border border-slate-800 bg-slate-900 p-3">
@@ -945,17 +949,17 @@ export default function LeadCRM({
                       <div className="min-w-0 flex-1">
                         <div className="truncate text-xs font-bold text-white">{property.title}</div>
                         <div className="mt-1 flex items-center gap-1 text-[11px] text-slate-400"><MapPin className="h-3 w-3" />{property.neighborhood} · {property.city}</div>
-                        <div className="mt-1 text-[11px] font-semibold text-emerald-300">{money(property.salePrice)} · {property.bedrooms} {property.bedrooms === 1 ? "quarto" : "quartos"} · critérios atendidos {score}%</div>
-                        <details className="mt-1.5 text-[10px] text-slate-400"><summary className="cursor-pointer font-semibold text-sky-300">Ver como calculamos</summary><ul className="mt-1 list-inside list-disc space-y-0.5">{reasons.map((reason) => <li key={reason}>{reason}</li>)}{selectedLead.propertyType && !typeMatches && <li>Tipo diferente do informado ({property.propertyType})</li>}{selectedLead.neighborhoods.length && !neighborhoodMatches ? <li>Fora dos bairros preferidos; cidade e demais critérios coincidem</li> : null}</ul><p className="mt-1">Compatibilidade é uma comparação simples das preferências preenchidas; confirme detalhes com o captador.</p></details>
+                        <div className="mt-1 text-[11px] font-semibold text-emerald-300">{money(property.salePrice, locale)} · {property.bedrooms} {property.bedrooms === 1 ? t("quarto") : t("quartos")} {t("· critérios atendidos")}{" "}{score}%</div>
+                        <details className="mt-1.5 text-[10px] text-slate-400"><summary className="cursor-pointer font-semibold text-sky-300">{t("Ver como calculamos")}</summary><ul className="mt-1 list-inside list-disc space-y-0.5">{reasons.map((reason) => <li key={reason}>{reason}</li>)}{selectedLead.propertyType && !typeMatches && <li>{t("Tipo diferente do informado (")}{t(property.propertyType)})</li>}{selectedLead.neighborhoods.length && !neighborhoodMatches ? <li>{t("Fora dos bairros preferidos; cidade e demais critérios coincidem")}</li> : null}</ul><p className="mt-1">{t("Compatibilidade é uma comparação simples das preferências preenchidas; confirme detalhes com o captador.")}</p></details>
                       </div>
                       <div className="flex shrink-0 flex-col gap-1.5 self-center">
-                        {(property.purpose || "venda") === "venda" && <button type="button" onClick={() => { setDocumentationProperty(property); document.getElementById("negotiation-documents")?.scrollIntoView({behavior: "smooth"}); }} className="rounded-lg border border-sky-700 px-2.5 py-1.5 text-[10px] font-bold text-sky-300">Preparar documentação</button>}
-                        <button type="button" onClick={() => onOpenProperty(property.id)} className="rounded-lg border border-slate-700 px-2.5 py-1.5 text-[10px] font-bold text-amber-300 hover:bg-slate-800">Abrir na Vitrine</button>
-                        {property.acceptsPartnership && property.brokerId !== currentUserId && currentUserId && <button type="button" onClick={() => { setVisitProperty(property); setError(null); }} className="rounded-lg bg-emerald-500/15 px-2.5 py-1.5 text-[10px] font-bold text-emerald-300 hover:bg-emerald-500/25">Registrar visita</button>}
+                        {(property.purpose || "venda") === "venda" && <button type="button" onClick={() => { setDocumentationProperty(property); document.getElementById("negotiation-documents")?.scrollIntoView({behavior: "smooth"}); }} className="rounded-lg border border-sky-700 px-2.5 py-1.5 text-[10px] font-bold text-sky-300">{t("Preparar documentação")}</button>}
+                        <button type="button" onClick={() => onOpenProperty(property.id)} className="rounded-lg border border-slate-700 px-2.5 py-1.5 text-[10px] font-bold text-amber-300 hover:bg-slate-800">{t("Abrir na Vitrine")}</button>
+                        {property.acceptsPartnership && property.brokerId !== currentUserId && currentUserId && <button type="button" onClick={() => { setVisitProperty(property); setError(null); }} className="rounded-lg bg-emerald-500/15 px-2.5 py-1.5 text-[10px] font-bold text-emerald-300 hover:bg-emerald-500/25">{t("Registrar visita")}</button>}
                       </div>
                     </article>
                   )) : (
-                    <p className="rounded-xl border border-dashed border-slate-700 px-4 py-5 text-center text-xs text-slate-500">Nenhum imóvel disponível atende aos critérios atuais deste lead. Revise as preferências ou confira a Vitrine.</p>
+                    <p className="rounded-xl border border-dashed border-slate-700 px-4 py-5 text-center text-xs text-slate-500">{t("Nenhum imóvel disponível atende aos critérios atuais deste lead. Revise as preferências ou confira a Vitrine.")}</p>
                   )}
                 </section>
               )}
@@ -963,32 +967,32 @@ export default function LeadCRM({
               {["comprador", "proprietario"].includes(selectedLead.leadType) && <div id="negotiation-documents"><NegotiationDocumentation key={`${selectedLead.id}-${documentationProperty?.id || "default"}`} lead={{...selectedLead, documentation: documentationProperty ? {...(selectedLead.documentation || {city: "", financing: false, fgts: false, statuses: {}, costs: [0,0,0,0,0,0]}), propertyId: documentationProperty.id, propertyTitle: documentationProperty.title, city: documentationProperty.city} : selectedLead.documentation}} properties={properties} chosenProperty={documentationProperty} onSaved={documentation => {setLeads(current => current.map(lead => lead.id === selectedLead.id ? {...lead, documentation} : lead)); setDocumentationProperty(undefined);}} /></div>}
 
               <form onSubmit={submitActivity} className="space-y-3 rounded-xl border border-slate-800 bg-slate-900 p-4">
-                <h4 className="text-sm font-bold text-white">Registrar contato e próxima ação</h4>
+                <h4 className="text-sm font-bold text-white">{t("Registrar contato e próxima ação")}</h4>
                 <div className="grid grid-cols-2 gap-2">
-                  <select name="activityType" className={selectClass}>{activityTypes.map(([value, label]) => <option key={value} value={value}>{label}</option>)}</select>
-                  <input name="nextAction" maxLength={160} className={inputClass} placeholder="Próxima ação" />
+                  <select name="activityType" className={selectClass}>{activityTypes.map(([value, label]) => <option key={value} value={value}>{t(label)}</option>)}</select>
+                  <input name="nextAction" maxLength={160} className={inputClass} placeholder={t("Próxima ação")} />
                 </div>
-                <input name="nextActionAt" type="datetime-local" className={inputClass} aria-label="Data do próximo retorno" />
-                <textarea name="description" required minLength={2} maxLength={2000} rows={2} className={`${inputClass} resize-y`} placeholder="O que aconteceu neste contato?" />
-                {error && <p role="alert" className="text-xs text-rose-300">{error}</p>}
-                <button disabled={busy} className="rounded-lg bg-slate-800 px-3 py-2 text-xs font-bold text-white hover:bg-slate-700 disabled:opacity-50">{busy ? "Salvando..." : "Salvar na linha do tempo"}</button>
+                <input name="nextActionAt" type="datetime-local" className={inputClass} aria-label={t("Data do próximo retorno")} />
+                <textarea name="description" required minLength={2} maxLength={2000} rows={2} className={`${inputClass} resize-y`} placeholder={t("O que aconteceu neste contato?")} />
+                {error && <p role="alert" className="text-xs text-rose-300">{t(error)}</p>}
+                <button disabled={busy} className="rounded-lg bg-slate-800 px-3 py-2 text-xs font-bold text-white hover:bg-slate-700 disabled:opacity-50">{busy ? t("Salvando...") : t("Salvar na linha do tempo")}</button>
               </form>
 
               <div>
-                <h4 className="mb-3 flex items-center gap-2 text-sm font-bold text-white"><Clock3 className="h-4 w-4 text-amber-400" /> Histórico</h4>
+                <h4 className="mb-3 flex items-center gap-2 text-sm font-bold text-white"><Clock3 className="h-4 w-4 text-amber-400" /> {t("Histórico")}</h4>
                 <div className="space-y-3">
                   {activities.filter((activity) => activity.leadId === selectedLead.id).map((activity) => (
                     <div key={activity.id} className="relative border-l border-slate-700 pl-4">
                       <span className="absolute -left-1 top-1 h-2 w-2 rounded-full bg-amber-500" />
-                      <div className="flex items-center justify-between gap-2"><span className="text-xs font-bold capitalize text-slate-200">{activity.activityType.replaceAll("_", " ")}</span><time className="text-[10px] text-slate-500">{new Date(activity.occurredAt).toLocaleString("pt-BR", { dateStyle: "short", timeStyle: "short" })}</time></div>
+                      <div className="flex items-center justify-between gap-2"><span className="text-xs font-bold capitalize text-slate-200">{activity.activityType.replaceAll("_", " ")}</span><time className="text-[10px] text-slate-500">{new Date(activity.occurredAt).toLocaleString(locale, { dateStyle: "short", timeStyle: "short" })}</time></div>
                       <p className="mt-1 whitespace-pre-wrap text-xs text-slate-400">{activity.description}</p>
                     </div>
                   ))}
-                  {activities.every((activity) => activity.leadId !== selectedLead.id) && <p className="text-xs text-slate-500">Nenhuma atividade registrada.</p>}
+                  {activities.every((activity) => activity.leadId !== selectedLead.id) && <p className="text-xs text-slate-500">{t("Nenhuma atividade registrada.")}</p>}
                 </div>
               </div>
             </div>
-            <div className="flex items-center gap-2 border-t border-slate-800 p-4 text-xs text-slate-500"><CheckCircle2 className="h-4 w-4 text-emerald-500" /> Dados privados da sua carteira</div>
+            <div className="flex items-center gap-2 border-t border-slate-800 p-4 text-xs text-slate-500"><CheckCircle2 className="h-4 w-4 text-emerald-500" /> {t("Dados privados da sua carteira")}</div>
           </aside>
         </div>
       )}

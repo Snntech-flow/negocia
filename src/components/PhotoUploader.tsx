@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "./I18nProvider";
+
 import { useEffect, useState } from "react";
 import { ImagePlus } from "lucide-react";
 import { getPhotoUploadStatus, uploadPropertyPhoto } from "@/lib/actions/photos";
@@ -23,6 +25,8 @@ async function prepare(file: File) {
 }
 
 export default function PhotoUploader({ remaining, onUploaded, label = "Enviar fotos" }: { remaining: number; onUploaded: (urls: string[]) => void; label?: string }) {
+  const { t } = useI18n();
+
   const [enabled, setEnabled] = useState<boolean | null>(null);
   const [status, setStatus] = useState("");
   const [error, setError] = useState("");
@@ -61,13 +65,13 @@ export default function PhotoUploader({ remaining, onUploaded, label = "Enviar f
     }
   }
 
-  if (enabled === false) return <p className="text-[11px] text-slate-500">O envio direto de fotos ainda não foi ativado. Cole o link (URL HTTPS) de cada foto.</p>;
+  if (enabled === false) return <p className="text-[11px] text-slate-500">{t("O envio direto de fotos ainda não foi ativado. Cole o link (URL HTTPS) de cada foto.")}</p>;
   return <div className="space-y-1">
     <label className={`inline-flex cursor-pointer items-center gap-2 rounded-xl border border-dashed border-amber-500 px-4 py-2.5 text-xs font-bold text-amber-700 hover:bg-amber-50 ${busy || enabled === null || remaining <= 0 ? "pointer-events-none opacity-50" : ""}`}>
-      <ImagePlus className="h-4 w-4" />{busy ? "Enviando…" : label}
+      <ImagePlus className="h-4 w-4" />{busy ? t("Enviando…") : t(label)}
       <input type="file" accept="image/jpeg,image/png,image/webp,image/heic,image/heif" multiple className="sr-only" disabled={busy || !enabled || remaining <= 0} onChange={(event) => { void send(event.target.files); event.currentTarget.value = ""; }} />
     </label>
     {status && <p role="status" className="text-[11px] text-emerald-700">{status}</p>}
-    {error && <p role="alert" className="text-[11px] text-red-700">{error}</p>}
+    {error && <p role="alert" className="text-[11px] text-red-700">{t(error)}</p>}
   </div>;
 }

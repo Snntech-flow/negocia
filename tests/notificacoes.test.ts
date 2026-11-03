@@ -13,7 +13,7 @@ test("🔴 o painel de notificações é escuro (preto desde 29/10/2026) com a l
   assert.match(painel, /^data-painel-notificacoes="" className="[^"]*bg-\[#131315\] text-\[#f59e0b\]/);
   assert.match(painel, /notif\.read \? "bg-\[#131315\][^"]*" : "bg-\[#19191c\] border-l-4 border-\[#f59e0b\]/, "lida: escuro; não lida: um tom acima com faixa laranja");
   assert.match(painel, /<span className="text-sm font-bold text-\[#f59e0b\] flex items-center gap-1\.5">\{!notif\.read/, "título laranja");
-  assert.match(painel, /<p className="text-\[13px\] font-medium text-\[#fbbf24\] leading-relaxed">\{notif\.message\}<\/p>/, "mensagem laranja-claro");
+  assert.match(painel, /<p className="text-\[13px\] font-medium text-\[#fbbf24\] leading-relaxed">\{t\(notif\.message\)\}<\/p>/, "mensagem laranja-claro");
   assert.doesNotMatch(painel, /bg-\[#f59e0b\] text-\[#131315\]|bg-\[#fcd34d\]/, "o quadro laranja saiu");
 });
 

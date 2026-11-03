@@ -1,4 +1,7 @@
 "use client";
+
+import { useI18n } from "./I18nProvider";
+
 // Termo de Parceria de cada parceria: o corretor lê o texto gerado com os dados da parceria, aceita, acompanha o aceite do
 // outro e imprime / salva em PDF. O servidor confere o texto aceito (impressão sha-256) e grava data, hora e IP.
 import { useCallback, useEffect, useState } from "react";
@@ -8,7 +11,7 @@ import { acceptPartnershipTerm, listMyPartnershipTerms, type TermoDaParceria } f
 import { unwrap } from "@/lib/action-result";
 import { blocosDoTermo, type SituacaoDaParte, type SituacaoDoTermo } from "@/lib/partnership-term";
 
-const quando = (data: Date) => new Date(data).toLocaleString("pt-BR", { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" });
+const quando = (data: Date, locale = "pt-BR") => new Date(data).toLocaleString(locale, { timeZone: "America/Sao_Paulo", dateStyle: "short", timeStyle: "short" });
 
 function situacaoDaLista(item: TermoDaParceria): { texto: string; cor: string } {
   if (item.termo?.assinado) return { texto: "Termo assinado", cor: "border-emerald-500/40 text-emerald-300" };
@@ -61,6 +64,8 @@ function imprimir(item: TermoDaParceria, termo: SituacaoDoTermo): boolean {
 }
 
 export default function PartnershipTerms() {
+  const { t } = useI18n();
+
   const [itens, setItens] = useState<TermoDaParceria[] | null>(null);
   const [erro, setErro] = useState("");
   const [escolhida, setEscolhida] = useState<string | null>(null);
@@ -103,24 +108,22 @@ export default function PartnershipTerms() {
   return (
     <div className="max-w-3xl mx-auto space-y-6">
       <div>
-        <h2 className="text-xl font-bold text-white flex items-center gap-2"><Scale className="w-5 h-5 text-amber-500" />Termo de Parceria</h2>
+        <h2 className="text-xl font-bold text-white flex items-center gap-2"><Scale className="w-5 h-5 text-amber-500" />{t("Termo de Parceria")}</h2>
         <p className="text-sm text-slate-400">
-          Cada parceria com a divisão da comissão confirmada pelos dois corretores tem o seu termo, com cláusula de não atravessamento.
-          Cada um lê e aceita aqui; com os dois aceites o termo fica assinado (assinatura eletrônica simples) e pode ser impresso ou salvo em PDF.
-        </p>
+          {t("Cada parceria com a divisão da comissão confirmada pelos dois corretores tem o seu termo, com cláusula de não atravessamento. Cada um lê e aceita aqui; com os dois aceites o termo fica assinado (assinatura eletrônica simples) e pode ser impresso ou salvo em PDF.")}</p>
       </div>
 
-      {erro && <p role="alert" className="rounded-xl border border-rose-500/40 bg-rose-950/30 p-4 text-sm text-rose-300">{erro}</p>}
-      {!itens && !erro && <p className="text-sm text-slate-400">Carregando os termos…</p>}
+      {erro && <p role="alert" className="rounded-xl border border-rose-500/40 bg-rose-950/30 p-4 text-sm text-rose-300">{t(erro)}</p>}
+      {!itens && !erro && <p className="text-sm text-slate-400">{t("Carregando os termos…")}</p>}
       {itens && itens.length === 0 && (
         <div className="rounded-xl border border-dashed border-slate-700 px-5 py-6 text-center">
-          <p className="text-sm font-semibold text-white">Você ainda não tem parcerias.</p>
-          <p className="mx-auto mt-2 max-w-lg text-xs leading-relaxed text-slate-400">A parceria nasce quando um corretor registra a visita a um imóvel de outro (Documentos › Registro de Visita). Depois que os dois confirmam a divisão da comissão, o termo aparece aqui.</p>
+          <p className="text-sm font-semibold text-white">{t("Você ainda não tem parcerias.")}</p>
+          <p className="mx-auto mt-2 max-w-lg text-xs leading-relaxed text-slate-400">{t("A parceria nasce quando um corretor registra a visita a um imóvel de outro (Documentos › Registro de Visita). Depois que os dois confirmam a divisão da comissão, o termo aparece aqui.")}</p>
         </div>
       )}
 
       {itens && itens.length > 0 && (
-        <ul className="space-y-2" aria-label="Parcerias">
+        <ul className="space-y-2" aria-label={t("Parcerias")}>
           {itens.map((i) => {
             const s = situacaoDaLista(i);
             const atual = i.id === escolhida;
@@ -130,9 +133,9 @@ export default function PartnershipTerms() {
                   className={`flex w-full flex-wrap items-center justify-between gap-2 rounded-xl border p-3 text-left ${atual ? "border-amber-500 ring-2 ring-amber-500/40" : "border-slate-800 hover:border-slate-600"}`}>
                   <span className="min-w-0">
                     <span className="block truncate text-sm font-semibold text-white">{i.imovel}</span>
-                    <span className="block text-[11px] text-slate-400">Parceria {i.codigo} · {i.souCaptador ? `você capta; parceiro: ${i.parceiro}` : `captador: ${i.captador}; você é o parceiro`}</span>
+                    <span className="block text-[11px] text-slate-400">{t("Parceria")}{" "}{i.codigo} · {i.souCaptador ? t("você capta; parceiro: {0}", [i.parceiro]) : t("captador: {0}; você é o parceiro", [i.captador])}</span>
                   </span>
-                  <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-bold ${s.cor}`}>{s.texto}</span>
+                  <span className={`shrink-0 rounded-full border px-2.5 py-1 text-[10px] font-bold ${s.cor}`}>{t(s.texto)}</span>
                 </button>
               </li>
             );
@@ -145,34 +148,30 @@ export default function PartnershipTerms() {
       {item && !termo && (
         <div className="space-y-3 rounded-xl border border-slate-700 p-4">
           <p className="text-sm text-slate-300">
-            {item.status === "recusado"
-              ? "Esta parceria foi recusada; não há termo."
-              : item.divisao === "nao_registrada"
-                ? "Esta parceria não tem divisão da comissão registrada. Revise a divisão em Documentos › Registro de Visita, no acompanhamento da parceria; com os dois de acordo, o termo aparece aqui."
-                : "O termo sai quando os dois corretores confirmam a divisão da comissão (Documentos › Registro de Visita, no acompanhamento da parceria)."}
+            {item.status === "recusado" ? t("Esta parceria foi recusada; não há termo.") : item.divisao === "nao_registrada" ? t("Esta parceria não tem divisão da comissão registrada. Revise a divisão em Documentos › Registro de Visita, no acompanhamento da parceria; com os dois de acordo, o termo aparece aqui.") : t("O termo sai quando os dois corretores confirmam a divisão da comissão (Documentos › Registro de Visita, no acompanhamento da parceria).")}
           </p>
-          {item.status !== "recusado" && <Link href={`/dvp#parceria-${item.id}`} className="inline-flex rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold text-slate-950">Ver e confirmar a divisão da comissão</Link>}
+          {item.status !== "recusado" && <Link href={`/dvp#parceria-${item.id}`} className="inline-flex rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold text-slate-950">{t("Ver e confirmar a divisão da comissão")}</Link>}
         </div>
       )}
 
       {item && termo && (
         <>
           <article className="bg-slate-900 rounded-2xl border border-slate-800 p-6 space-y-4">
-            {!termo.assinado && <p className="rounded-lg border border-amber-500/40 bg-amber-950/20 p-2 text-center text-[11px] font-bold text-amber-300">Rascunho até os dois corretores aceitarem.</p>}
+            {!termo.assinado && <p className="rounded-lg border border-amber-500/40 bg-amber-950/20 p-2 text-center text-[11px] font-bold text-amber-300">{t("Rascunho até os dois corretores aceitarem.")}</p>}
             {blocosDoTermo(termo.texto).map((bloco, i) => i === 0
               ? <h3 key={i} className="text-center text-sm font-bold uppercase tracking-wide text-white">{bloco.texto}</h3>
               : i === 1
                 ? <p key={i} className="text-center text-[11px] text-slate-400">{bloco.texto}</p>
                 : <section key={i}>{bloco.titulo && <h4 className="text-sm font-bold text-white">{bloco.titulo}</h4>}<p className="whitespace-pre-line text-sm leading-relaxed text-slate-300">{bloco.texto}</p></section>)}
             <section className="space-y-2 border-t border-slate-800 pt-4">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-white">Registro dos aceites</h4>
+              <h4 className="text-xs font-bold uppercase tracking-wider text-white">{t("Registro dos aceites")}</h4>
               {([["CAPTADOR", item.captador, termo.captador], ["PARCEIRO", item.parceiro, termo.parceiro]] as const).map(([papel, nome, s]) => (
                 <p key={papel} className="flex items-start gap-2 text-xs text-slate-300">
                   {s.situacao === "aceito" ? <CheckCircle2 className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" /> : <Clock className="mt-0.5 h-4 w-4 shrink-0 text-amber-400" />}
-                  <span><strong>{papel}</strong> — {nome}: {textoDaParte(s)}</span>
+                  <span><strong>{papel}</strong> — {t(nome)}: {t(textoDaParte(s))}</span>
                 </p>
               ))}
-              <p className="break-all font-mono text-[10px] text-slate-500">Impressão sha-256 do texto: {termo.impressao}</p>
+              <p className="break-all font-mono text-[10px] text-slate-500">{t("Impressão sha-256 do texto:")}{" "}{termo.impressao}</p>
             </section>
           </article>
 
@@ -181,22 +180,21 @@ export default function PartnershipTerms() {
               <div className="flex-1 space-y-2 rounded-xl border border-amber-500/40 bg-amber-950/20 p-4">
                 <label className="flex items-start gap-2 text-sm text-slate-300">
                   <input type="checkbox" className="mt-1" checked={li} onChange={(e) => setLi(e.target.checked)} />
-                  <span>Li o termo inteiro e aceito as cláusulas acima.</span>
+                  <span>{t("Li o termo inteiro e aceito as cláusulas acima.")}</span>
                 </label>
-                <p className="text-[11px] text-slate-400">Ao aceitar, a NegociaLar registra a data, a hora, o endereço IP e a impressão deste texto (cláusula 7).</p>
+                <p className="text-[11px] text-slate-400">{t("Ao aceitar, a NegociaLar registra a data, a hora, o endereço IP e a impressão deste texto (cláusula 7).")}</p>
                 <button type="button" disabled={!li || ocupado} onClick={() => void aceitar()} className="rounded-lg bg-amber-500 px-4 py-2 text-sm font-bold text-slate-950 disabled:opacity-50">
-                  {ocupado ? "Registrando…" : "Aceitar o termo"}
+                  {ocupado ? t("Registrando…") : t("Aceitar o termo")}
                 </button>
               </div>
             )}
             <button type="button" onClick={() => { if (!imprimir(item, termo)) setMensagem("Permita a abertura da janela para imprimir."); }}
               className="inline-flex items-center gap-2 rounded-lg border border-slate-600 px-3 py-2 text-xs font-semibold text-slate-300">
-              <Printer className="h-4 w-4" />Imprimir / salvar PDF
-            </button>
+              <Printer className="h-4 w-4" />{t("Imprimir / salvar PDF")}</button>
           </div>
         </>
       )}
-      {mensagem && <p role="status" className="text-sm text-amber-300">{mensagem}</p>}
+      {mensagem && <p role="status" className="text-sm text-amber-300">{t(mensagem)}</p>}
     </div>
   );
 }

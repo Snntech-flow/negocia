@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "./I18nProvider";
+
 import { Building2, ShieldCheck, Search, PlusCircle, Lock, Image as ImageIcon, MapPin, Bed, Bath, Car, Maximize2, CheckCircle2, Pencil, Share2, Stamp } from "lucide-react";
 import { rotuloDaCondicao } from "@/lib/partnership-models";
 import { PROPERTY_PAGE_SIZE } from "@/lib/marketplace-query";
@@ -21,6 +23,8 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
   setPropertyPage: (value: number) => void; onCreate: () => void; blockedReason?: string | null; onShare: (property: Property) => void; onSchedule: (property: Property) => void;
   onEdit?: (property: Property) => void;
 }) {
+  const { t, locale } = useI18n();
+
   // Fotos em tela cheia (14/10/2026): a foto do cartão e o selo "N fotos" abrem a galeria.
   const [galeria, setGaleria] = useState<{ fotos: string[]; indice: number; titulo: string } | null>(null);
   const fecharGaleria = useCallback(() => setGaleria(null), []);
@@ -29,22 +33,20 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
     const fotos = fotosComCapaNaFrente(prop.photos || [], prop.coverPhoto);
     if (fotos.length) setGaleria({ fotos, indice: 0, titulo: prop.title });
   };
-  const formatBRL = (value: string) => Number(value).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-  const area = (value: string) => Number(value).toLocaleString("pt-BR", { maximumFractionDigits: 2 });
+  const formatBRL = (value: string) => Number(value).toLocaleString(locale, { style: "currency", currency: "BRL" });
+  const area = (value: string) => Number(value).toLocaleString(locale, { maximumFractionDigits: 2 });
   return (
 <div className="space-y-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
               <div>
                 <h2 className="text-xl font-bold text-white flex items-center gap-2">
                   <Building2 className="w-5 h-5 text-orange-700" />
-                  Imóveis Disponíveis para Parceria
-                </h2>
-            <p className="text-sm text-slate-400">Todo imóvel desta vitrine aceita parceria, na condição que o captador informou em cada um: só 50/50, só 40/40/20 ou as duas.</p>
+                  {t("Imóveis Disponíveis para Parceria")}</h2>
+            <p className="text-sm text-slate-400">{t("Todo imóvel desta vitrine aceita parceria, na condição que o captador informou em cada um: só 50/50, só 40/40/20 ou as duas.")}</p>
               </div>
               <div className="flex items-center gap-2 text-xs text-slate-300 bg-slate-900 border border-slate-800 px-3 py-2 rounded-lg">
                 <ShieldCheck className="w-4 h-4 text-emerald-400" />
-                Endereço completo visível só para o captador
-              </div>
+                {t("Endereço completo visível só para o captador")}</div>
             </div>
 
             {/* BARRA DE FILTROS DA VITRINE MLS */}
@@ -67,7 +69,7 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
                           : "text-slate-900 hover:bg-slate-800"
                       }`}
                     >
-                      {tab.label}
+                      {t(tab.label)}
                     </button>
                   ))}
                 </div>
@@ -75,12 +77,12 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
                 {/* Filtro por Tipo de Imóvel */}
                 <div className="flex flex-col gap-2 sm:flex-row sm:items-center">
                   <select
-                    aria-label="Tipo de imóvel"
+                    aria-label={t("Tipo de imóvel")}
                     value={propertyFilterType}
                     onChange={(e) => setPropertyFilterType(e.target.value)}
                     className="bg-slate-950 border border-slate-800 rounded-xl px-3 py-1.5 text-xs text-white focus:outline-none focus:border-amber-500"
                   >
-                    <option value="todos">Todos os tipos</option>
+                    <option value="todos">{t("Todos os tipos")}</option>
                     {propertyTypes.map((t) => (
                       <option key={t} value={t}>
                         {t}
@@ -96,8 +98,8 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
                       value={propertyFilterSearch}
                       onChange={(e) => setPropertyFilterSearch(e.target.value)}
                       maxLength={200}
-                      aria-label="Buscar imóveis"
-                      placeholder="Bairro, condomínio, cidade..."
+                      aria-label={t("Buscar imóveis")}
+                      placeholder={t("Bairro, condomínio, cidade...")}
                       className="bg-slate-950 border border-slate-800 rounded-xl pl-8 pr-3 py-1.5 text-xs text-white placeholder-slate-500 focus:outline-none focus:border-amber-500 w-full sm:w-56"
                     />
                   </div>
@@ -105,29 +107,27 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
               </div>
             </div>
 
-            {loading ? <p role="status" className="rounded-xl border border-slate-700 bg-slate-900 p-6 text-sm text-slate-300">Carregando imóveis...</p> : properties.length === 0 ? (
+            {loading ? <p role="status" className="rounded-xl border border-slate-700 bg-slate-900 p-6 text-sm text-slate-300">{t("Carregando imóveis...")}</p> : properties.length === 0 ? (
               <div className="bg-slate-900 border border-slate-800 rounded-3xl p-12 text-center max-w-xl mx-auto space-y-4 shadow-2xl">
                 <div className="w-16 h-16 rounded-2xl bg-amber-500/10 border border-amber-500/30 flex items-center justify-center text-orange-700 mx-auto">
                   <Building2 className="w-8 h-8" />
                 </div>
                 <div className="space-y-1">
-                  <h3 className="text-lg font-bold text-white">Nenhum Imóvel Encontrado</h3>
+                  <h3 className="text-lg font-bold text-white">{t("Nenhum Imóvel Encontrado")}</h3>
                   <p className="text-xs text-slate-400">
-                    {properties.length === 0
-                      ? "Nenhum imóvel disponível para os filtros selecionados. Cadastre um imóvel ou ajuste a busca."
-                      : "Nenhum imóvel corresponde aos filtros selecionados. Tente alterar o tipo ou a finalidade."}
+                    {properties.length === 0 ? t("Nenhum imóvel disponível para os filtros selecionados. Cadastre um imóvel ou ajuste a busca.") : t("Nenhum imóvel corresponde aos filtros selecionados. Tente alterar o tipo ou a finalidade.")}
                   </p>
                 </div>
                 {!propertyFilterSearch && propertyFilterPurpose === "todos" && propertyFilterType === "todos" ? (
                   <button
                     type="button"
                     disabled={!!blockedReason}
-                    title={blockedReason || undefined}
+                    title={t(blockedReason) || undefined}
                     onClick={onCreate}
                     className="bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs py-3 px-6 rounded-xl transition inline-flex items-center gap-2 shadow-lg shadow-amber-500/20 disabled:cursor-not-allowed disabled:opacity-50"
                   >
                     <PlusCircle className="w-4 h-4" />
-                    <span>Cadastrar imóvel</span>
+                    <span>{t("Cadastrar imóvel")}</span>
                   </button>
                 ) : (
                   <button
@@ -138,8 +138,7 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
                     }}
                     className="text-orange-700 hover:underline text-xs font-semibold"
                   >
-                    Limpar todos os filtros
-                  </button>
+                    {t("Limpar todos os filtros")}</button>
                 )}
               </div>
             ) : (
@@ -153,46 +152,44 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
                     <div>
                       {/* Imagem principal com badges */}
                       <div className="relative h-64 w-full bg-slate-950 overflow-hidden">
-                        {prop.coverPhoto || prop.photos[0] ? <button type="button" onClick={() => abrirFotos(prop)} aria-label={`Ver as fotos de ${prop.title}`} className="block h-full w-full cursor-zoom-in"><img
+                        {prop.coverPhoto || prop.photos[0] ? <button type="button" onClick={() => abrirFotos(prop)} aria-label={t("Ver as fotos de {0}", [prop.title])} className="block h-full w-full cursor-zoom-in"><img
                           src={prop.coverPhoto || prop.photos[0]}
                           loading="lazy"
                           alt={prop.title}
                           className="w-full h-full object-cover"
-                        /></button> : <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-slate-400"><ImageIcon className="h-10 w-10" /><span className="text-xs">Sem fotos cadastradas</span></div>}
+                        /></button> : <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-slate-400"><ImageIcon className="h-10 w-10" /><span className="text-xs">{t("Sem fotos cadastradas")}</span></div>}
                         <div className="absolute top-3 left-3 flex flex-wrap gap-1.5 max-w-[85%]">
                           <span className="bg-amber-500 text-slate-950 text-xs font-black px-2.5 py-1 rounded-md shadow-lg flex items-center gap-1">
-                            {prop.acceptsPartnership ? rotuloDaCondicao(prop.partnershipModels) : "Fora da rede"}
+                            {prop.acceptsPartnership ? t(rotuloDaCondicao(prop.partnershipModels)) : t("Fora da rede")}
                           </span>
                           <span className="bg-slate-900/90 backdrop-blur text-white text-xs font-medium px-2.5 py-1 rounded-md border border-slate-700">
-                            {prop.propertyType}
+                            {t(prop.propertyType)}
                           </span>
                           {prop.purpose && prop.purpose !== "venda" && (
                             <span className="bg-blue-600/90 backdrop-blur text-white text-[11px] font-bold px-2 py-0.5 rounded-md uppercase">
-                              {optionLabel(PURPOSES, prop.purpose) || prop.purpose}
+                              {t(optionLabel(PURPOSES, prop.purpose)) || prop.purpose}
                             </span>
                           )}
                           {prop.acceptsTrade && (
                             <span className="bg-purple-600/90 backdrop-blur text-white text-[11px] font-bold px-2 py-0.5 rounded-md">
-                              🔄 Aceita Permuta
-                            </span>
+                              {t("🔄 Aceita Permuta")}</span>
                           )}
                           {prop.condition && prop.condition !== "usado" && (
                             <span className="bg-emerald-700/90 backdrop-blur text-white text-[11px] font-bold px-2 py-0.5 rounded-md capitalize">
-                              {optionLabel(CONDITIONS, prop.condition) || prop.condition}
-                              {prop.deliveryForecast ? ` · entrega ${previsaoParaTela(prop.deliveryForecast)}` : ""}
+                              {t(optionLabel(CONDITIONS, prop.condition)) || prop.condition}
+                              {prop.deliveryForecast ? t(" · entrega {0}", [previsaoParaTela(prop.deliveryForecast)]) : ""}
                             </span>
                           )}
                         </div>
 
                         <div className="absolute bottom-3 left-3 bg-slate-950/80 backdrop-blur px-3 py-1 rounded-lg border border-slate-800 text-xs flex items-center gap-1 text-slate-300">
                           <Lock className="w-3.5 h-3.5 text-orange-700" />
-                          Endereço só com o captador
-                        </div>
+                          {t("Endereço só com o captador")}</div>
 
                         {prop.photos && prop.photos.length > 0 && (
                           <button type="button" onClick={() => abrirFotos(prop)} className="absolute bottom-3 right-3 bg-slate-950/80 backdrop-blur px-2.5 py-1 rounded-lg border border-slate-800 text-[11px] font-semibold text-slate-300 flex items-center gap-1 hover:border-amber-500">
                             <ImageIcon className="w-3 h-3 text-orange-700" />
-                            Ver {prop.photos.length === 1 ? "a foto" : `${prop.photos.length} fotos`}
+                            {t("Ver")}{" "}{prop.photos.length === 1 ? t("a foto") : t("{0} fotos", [prop.photos.length])}
                           </button>
                         )}
                       </div>
@@ -211,7 +208,7 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
                           <div className="text-right shrink-0">
                             <div className="text-xl font-black text-orange-700">{formatBRL(prop.salePrice)}</div>
                             {prop.condoFee && parseFloat(prop.condoFee) > 0 && (
-                              <div className="text-xs text-orange-700">Cond: {formatBRL(prop.condoFee)}</div>
+                              <div className="text-xs text-orange-700">{t("Cond:")}{" "}{formatBRL(prop.condoFee)}</div>
                             )}
                           </div>
                         </div>
@@ -222,19 +219,19 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
                         <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3 border-t border-slate-800/80 text-xs text-slate-300">
                           <div className="flex items-center gap-1.5 bg-slate-800/40 p-2 rounded-lg">
                             <Bed className="w-3.5 h-3.5 text-orange-700" />
-                            <span>{prop.bedrooms} {prop.bedrooms === 1 ? "quarto" : "quartos"}</span>
+                            <span>{prop.bedrooms} {prop.bedrooms === 1 ? t("quarto") : t("quartos")}</span>
                           </div>
                           <div className="flex items-center gap-1.5 bg-slate-800/40 p-2 rounded-lg">
                             <Bath className="w-3.5 h-3.5 text-orange-700" />
-                            <span>{prop.bathrooms} {prop.bathrooms === 1 ? "banheiro" : "banheiros"}</span>
+                            <span>{prop.bathrooms} {prop.bathrooms === 1 ? t("banheiro") : t("banheiros")}</span>
                           </div>
                           <div className="flex items-center gap-1.5 bg-slate-800/40 p-2 rounded-lg">
                             <Car className="w-3.5 h-3.5 text-orange-700" />
-                            <span>{prop.parkingSpots} {prop.parkingSpots === 1 ? "vaga" : "vagas"}</span>
+                            <span>{prop.parkingSpots} {prop.parkingSpots === 1 ? t("vaga") : t("vagas")}</span>
                           </div>
                           <div className="flex items-center gap-1.5 bg-slate-800/40 p-2 rounded-lg">
                             <Maximize2 className="w-3.5 h-3.5 text-orange-700" />
-                            <span>{area(prop.usefulAreaM2 || prop.areaM2)} m²</span>
+                            <span>{area(prop.usefulAreaM2 || prop.areaM2)} {t("m²")}</span>
                           </div>
                         </div>
 
@@ -243,16 +240,15 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
                           <div className="flex flex-wrap gap-1 pt-1">
                             {prop.privateAmenities.slice(0, 3).map((am) => (
                               <span
-                                key={am}
+                                key={t(am)}
                                 className="text-[10px] bg-slate-800/60 text-slate-300 border border-slate-700/60 px-2 py-0.5 rounded-md"
                               >
-                                {am}
+                                {t(am)}
                               </span>
                             ))}
                             {prop.privateAmenities.length > 3 && (
                               <span className="text-[10px] text-orange-700 font-semibold px-1 py-0.5">
-                                +{prop.privateAmenities.length - 3} itens
-                              </span>
+                                +{prop.privateAmenities.length - 3} {t("itens")}</span>
                             )}
                           </div>
                         )}
@@ -263,11 +259,11 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
                             <Avatar name={prop.broker.name} url={prop.broker.avatarUrl} size={32} />
                             <div>
                               <div className="text-xs font-semibold text-white">{prop.broker.name}</div>
-                              <div className="text-[10px] text-slate-400">Captador · CRECI {prop.broker.creci}</div>
+                              <div className="text-[10px] text-slate-400">{t("Captador · CRECI")}{" "}{prop.broker.creci}</div>
                             </div>
                           </div>
                           <span className="text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
-                            {prop.broker.verificationStatus === "aprovado" ? <><CheckCircle2 className="w-3 h-3" /> CRECI verificado</> : "CRECI em análise"}
+                            {prop.broker.verificationStatus === "aprovado" ? <><CheckCircle2 className="w-3 h-3" /> {t("CRECI verificado")}</> : "CRECI em análise"}
                           </span>
                         </div>
                       </div>
@@ -278,33 +274,32 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
                       <button
                         onClick={() => onShare(prop)}
                         type="button"
-                        title="Ficha do imóvel com os seus dados de contato, para enviar ao cliente. Confira os dados antes de enviar."
+                        title={t("Ficha do imóvel com os seus dados de contato, para enviar ao cliente. Confira os dados antes de enviar.")}
                         className="flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs py-2.5 px-3 rounded-xl transition shadow-md shadow-amber-500/10"
                       >
                         <Share2 className="w-4 h-4" />
-                        Ficha para o cliente
-                      </button>
+                        {t("Ficha para o cliente")}</button>
                       {prop.broker.id !== currentUserId && prop.acceptsPartnership && prop.status === "disponivel" && prop.broker.verificationStatus === "aprovado" ? <button
                         type="button"
                         disabled={!!blockedReason}
-                        title={blockedReason || undefined}
+                        title={t(blockedReason) || undefined}
                         onClick={() => onSchedule(prop)}
                         className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs py-2.5 px-3 rounded-xl transition border border-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
-                      ><Stamp className="w-4 h-4 text-emerald-400" />Agendar visita</button> : prop.broker.id === currentUserId && onEdit ? <button
+                      ><Stamp className="w-4 h-4 text-emerald-400" />{t("Agendar visita")}</button> : prop.broker.id === currentUserId && onEdit ? <button
                         type="button"
                         onClick={() => onEdit(prop)}
-                        title="Imóvel seu: fotos, valor e condição de parceria se mudam em Imóveis › Meus imóveis."
+                        title={t("Imóvel seu: fotos, valor e condição de parceria se mudam em Imóveis › Meus imóveis.")}
                         className="flex items-center justify-center gap-2 rounded-xl border border-[#131315] bg-[#ffffff] px-3 py-2.5 text-xs font-bold text-[#131315] transition hover:bg-[#f3f3f5]"
-                      ><Pencil className="h-4 w-4" />Editar em Meus imóveis</button> : <button type="button" disabled className="flex cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-xs font-semibold text-slate-500" title={prop.broker.id === currentUserId ? "Esta é uma captação sua; escolha um imóvel de outro corretor para iniciar uma parceria." : "Este imóvel não está aceitando parcerias."}><Stamp className="h-4 w-4" />{prop.broker.id === currentUserId ? "Imóvel da sua carteira" : "Parceria indisponível"}</button>}
+                      ><Pencil className="h-4 w-4" />{t("Editar em Meus imóveis")}</button> : <button type="button" disabled className="flex cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-xs font-semibold text-slate-500" title={prop.broker.id === currentUserId ? t("Esta é uma captação sua; escolha um imóvel de outro corretor para iniciar uma parceria.") : t("Este imóvel não está aceitando parcerias.")}><Stamp className="h-4 w-4" />{prop.broker.id === currentUserId ? t("Imóvel da sua carteira") : t("Parceria indisponível")}</button>}
                     </div>
                   </div>
                 ))}
               </div>
             )}
-            {propertyTotal > PROPERTY_PAGE_SIZE && <nav aria-label="Páginas da vitrine" className="flex items-center justify-center gap-4 pt-4">
-              <button type="button" disabled={loading || propertyPage <= 1} onClick={() => setPropertyPage(propertyPage - 1)} className="rounded-lg border border-slate-700 px-4 py-2 text-sm disabled:opacity-40">Anterior</button>
-              <span className="text-sm">Página {propertyPage} de {Math.ceil(propertyTotal / PROPERTY_PAGE_SIZE)} · {propertyTotal} imóveis</span>
-              <button type="button" disabled={loading || propertyPage * PROPERTY_PAGE_SIZE >= propertyTotal} onClick={() => setPropertyPage(propertyPage + 1)} className="rounded-lg border border-slate-700 px-4 py-2 text-sm disabled:opacity-40">Próxima</button>
+            {propertyTotal > PROPERTY_PAGE_SIZE && <nav aria-label={t("Páginas da vitrine")} className="flex items-center justify-center gap-4 pt-4">
+              <button type="button" disabled={loading || propertyPage <= 1} onClick={() => setPropertyPage(propertyPage - 1)} className="rounded-lg border border-slate-700 px-4 py-2 text-sm disabled:opacity-40">{t("Anterior")}</button>
+              <span className="text-sm">{t("Página")}{" "}{propertyPage} {t("de")}{" "}{Math.ceil(propertyTotal / PROPERTY_PAGE_SIZE)} · {propertyTotal} {t("imóveis")}</span>
+              <button type="button" disabled={loading || propertyPage * PROPERTY_PAGE_SIZE >= propertyTotal} onClick={() => setPropertyPage(propertyPage + 1)} className="rounded-lg border border-slate-700 px-4 py-2 text-sm disabled:opacity-40">{t("Próxima")}</button>
             </nav>}
             {galeria && <PhotoViewer fotos={galeria.fotos} indice={galeria.indice} titulo={galeria.titulo} onIndice={mudarFoto} onFechar={fecharGaleria} />}
           </div>

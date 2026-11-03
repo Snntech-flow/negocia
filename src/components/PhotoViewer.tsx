@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "./I18nProvider";
+
 import { useEffect, useRef } from "react";
 import { createPortal } from "react-dom";
 import { ChevronLeft, ChevronRight, X } from "lucide-react";
@@ -15,16 +17,18 @@ export const fotoVizinha = (indice: number, total: number, passo: 1 | -1) => (to
 export function GaleriaDeFotos({ fotos, indice, titulo, onIndice, onFechar }: {
   fotos: string[]; indice: number; titulo: string; onIndice: (indice: number) => void; onFechar: () => void;
 }) {
+  const { t } = useI18n();
+
   const inicioDoToque = useRef<number | null>(null);
   const ir = (passo: 1 | -1) => onIndice(fotoVizinha(indice, fotos.length, passo));
   const seta = "absolute top-1/2 flex h-12 w-12 -translate-y-1/2 items-center justify-center rounded-full bg-[#ffffff]/15 text-[#ffffff] hover:bg-[#ffffff]/25";
-  return <div role="dialog" aria-modal="true" aria-label={`Fotos: ${titulo}`} className="fixed inset-0 z-[100] flex flex-col bg-[#000000]/95 text-[#ffffff]"
+  return <div role="dialog" aria-modal="true" aria-label={t("Fotos: {0}", [titulo])} className="fixed inset-0 z-[100] flex flex-col bg-[#000000]/95 text-[#ffffff]"
     onClick={(event) => { if (event.target === event.currentTarget) onFechar(); }}>
     <div className="flex items-center justify-between gap-3 px-4 py-3">
       <p className="min-w-0 truncate text-sm font-semibold">{titulo}</p>
       <div className="flex shrink-0 items-center gap-3">
         <span className="text-sm tabular-nums">{indice + 1} / {fotos.length}</span>
-        <button type="button" aria-label="Fechar fotos" onClick={onFechar} className="flex h-10 w-10 items-center justify-center rounded-full bg-[#ffffff]/15 hover:bg-[#ffffff]/25"><X className="h-5 w-5" /></button>
+        <button type="button" aria-label={t("Fechar fotos")} onClick={onFechar} className="flex h-10 w-10 items-center justify-center rounded-full bg-[#ffffff]/15 hover:bg-[#ffffff]/25"><X className="h-5 w-5" /></button>
       </div>
     </div>
     <div className="relative flex min-h-0 flex-1 items-center justify-center px-2 pb-4"
@@ -34,10 +38,10 @@ export function GaleriaDeFotos({ fotos, indice, titulo, onIndice, onFechar }: {
         const fim = event.changedTouches[0]?.clientX;
         if (inicio !== null && fim !== undefined && Math.abs(fim - inicio) > 40) ir(fim < inicio ? 1 : -1);
       }}>
-      <img src={fotos[indice]} alt={`${titulo} — foto ${indice + 1} de ${fotos.length}`} className="max-h-full max-w-full select-none object-contain" draggable={false} />
+      <img src={fotos[indice]} alt={t("{0} — foto {1} de {2}", [titulo, indice + 1, fotos.length])} className="max-h-full max-w-full select-none object-contain" draggable={false} />
       {fotos.length > 1 && <>
-        <button type="button" aria-label="Foto anterior" onClick={() => ir(-1)} className={`${seta} left-3`}><ChevronLeft className="h-6 w-6" /></button>
-        <button type="button" aria-label="Próxima foto" onClick={() => ir(1)} className={`${seta} right-3`}><ChevronRight className="h-6 w-6" /></button>
+        <button type="button" aria-label={t("Foto anterior")} onClick={() => ir(-1)} className={`${seta} left-3`}><ChevronLeft className="h-6 w-6" /></button>
+        <button type="button" aria-label={t("Próxima foto")} onClick={() => ir(1)} className={`${seta} right-3`}><ChevronRight className="h-6 w-6" /></button>
       </>}
     </div>
   </div>;

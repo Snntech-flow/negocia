@@ -46,7 +46,7 @@ test("🔴 em Meus imóveis os botões ficam à direita em todo cartão; o títu
 
 test("🔴 o seletor da situação em Meus imóveis abraça a opção escolhida, sem a largura de 'Em negociação'", () => {
   const inventario = readFileSync(new URL("../src/components/PropertyInventory.tsx", import.meta.url), "utf8");
-  const inicio = inventario.indexOf("aria-label={`Status: ${property.title}`}");
+  const inicio = inventario.indexOf('aria-label={t("Status: {0}", [property.title])}');
   assert.ok(inicio > 0, "achei o seletor da situação");
   const seletor = inventario.slice(inicio, inventario.indexOf("{PROPERTY_STATUSES.map(value =>", inicio));
   assert.match(seletor, /className="rounded-lg border border-slate-300 py-2 pl-2\.5 pr-1\.5 text-sm \[field-sizing:content\]">$/);

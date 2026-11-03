@@ -1,5 +1,7 @@
 "use client";
 
+import { useI18n } from "./I18nProvider";
+
 import { type FormEvent, useEffect, useId, useRef, useState, useSyncExternalStore } from "react";
 import { AlertTriangle, HelpCircle } from "lucide-react";
 import BotaoFechar from "./BotaoFechar";
@@ -13,6 +15,8 @@ export default function DialogHost() {
 }
 
 function DialogWindow({ request }: { request: DialogRequest }) {
+  const { t } = useI18n();
+
   const [text, setText] = useState(request.kind === "text" ? request.defaultValue ?? "" : "");
   const [tried, setTried] = useState(false);
   const focusRef = useRef<HTMLElement | null>(null);
@@ -60,14 +64,14 @@ function DialogWindow({ request }: { request: DialogRequest }) {
         {request.multiline
           ? <textarea ref={(element) => { focusRef.current = element; }} rows={3} value={text} onChange={(event) => setText(event.target.value)} aria-invalid={tried && !!error} className={`${field} resize-y`} />
           : <input ref={(element) => { focusRef.current = element; }} value={text} onChange={(event) => setText(event.target.value)} aria-invalid={tried && !!error} className={field} />}
-        {tried && error && <span role="alert" className="mt-1 block text-[11px] font-semibold text-red-400">{error}</span>}
+        {tried && error && <span role="alert" className="mt-1 block text-[11px] font-semibold text-red-400">{t(error)}</span>}
         {request.maxLength && <span className="mt-1 block text-right text-[10px] font-normal text-slate-500">{text.trim().length}/{request.maxLength}</span>}
       </label>}
       <div className="flex flex-col gap-2 sm:flex-row-reverse">
         <button type="submit" ref={(element) => { if (request.kind === "confirm" && !danger) focusRef.current = element; }}
-          className={danger ? "rounded-lg bg-red-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-700" : "rounded-lg bg-amber-500 px-4 py-2.5 text-sm font-bold text-slate-950 hover:bg-amber-400"}>{request.confirmLabel || "Confirmar"}</button>
+          className={danger ? "rounded-lg bg-red-600 px-4 py-2.5 text-sm font-bold text-white hover:bg-red-700" : "rounded-lg bg-amber-500 px-4 py-2.5 text-sm font-bold text-slate-950 hover:bg-amber-400"}>{t(request.confirmLabel || "Confirmar")}</button>
         <button type="button" onClick={cancel} ref={(element) => { if (request.kind === "confirm" && danger) focusRef.current = element; }}
-          className="rounded-lg border border-slate-700 px-4 py-2.5 text-sm font-semibold text-slate-200 hover:bg-slate-800">Cancelar</button>
+          className="rounded-lg border border-slate-700 px-4 py-2.5 text-sm font-semibold text-slate-200 hover:bg-slate-800">{t("Cancelar")}</button>
       </div>
     </form>
   </div>;

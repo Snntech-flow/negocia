@@ -76,7 +76,7 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
     role: "corretor",
     verificationStatus: "aprovado",
     subscriptionStatus: "pendente",
-    plan: "10",
+    plan: "12",
   }).returning();
   const [otherBroker] = await db.insert(users).values({
     name: "Teste Outro Corretor",
@@ -88,7 +88,7 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
     role: "corretor",
     verificationStatus: "aprovado",
     subscriptionStatus: "ativo",
-    plan: "10",
+    plan: "12",
   }).returning();
   const referrerExpiry = new Date(Date.now() + 15 * 86_400_000);
   await db.update(users).set({ nextBillingDate: referrerExpiry }).where(eq(users.id, otherBroker.id));
@@ -103,7 +103,7 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
     role: "admin",
     verificationStatus: "aprovado",
     subscriptionStatus: "ativo",
-    plan: "10",
+    plan: "12",
   }).returning();
 
   const [ownerLead] = await db.insert(leads).values({
@@ -136,7 +136,7 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
   }).returning();
   const [payment] = await db.insert(transactions).values({
     userId: owner.id,
-    amount: "59.90",
+    amount: "79.90",
     type: "mensalidade_pro",
     paymentMethod: "pix",
     status: "pendente",
@@ -162,10 +162,15 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
     const cookieStore = { set: () => {}, delete: () => {}, get: (name: string) => name === "negocialar_session" ? { name, value: cookieValue } : undefined };
     const headers = new Headers();
     if (options.address) headers.set("x-vercel-forwarded-for", options.address);
-    const workStore = { route: "/", page: "/", incrementalCache: {}, pendingRevalidatedTags: [] as unknown[] } as unknown as Parameters<typeof workAsyncStorage.run>[0];
+    const afterTasks: (() => Promise<unknown>)[] = [];
+    const workStore = { route: "/", page: "/", incrementalCache: {}, pendingRevalidatedTags: [] as unknown[], afterContext: { after: (task: Promise<unknown> | (() => unknown)) => { afterTasks.push(async () => typeof task === "function" ? task() : task); } } } as unknown as Parameters<typeof workAsyncStorage.run>[0];
     const requestStore = { type: "request", phase: "action", cookies: cookieStore, mutableCookies: cookieStore, userspaceMutableCookies: cookieStore, headers } as unknown as Parameters<typeof workUnitAsyncStorage.run>[0];
     return workAsyncStorage.run(workStore, () =>
-      workUnitAsyncStorage.run(requestStore, callback));
+      workUnitAsyncStorage.run(requestStore, async () => {
+        const result = await callback();
+        for (const task of afterTasks) await task();
+        return result;
+      }));
   }
 
   await t.test("as migrations criam toda coluna que o código usa (coluna sem migration derruba a produção)", async () => {
@@ -251,7 +256,7 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
     const assinada = (caminho: string) => `https://projeto.supabase.co/storage/v1/object/sign/imoveis/${caminho}?token=abc.def.ghi`;
     const form = { title: "Imóvel com foto enviada", propertyType: "Apartamento", salePrice: "300000", city, neighborhood: "Centro", bedrooms: 2,
       parkingSpots: 1, bathrooms: 1, suites: 0, areaM2: "80", description: "Imóvel de testes", condition: "usado", acceptsFinancing: true, state: "SP",
-      confidentialAddress: "Endereço fictício", ownerName: "Pessoa fictícia", ownerPhone: "11900001234", acceptsPartnership: false, purpose: "venda",
+      confidentialAddress: "Endereço fictício", ownerName: "Pessoa fictícia", ownerPhone: "11900001234", acceptsPartnership: true, partnershipModels: "ambos" as const, confirmaParceria: true, purpose: "venda",
       photos: [minha, externa], floorPlanPhotos: [outraMinha] };
     try {
       const criado = (await asUser(otherBroker.id, () => actions.createProperty(form))).property;
@@ -588,20 +593,20 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
       {...base, acceptsPartnership:false}, {...base, salePrice:"900000"},
     ]);
     const profile = {clientInternalName:"Teste radar", propertyType:"Apartamento", city, neighborhoods:["Centro"], maxBudget:"400000", minBedrooms:2, minParkingSpots:1};
-    await asUser(otherBroker.id, () => actions.createBuyerProfile(profile));
-    const notices = await db.select().from(notifications).where(eq(notifications.userId, otherBroker.id));
-    const notice = notices.find(row => row.type === "ai_match" && row.propertyId === valid.id);
-    assert.ok(notice); assert.match(notice.title, /1 imóvel compatível/);
+    const savedProfile = await asUser(otherBroker.id, () => actions.createBuyerProfile(profile));
+    // Matches moved from notifications to the dedicated Match panel on 28/10/2026.
+    const found = await asUser(otherBroker.id, () => actions.getMyMatches());
+    assert.deepEqual(found.matches.filter(match => match.perfilId === savedProfile.profile.id).map(match => match.imovelId), [valid.id]);
     await asUser(admin.id, () => actions.createBuyerProfile(profile));
-    const before = await db.select().from(notifications).where(eq(notifications.userId, admin.id));
+    const before = (await asUser(admin.id, () => actions.getMyMatches())).matches.filter(match => match.imovel.city === city);
     const form = {title:"Nova oferta radar", propertyType:"Apartamento", salePrice:"300000", city, neighborhood:"Centro", bedrooms:2, parkingSpots:1, bathrooms:1, suites:0, areaM2:"80", description:"Imóvel de testes", photos:[], condition:"usado", acceptsFinancing:true, state:"SP", confidentialAddress:"Endereço fictício", ownerName:"Pessoa fictícia", ownerPhone:"11900001234", acceptsPartnership:true, splitPercentage:"50", purpose:"venda", partnershipModels:"ambos" as const, confirmaParceria:true};
     const created = await asUser(otherBroker.id, () => actions.createProperty(form));
-    const after = await db.select().from(notifications).where(eq(notifications.userId, admin.id));
-    assert.equal(after.length, before.length + 1); assert.ok(after.some(row => row.propertyId === created.property.id));
+    const after = (await asUser(admin.id, () => actions.getMyMatches())).matches.filter(match => match.imovel.city === city);
+    assert.equal(after.length, before.length + 1); assert.ok(after.some(match => match.imovelId === created.property.id));
     // Parceria obrigatória (01/11/2026): imóvel sem parceria não é mais cadastrado.
     await assert.rejects(asUser(otherBroker.id, () => actions.createProperty({...form, acceptsPartnership:false})), /todo imóvel aceita parceria/);
     await asUser(otherBroker.id, () => actions.createProperty({...form, purpose:"aluguel"}));
-    const unchanged = await db.select().from(notifications).where(eq(notifications.userId, admin.id));
+    const unchanged = (await asUser(admin.id, () => actions.getMyMatches())).matches.filter(match => match.imovel.city === city);
     assert.equal(unchanged.length, after.length);
     await db.delete(properties).where(eq(properties.city, city));
     await db.delete(buyerProfiles).where(eq(buyerProfiles.city, city));
@@ -612,17 +617,17 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
     const city = `Limite ${suffix}`;
     const base = {brokerId: otherBroker.id, title:"Anúncio do limite", propertyType:"Apartamento", salePrice:"300000", city, neighborhood:"Centro", bedrooms:2, parkingSpots:1, areaM2:"80", description:"Teste", confidentialAddress:"Endereço fictício", ownerName:"Pessoa fictícia", ownerPhone:"11900001234", acceptsPartnership:false, status:"disponivel", purpose:"venda"};
     const active = await db.select({ id: properties.id }).from(properties).where(and(eq(properties.brokerId, otherBroker.id), inArray(properties.status, ["disponivel", "em_negociacao"])));
-    await db.insert(properties).values(Array.from({length: 10 - active.length}, (_, index) => ({...base, title:`Anúncio ${index}`, status: index % 2 ? "em_negociacao" : "disponivel"})));
+    await db.insert(properties).values(Array.from({length: 12 - active.length}, (_, index) => ({...base, title:`Anúncio ${index}`, status: index % 2 ? "em_negociacao" : "disponivel"})));
     const [archived] = await db.insert(properties).values({...base, title:"Anúncio arquivado", status:"arquivado"}).returning();
     try {
       const { brokerId: _brokerId, status: _status, ...fields } = base;
-      const form = {...fields, bathrooms:1, suites:0, photos:[], splitPercentage:"50", condition:"usado", acceptsFinancing:true, state:"SP", partnershipModels:"ambos" as const, confirmaParceria:true};
-      await assert.rejects(asUser(otherBroker.id, () => actions.createProperty(form)), /permite 10 anúncios ativos e você já tem 10/);
-      await assert.rejects(asUser(otherBroker.id, () => inventory.updateOwnPropertyStatus(archived.id, archived.updatedAt.toISOString(), "disponivel")), /permite 10 anúncios/);
+      const form = {...fields, acceptsPartnership: true, bathrooms:1, suites:0, photos:[], splitPercentage:"50", condition:"usado", acceptsFinancing:true, state:"SP", partnershipModels:"ambos" as const, confirmaParceria:true};
+      await assert.rejects(asUser(otherBroker.id, () => actions.createProperty(form)), /permite 12 anúncios ativos e você já tem 12/);
+      await assert.rejects(asUser(otherBroker.id, () => inventory.updateOwnPropertyStatus(archived.id, archived.updatedAt.toISOString(), "disponivel")), /permite 12 anúncios/);
       const sold = await asUser(otherBroker.id, () => inventory.updateOwnPropertyStatus(archived.id, archived.updatedAt.toISOString(), "vendido"));
       assert.equal(sold.property.status, "vendido", "trocar entre situações inativas não consome vaga");
       const page = await asUser(otherBroker.id, () => inventory.getOwnProperties());
-      assert.equal(page.activeListings, 10); assert.equal(page.listingLimit, 10);
+      assert.equal(page.activeListings, 12); assert.equal(page.listingLimit, 12);
       await assert.rejects(asUser(otherBroker.id, () => actions.createProperty({...form, condition:undefined})), /condição do imóvel/);
     } finally { await db.delete(properties).where(eq(properties.city, city)); }
   });
@@ -780,13 +785,13 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
     const [before] = await db.select().from(users).where(eq(users.id, otherBroker.id));
     await assert.rejects(asUser(owner.id, () => actions.registerUserWithPix({
       name: "Corretor teste UF", email: `uf-${suffix}@example.test`, whatsapp: "11999990005",
-      creci: "999998-F", state: "XX", city: "São Paulo", plan: "40", billingCycle: "monthly",
+      creci: "999998-F", state: "XX", city: "São Paulo", plan: "50", billingCycle: "monthly",
       password: "test-only-password-12345",
     })), /estado/);
     const startedAt = Date.now();
     const result = await asUser(owner.id, () => actions.registerUserWithPix({
       name: "Corretor teste cadastro", email: `new-${suffix}@example.test`, whatsapp: "11999990004",
-      creci: "999999-F", state: "SP", city: "São Paulo", plan: "40", billingCycle: "annual",
+      creci: "999999-F", state: "SP", city: "São Paulo", plan: "50", billingCycle: "annual",
       password: "test-only-password-12345", referralCode: otherBroker.id,
     }));
     registeredIds.push(result.user.id);
@@ -801,7 +806,7 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
     assert.equal(result.user.avatarUrl, null, "conta nova não recebe foto de outra pessoa");
     await assert.rejects(asUser(owner.id, () => actions.registerUserWithPix({
       name: "Corretor repetido", email: `NEW-${suffix}@example.test`, whatsapp: "11999990006",
-      creci: "999997-F", state: "BA", city: "Salvador", plan: "10", billingCycle: "monthly",
+      creci: "999997-F", state: "BA", city: "Salvador", plan: "12", billingCycle: "monthly",
       password: "test-only-password-12345",
     })), /já tem cadastro/);
     const initialPayments = await db.select().from(transactions).where(eq(transactions.userId, result.user.id));
@@ -814,7 +819,7 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
     const [partner] = await db.insert(users).values({
       name: "Teste Sócia", email: `socia-${suffix}@example.test`, creci: `3${suffix.slice(0, 6)}F`, whatsapp: "11999990006",
       city: "São Paulo", state: "SP", role: "corretor", verificationStatus: "aprovado", subscriptionStatus: "teste",
-      nextBillingDate: new Date(Date.now() + 2 * 86_400_000), plan: "40", monthlyFee: "150.00",
+      nextBillingDate: new Date(Date.now() + 2 * 86_400_000), plan: "50", monthlyFee: "150.00",
     }).returning();
     registeredIds.push(partner.id);
     // Pix confirmado antes do registro de estorno (sem confirmed_at e period_end) e um Pix aguardando conferência.
@@ -850,15 +855,15 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
     const [trial] = await db.insert(users).values({
       name: "Teste Ciclo", email: `ciclo-${suffix}@example.test`, creci: `4${suffix.slice(0, 6)}F`, whatsapp: "11999990007",
       city: "São Paulo", state: "SP", role: "corretor", verificationStatus: "aprovado", subscriptionStatus: "teste",
-      nextBillingDate: new Date(Date.now() + 2 * 86_400_000), plan: "40", billingCycle: "monthly", monthlyFee: "150.00",
+      nextBillingDate: new Date(Date.now() + 2 * 86_400_000), plan: "50", billingCycle: "monthly", monthlyFee: "150.00",
     }).returning();
     registeredIds.push(trial.id);
     const first = await asUser(trial.id, () => actions.requestSubscriptionRenewal("annual"));
     let [charge] = await db.select().from(transactions).where(eq(transactions.id, first.payment.id));
-    assert.equal(charge.amount, "1650.00");
+    assert.equal(charge.amount, "2528.90");
     const [chosen] = await db.select().from(users).where(eq(users.id, trial.id));
     assert.equal(chosen.billingCycle, "annual");
-    assert.equal(chosen.monthlyFee, "137.50");
+    assert.equal(chosen.monthlyFee, "210.74");
     let view = await asUser(trial.id, () => actions.getMarketplaceData({ section: "vitrine" }));
     assert.equal(view.currentUser?.hasPaid, false);
     assert.equal(view.currentUser?.pendingPix, true);
@@ -871,13 +876,13 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
     await assert.rejects(asUser(trial.id, () => actions.requestSubscriptionRenewal("monthly")), /ciclo é escolhido no primeiro pagamento/);
     const renewal = await asUser(trial.id, () => actions.requestSubscriptionRenewal());
     [charge] = await db.select().from(transactions).where(eq(transactions.id, renewal.payment.id));
-    assert.equal(charge.amount, "1650.00");
+    assert.equal(charge.amount, "2528.90");
   });
 
   await t.test("financeiro é privado por corretor: outra conta não lê, não altera, não exclui nem vincula cliente alheio", async () => {
     const broker = (n: number, extra: Record<string, unknown> = {}) => ({
       name: `Teste Financeiro ${n}`, email: `fin${n}-${suffix}@example.test`, creci: `${5 + n}${suffix.slice(0, 6)}F`, whatsapp: `1199999001${n}`,
-      city: "São Paulo", state: "SP", role: "corretor", verificationStatus: "aprovado", subscriptionStatus: "ativo", nextBillingDate: null, plan: "10", ...extra,
+      city: "São Paulo", state: "SP", role: "corretor", verificationStatus: "aprovado", subscriptionStatus: "ativo", nextBillingDate: null, plan: "12", ...extra,
     });
     const [alice] = await db.insert(users).values(broker(1)).returning();
     const [bruno] = await db.insert(users).values(broker(2)).returning();
@@ -945,7 +950,7 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
   await t.test("fechar parceria exige o valor da comissão e lança a parte de cada corretor no Financeiro, uma vez só", async () => {
     const broker = (n: number) => ({
       name: `Teste Fechamento ${n}`, email: `close${n}-${suffix}@example.test`, creci: `${7 + n}${suffix.slice(0, 6)}F`, whatsapp: `1199999002${n}`,
-      city: "São Paulo", state: "SP", role: "corretor", verificationStatus: "aprovado", subscriptionStatus: "ativo", nextBillingDate: null, plan: "10",
+      city: "São Paulo", state: "SP", role: "corretor", verificationStatus: "aprovado", subscriptionStatus: "ativo", nextBillingDate: null, plan: "12",
     });
     const [captor] = await db.insert(users).values(broker(1)).returning();
     const [partner] = await db.insert(users).values(broker(2)).returning();
@@ -995,7 +1000,7 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
   await t.test("Termo de Parceria: só captador e parceiro aceitam, o texto aceito é conferido e gravado, e assinado vale o texto gravado", async () => {
     const broker = (n: number) => ({
       name: `Teste Termo ${n}`, email: `term${n}-${suffix}@example.test`, creci: `${4 + n}${suffix.slice(0, 6)}T`, whatsapp: `1199999003${n}`,
-      city: "Salvador", state: "BA", role: "corretor", verificationStatus: "aprovado", subscriptionStatus: "ativo", nextBillingDate: null, plan: "10",
+      city: "Salvador", state: "BA", role: "corretor", verificationStatus: "aprovado", subscriptionStatus: "ativo", nextBillingDate: null, plan: "12",
     });
     const [captor] = await db.insert(users).values(broker(1)).returning();
     const [partner] = await db.insert(users).values(broker(2)).returning();
@@ -1068,7 +1073,7 @@ test("server actions enforce account ownership and admin-only Pix confirmation",
   await t.test("controle de visita: só quem registrou a visita imprime, só imóvel à venda, e o endereço protegido não sai", async () => {
     const broker = (n: number) => ({
       name: `Teste Visita ${n}`, email: `visit${n}-${suffix}@example.test`, creci: `${n}${suffix.slice(0, 6)}V`, whatsapp: `1199999004${n}`,
-      city: "Salvador", state: "BA", role: "corretor", verificationStatus: "aprovado", subscriptionStatus: "ativo", nextBillingDate: null, plan: "10",
+      city: "Salvador", state: "BA", role: "corretor", verificationStatus: "aprovado", subscriptionStatus: "ativo", nextBillingDate: null, plan: "12",
     });
     const [captor] = await db.insert(users).values(broker(1)).returning();
     const [partner] = await db.insert(users).values(broker(2)).returning();
