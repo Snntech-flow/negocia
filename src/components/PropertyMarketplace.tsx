@@ -182,16 +182,19 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
                           )}
                         </div>
 
-                        <div className="absolute bottom-3 left-3 bg-slate-950/80 backdrop-blur px-3 py-1 rounded-lg border border-slate-800 text-xs flex items-center gap-1 text-slate-300">
-                          <Lock className="w-3.5 h-3.5 text-orange-700" />
-                          {t("Endereço só com o captador")}</div>
+                        {/* As duas etiquetas da base dividem a linha: com 4 cartões por linha, o "Ver N fotos" cobria o aviso do endereço. */}
+                        <div className="absolute bottom-3 left-3 right-3 flex items-end justify-between gap-2 pointer-events-none">
+                          <div title={t("Endereço só com o captador")} className="min-w-0 bg-slate-950/80 backdrop-blur px-2.5 py-1 rounded-lg border border-slate-800 text-[11px] flex items-center gap-1 text-slate-300">
+                            <Lock className="w-3 h-3 shrink-0 text-orange-700" />
+                            <span className="truncate">{t("Endereço só com o captador")}</span></div>
 
-                        {prop.photos && prop.photos.length > 0 && (
-                          <button type="button" onClick={() => abrirFotos(prop)} className="absolute bottom-3 right-3 bg-slate-950/80 backdrop-blur px-2.5 py-1 rounded-lg border border-slate-800 text-[11px] font-semibold text-slate-300 flex items-center gap-1 hover:border-amber-500">
-                            <ImageIcon className="w-3 h-3 text-orange-700" />
-                            {t("Ver")}{" "}{prop.photos.length === 1 ? t("a foto") : t("{0} fotos", [prop.photos.length])}
-                          </button>
-                        )}
+                          {prop.photos && prop.photos.length > 0 && (
+                            <button type="button" onClick={() => abrirFotos(prop)} className="pointer-events-auto shrink-0 bg-slate-950/80 backdrop-blur px-2.5 py-1 rounded-lg border border-slate-800 text-[11px] font-semibold text-slate-300 flex items-center gap-1 hover:border-amber-500">
+                              <ImageIcon className="w-3 h-3 text-orange-700" />
+                              {t("Ver")}{" "}{prop.photos.length === 1 ? t("a foto") : t("{0} fotos", [prop.photos.length])}
+                            </button>
+                          )}
+                        </div>
                       </div>
 
                       {/* Conteúdo */}
