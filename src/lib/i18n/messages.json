@@ -5589,6 +5589,11 @@
     "Dúplex",
     "Duplex"
   ],
+  "Triplex": [
+    "Triplex",
+    "Tríplex",
+    "Triplex"
+  ],
   "Terreno": [
     "Land",
     "Terreno",
@@ -5923,6 +5928,16 @@
     "Bar / restaurant",
     "Bar / restaurante",
     "Bar / Restaurante"
+  ],
+  "Quintal": [
+    "Backyard",
+    "Patio trasero",
+    "Quintal"
+  ],
+  "Pátio": [
+    "Courtyard",
+    "Patio",
+    "Pátio"
   ],
   "Esportes & Saúde": [
     "Sports & health",

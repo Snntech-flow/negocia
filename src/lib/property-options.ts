@@ -58,7 +58,7 @@ export function optionLabel(options: readonly Option[], id: string | null | unde
 }
 
 export const PROPERTY_TYPES = [
-  "Apartamento", "Casa em Condomínio", "Casa Solta", "Cobertura", "Comercial", "Duplex", "Terreno",
+  "Apartamento", "Casa em Condomínio", "Casa Solta", "Cobertura", "Comercial", "Duplex", "Triplex", "Terreno",
   "Chácara", "Sítio", "Fazenda", "Hotel", "Pousada", "Loft", "Apart-Hotel",
 ];
 
@@ -80,7 +80,7 @@ export const CONDO_AMENITIES_GROUPS = [
       "Espaço gourmet", "Salão de festas", "Churrasqueira coletiva", "Salão de jogos", "Cinema / Home theater",
       "Espaço kids / Brinquedoteca", "Playground", "Parque infantil", "Coworking / Sala de reunião", "Pista de cooper / caminhada",
       "Área verde / Bosque preservado", "Pet place / Pet care", "Haras / Hípica", "Heliponto", "Parque aquático",
-      "Lavanderia compartilhada", "Bar / Restaurante",
+      "Lavanderia compartilhada", "Bar / Restaurante", "Quintal", "Pátio",
     ],
   },
   {

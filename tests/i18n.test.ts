@@ -57,3 +57,11 @@ test("assistant accepts only a supported output language and preserves the exist
   assert.equal(validateBrokerAssistantInput({ question: "How can I organize?", history: [], locale: "en" }).locale, "en");
   assert.throws(() => validateBrokerAssistantInput({ question: "How can I organize?", history: [], locale: "fr" as "en" }));
 });
+
+test("every property checklist item has a translation, so no option stays in Portuguese in the other languages", async () => {
+  const { CONDO_AMENITIES_GROUPS, PRIVATE_AMENITIES_LIST, PROPERTY_TYPES } = await import("../src/lib/property-options");
+  const catalog: Record<string, readonly string[]> = messages;
+  const items = [...PROPERTY_TYPES, ...PRIVATE_AMENITIES_LIST, ...CONDO_AMENITIES_GROUPS.flatMap((group) => [group.category, ...group.items])];
+  for (const novo of ["Quintal", "Pátio", "Triplex"]) assert.ok(items.includes(novo), novo);
+  for (const item of items) assert.ok(catalog[item], `sem tradução: ${item}`);
+});
