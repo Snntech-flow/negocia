@@ -142,7 +142,7 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
                 )}
               </div>
             ) : (
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                 {properties.map((prop) => (
                   <div
                     key={prop.id}
@@ -151,7 +151,7 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
                   >
                     <div>
                       {/* Imagem principal com badges */}
-                      <div className="relative h-64 w-full bg-slate-950 overflow-hidden">
+                      <div className="relative h-44 w-full bg-slate-950 overflow-hidden">
                         {prop.coverPhoto || prop.photos[0] ? <button type="button" onClick={() => abrirFotos(prop)} aria-label={t("Ver as fotos de {0}", [prop.title])} className="block h-full w-full cursor-zoom-in"><img
                           src={prop.coverPhoto || prop.photos[0]}
                           loading="lazy"
@@ -195,18 +195,18 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
                       </div>
 
                       {/* Conteúdo */}
-                      <div className="p-5 space-y-4">
-                        <div className="flex items-start justify-between gap-2">
+                      <div className="p-4 space-y-3">
+                        <div className="flex flex-col gap-1">
                           <div>
                             <div className="flex items-center gap-1.5 text-xs font-medium text-orange-700 mb-1">
                               <MapPin className="w-3.5 h-3.5" />
                               {prop.condoName ? `${prop.condoName} • ` : ""}
                               {prop.neighborhood}, {prop.city}
                             </div>
-                            <h3 className="font-bold text-lg text-orange-700 leading-snug">{prop.title}</h3>
+                            <h3 className="font-bold text-base text-orange-700 leading-snug">{prop.title}</h3>
                           </div>
-                          <div className="text-right shrink-0">
-                            <div className="text-xl font-black text-orange-700">{formatBRL(prop.salePrice)}</div>
+                          <div>
+                            <div className="text-lg font-black text-orange-700">{formatBRL(prop.salePrice)}</div>
                             {prop.condoFee && parseFloat(prop.condoFee) > 0 && (
                               <div className="text-xs text-orange-700">{t("Cond:")}{" "}{formatBRL(prop.condoFee)}</div>
                             )}
@@ -216,7 +216,7 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
                         <DescricaoDoImovel texto={prop.description} />
 
                         {/* Características */}
-                        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-3 border-t border-slate-800/80 text-xs text-slate-300">
+                        <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-800/80 text-xs text-slate-300">
                           <div className="flex items-center gap-1.5 bg-slate-800/40 p-2 rounded-lg">
                             <Bed className="w-3.5 h-3.5 text-orange-700" />
                             <span>{prop.bedrooms} {prop.bedrooms === 1 ? t("quarto") : t("quartos")}</span>
@@ -254,7 +254,7 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
                         )}
 
                         {/* Info do Captador */}
-                        <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80 flex items-center justify-between">
+                        <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80 flex flex-wrap items-center justify-between gap-2">
                           <div className="flex items-center gap-2.5">
                             <Avatar name={prop.broker.name} url={prop.broker.avatarUrl} size={32} />
                             <div>
@@ -270,7 +270,7 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
                     </div>
 
                     {/* Ações de Co-corretagem */}
-                    <div className="p-5 pt-0 grid grid-cols-2 gap-3">
+                    <div className="p-4 pt-0 grid grid-cols-2 gap-2">
                       <button
                         onClick={() => onShare(prop)}
                         type="button"
