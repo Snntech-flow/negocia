@@ -11,7 +11,7 @@ export async function submitPilotFeedbackImpl(input: { screen: string; category:
   const screen = input.screen.trim();
   const category = input.category.trim();
   const message = input.message.trim();
-  if (!["vitrine", "crm", "radar", "cadastrar", "termo", "dvp", "financeiro", "admin"].includes(screen)) throw new ActionError("Selecione uma tela válida.");
+  if (!["vitrine", "crm", "radar", "cadastrar", "meus-imoveis", "termo", "dvp", "financeiro", "admin"].includes(screen)) throw new ActionError("Selecione uma tela válida.");
   if (!["duvida", "erro", "ideia"].includes(category)) throw new ActionError("Selecione um tipo de feedback válido.");
   if (message.length < 10 || message.length > 2000) throw new ActionError("Escreva de 10 a 2.000 caracteres.");
   // O feedback e o aviso no sino de cada administrador (menos quem mandou) entram juntos (28/10/2026, lib/aviso-de-feedback).

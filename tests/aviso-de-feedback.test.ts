@@ -10,7 +10,8 @@ const ler = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), "ut
 test("o aviso diz o tipo, quem mandou, a tela e o começo da mensagem", () => {
   const aviso = avisoDeFeedback({ nome: "Ana", screen: "cadastrar", category: "erro", message: "O botão\n  Salvar não responde." });
   assert.equal(aviso.title, "Feedback novo: Erro");
-  assert.equal(aviso.message, "Ana · Meus imóveis: “O botão Salvar não responde.”");
+  assert.equal(aviso.message, "Ana · Cadastrar imóvel: “O botão Salvar não responde.”");
+  assert.match(avisoDeFeedback({ nome: "Ana", screen: "meus-imoveis", category: "erro", message: "x" }).message, /^Ana · Meus imóveis: /);
   const longo = avisoDeFeedback({ nome: "Ana", screen: "vitrine", category: "ideia", message: "x".repeat(500) });
   assert.equal(longo.title, "Feedback novo: Sugestão");
   assert.ok(longo.message.endsWith("…”") && longo.message.length < TAMANHO_DO_TRECHO + 40, "mensagem longa vai cortada");

@@ -28,7 +28,7 @@ import type { WorkspaceNotification, WorkspaceSessionUser } from "@/lib/workspac
 
 const SubscriptionPanel = dynamic(() => import("@/components/SubscriptionPanel"));
 
-export type WorkspaceTab = "vitrine" | "crm" | "radar" | "cadastrar" | "termo" | "dvp" | "financeiro" | "admin";
+export type WorkspaceTab = "vitrine" | "crm" | "radar" | "cadastrar" | "meus-imoveis" | "termo" | "dvp" | "financeiro" | "admin";
 
 const href = (tab: WorkspaceTab) => `/${tab}`;
 
@@ -63,7 +63,7 @@ function AppShellWorkspace({ currentUser, initialNotifications, propertyTotal, n
   const pathname = usePathname();
   const router = useRouter();
   const veAdmin = currentUser.role === "admin" || currentUser.adminViewAccess === true;
-  const abasPermitidas = useMemo<WorkspaceTab[]>(() => ["vitrine", "crm", "radar", "cadastrar", "termo", "dvp", "financeiro", ...(veAdmin ? ["admin" as const] : [])], [veAdmin]);
+  const abasPermitidas = useMemo<WorkspaceTab[]>(() => ["vitrine", "crm", "radar", "cadastrar", "meus-imoveis", "termo", "dvp", "financeiro", ...(veAdmin ? ["admin" as const] : [])], [veAdmin]);
 
   // Aba ativa = primeira parte do caminho (/vitrine → vitrine); fora das telas conhecidas, nenhuma fica marcada.
   const activeTab = useMemo<WorkspaceTab | null>(() => {
@@ -169,7 +169,8 @@ function AppShellWorkspace({ currentUser, initialNotifications, propertyTotal, n
   const navMenus: { title: string; active: WorkspaceTab[]; items: { id: WorkspaceTab; label: string; icon: typeof Users }[] }[] = [
     { title: "CRM", active: ["crm", "radar"], items: [{ id: "crm", label: "Minha carteira", icon: Users }, { id: "radar", label: "Radar de Compradores", icon: Radar }] },
     { title: "Documentos", active: ["termo", "dvp"], items: [{ id: "termo", label: "Termo de Parceria", icon: FileText }, { id: "dvp", label: "Registro de Visita", icon: Stamp }] },
-    { title: "Imóveis", active: ["cadastrar"], items: [{ id: "cadastrar", label: "Meus imóveis", icon: PlusCircle }] },
+    // Cadastrar em cima e a carteira em outra tela (14/11/2026): com as duas juntas, o cadastro ficava lá embaixo.
+    { title: "Imóveis", active: ["cadastrar", "meus-imoveis"], items: [{ id: "cadastrar", label: "Cadastrar imóvel", icon: PlusCircle }, { id: "meus-imoveis", label: "Meus imóveis", icon: Building2 }] },
     { title: "Financeiro", active: ["financeiro"], items: [{ id: "financeiro", label: "Receitas e despesas", icon: Wallet }] },
     ...(veAdmin ? [{ title: "Administração", active: ["admin" as WorkspaceTab], items: [{ id: "admin" as WorkspaceTab, label: "Corretores e pagamentos", icon: UserCheck }] }] : []),
   ];

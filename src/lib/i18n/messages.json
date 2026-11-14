@@ -1624,11 +1624,6 @@
     "Encontré un error",
     "Encontrei um erro"
   ],
-  "Endereço completo e dados do proprietário ficam visíveis só para você. Campos com * são obrigatórios.": [
-    "Only you can see the full address and owner details. Fields marked * are required.",
-    "Solo usted ve la dirección completa y los datos del propietario. Los campos con * son obligatorios.",
-    "Morada completo e dados do proprietário ficam visíveis só para o utilizador. Campos com * são obrigatórios."
-  ],
   "Endereço completo protegido": [
     "Full address protected",
     "Dirección completa protegida",
@@ -3413,11 +3408,6 @@
     "To reorder, use the arrows",
     "Para cambiar el orden, use las flechas",
     "Para mudar a ordem, use as setas"
-  ],
-  "Para mudar fotos, valor ou condição de parceria, clique em “Editar” no imóvel, na lista abaixo. Aqui você também arquiva e cadastra imóveis. Os dados completos de endereço e do proprietário ficam visíveis apenas para o corretor captador.": [
-    "To change photos, price or partnership terms, click “Edit” on the property below. You can also archive and add properties here. Only the listing agent can see full address and owner details.",
-    "Para cambiar fotos, precio o condiciones, pulse «Editar» en la lista. Aquí también puede archivar y registrar inmuebles. Solo el captador ve la dirección completa y los datos del propietario.",
-    "Para mudar fotografias, valor ou condição de parceria, clique em “Editar” no imóvel, na lista abaixo. Aqui o utilizador também arquiva e cadastra imóveis. Os dados completos de morada e do proprietário ficam visíveis apenas para o mediador angariador."
   ],
   "Parceiro": [
     "Partner",
@@ -8068,5 +8058,15 @@
     "No entries from {de} to {ate} to compare.",
     "Sin movimientos de {de} a {ate} para comparar.",
     "Sem movimentos de {de} a {ate} para comparar."
+  ],
+  "Preencha os dados abaixo para publicar o imóvel na vitrine da rede. Campos com * são obrigatórios. Endereço completo e dados do proprietário ficam visíveis só para você. Para mudar um imóvel já cadastrado, use o menu Imóveis › Meus imóveis.": [
+    "Fill in the details below to publish the property in the network showcase. Fields marked with * are required. Only you can see the full address and owner details. To change a property that is already listed, use the menu Properties › My properties.",
+    "Complete los datos a continuación para publicar el inmueble en la vitrina de la red. Los campos con * son obligatorios. La dirección completa y los datos del propietario solo son visibles para usted. Para modificar un inmueble ya registrado, use el menú Inmuebles › Mis inmuebles.",
+    "Preencha os dados abaixo para publicar o imóvel na montra da rede. Os campos com * são obrigatórios. A morada completa e os dados do proprietário ficam visíveis só para si. Para alterar um imóvel já registado, use o menu Imóveis › Meus imóveis."
+  ],
+  "Para mudar fotos, valor ou condição de parceria, clique em “Editar” no imóvel, na lista abaixo. Aqui você também muda a situação e arquiva. Para incluir um imóvel novo, use o botão “Cadastrar imóvel”. Os dados completos de endereço e do proprietário ficam visíveis apenas para o corretor captador.": [
+    "To change photos, price or partnership terms, click “Edit” on the property below. You can also change its status and archive it here. To add a new one, use the “Add property” button. Only the listing agent can see full address and owner details.",
+    "Para cambiar fotos, precio o condiciones, pulse «Editar» en la lista. Aquí también puede cambiar la situación y archivar. Para añadir un inmueble nuevo, use el botón «Registrar inmueble». Solo el captador ve la dirección completa y los datos del propietario.",
+    "Para alterar fotografias, valor ou condição de parceria, clique em “Editar” no imóvel, na lista abaixo. Aqui também altera a situação e arquiva. Para incluir um imóvel novo, use o botão “Registar imóvel”. Os dados completos da morada e do proprietário ficam visíveis apenas para o mediador angariador."
   ]
 }

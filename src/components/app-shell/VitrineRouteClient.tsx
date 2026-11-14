@@ -94,7 +94,7 @@ export default function VitrineRouteClient({ initialProperties, initialPropertyT
         setPropertyPage={setPropertyPage} onCreate={() => router.push("/cadastrar")} blockedReason={blockedReason}
         onShare={setSelectedForWhiteLabel}
         onSchedule={(property) => router.push(`/dvp?imovel=${property.id}`)}
-        onEdit={(property) => router.push(`/cadastrar?imovel=${property.id}`)} />
+        onEdit={(property) => router.push(`/meus-imoveis?imovel=${property.id}`)} />
 
       {selectedForWhiteLabel && <WhiteLabelSheet key={selectedForWhiteLabel.id} property={selectedForWhiteLabel} broker={broker} onClose={() => setSelectedForWhiteLabel(null)} />}
     </>

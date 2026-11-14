@@ -51,3 +51,20 @@ test("🔴 o seletor da situação em Meus imóveis abraça a opção escolhida,
   const seletor = inventario.slice(inicio, inventario.indexOf("{PROPERTY_STATUSES.map(value =>", inicio));
   assert.match(seletor, /className="rounded-lg border border-slate-300 py-2 pl-2\.5 pr-1\.5 text-sm \[field-sizing:content\]">$/);
 });
+
+// 14/11/2026, corretoras: "para os desatentos… tem que descer para cadastrar o imóvel" — o cadastro vinha abaixo da carteira.
+test("🔴 Imóveis tem duas telas: Cadastrar imóvel abre no formulário e Meus imóveis mostra só a carteira", () => {
+  const ler = (p: string) => readFileSync(new URL(`../${p}`, import.meta.url), "utf8");
+  const app = ler("src/components/app-shell/AppShellClient.tsx");
+  assert.match(app, /title: "Imóveis", active: \["cadastrar", "meus-imoveis"\], items: \[\{ id: "cadastrar", label: "Cadastrar imóvel"[^}]*\}, \{ id: "meus-imoveis", label: "Meus imóveis"/, "Cadastrar vem primeiro no menu");
+  const cadastro = ler("src/components/app-shell/CadastrarRouteClient.tsx");
+  assert.match(cadastro, /<PropertyCreateForm /);
+  assert.doesNotMatch(cadastro, /PropertyInventory/, "nada de carteira em cima do formulário");
+  assert.match(cadastro, /router\.push\("\/meus-imoveis\?publicado=1"\)/, "depois de cadastrar, a corretora vê o anúncio na carteira");
+  const carteira = ler("src/components/app-shell/MeusImoveisRouteClient.tsx");
+  assert.match(carteira, /<PropertyInventory /);
+  assert.doesNotMatch(carteira, /PropertyCreateForm/);
+  assert.match(carteira, /<Link href="\/cadastrar"/, "a carteira leva ao cadastro por um botão no topo");
+  assert.match(ler("src/app/(app)/cadastrar/page.tsx"), /redirect\(`\/meus-imoveis\?imovel=\$\{imovel\}`\)/, "o endereço antigo de edição segue valendo");
+  assert.match(ler("src/components/app-shell/VitrineRouteClient.tsx"), /router\.push\(`\/meus-imoveis\?imovel=\$\{property\.id\}`\)/);
+});

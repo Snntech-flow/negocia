@@ -9,7 +9,8 @@ export const SCREEN_GUIDANCE: Record<string, { title: string; description: strin
   radar: { title: "Radar de Compradores", description: "Compare as preferências de compradores cadastrados com os imóveis disponíveis. Confira os critérios do match antes de falar com o corretor responsável." },
   termo: { title: "Termo de Parceria", description: "O termo de cada parceria sai com a divisão da comissão confirmada pelos dois corretores. Leia, aceite e acompanhe o aceite do outro; assinado, imprima ou salve em PDF." },
   dvp: { title: "Registro de visita · DVP", description: "Salve os dados da visita para consulta e acompanhamento. O rascunho não é assinado por ninguém, não confirma um acordo e não garante comissão." },
-  cadastrar: { title: "Meus imóveis", description: "Para mudar fotos, valor ou condição de parceria, clique em “Editar” no imóvel, na lista abaixo. Aqui você também arquiva e cadastra imóveis. Os dados completos de endereço e do proprietário ficam visíveis apenas para o corretor captador." },
+  cadastrar: { title: "Cadastrar imóvel", description: "Preencha os dados abaixo para publicar o imóvel na vitrine da rede. Campos com * são obrigatórios. Endereço completo e dados do proprietário ficam visíveis só para você. Para mudar um imóvel já cadastrado, use o menu Imóveis › Meus imóveis." },
+  "meus-imoveis": { title: "Meus imóveis", description: "Para mudar fotos, valor ou condição de parceria, clique em “Editar” no imóvel, na lista abaixo. Aqui você também muda a situação e arquiva. Para incluir um imóvel novo, use o botão “Cadastrar imóvel”. Os dados completos de endereço e do proprietário ficam visíveis apenas para o corretor captador." },
   admin: { title: "Corretores e pagamentos", description: "Aprove CRECIs e confirme ou estorne pagamentos via Pix. O pagamento é conferido manualmente no extrato do banco." },
 };
 

@@ -4,7 +4,7 @@
 
 const TIPOS: Record<string, string> = { duvida: "Dúvida", erro: "Erro", ideia: "Sugestão" };
 const TELAS: Record<string, string> = {
-  vitrine: "Vitrine", crm: "CRM", radar: "Radar de Compradores", cadastrar: "Meus imóveis", termo: "Termo de Parceria",
+  vitrine: "Vitrine", crm: "CRM", radar: "Radar de Compradores", cadastrar: "Cadastrar imóvel", "meus-imoveis": "Meus imóveis", termo: "Termo de Parceria",
   dvp: "Registro de Visita", financeiro: "Financeiro", admin: "Administração",
 };
 export const TAMANHO_DO_TRECHO = 140;

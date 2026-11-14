@@ -1,13 +1,8 @@
 "use client";
 
-import { useI18n } from "../I18nProvider";
-
-// Rota /cadastrar (Meus imóveis): a carteira (PropertyInventory) + o cadastro de imóvel (PropertyCreateForm).
-// ?imovel=<id> abre a edição daquele imóvel (veio do "Editar" da vitrine). Ao cadastrar, vai pra vitrine.
-import { useState } from "react";
-import { useRouter, useSearchParams } from "next/navigation";
-import { PlusCircle } from "lucide-react";
-import PropertyInventory from "@/components/PropertyInventory";
+// Rota /cadastrar: só o cadastro de imóvel (PropertyCreateForm), já no topo da tela. A carteira fica em /meus-imoveis
+// (14/11/2026). Ao cadastrar, vai para Meus imóveis, onde o anúncio novo aparece.
+import { useRouter } from "next/navigation";
 import PropertyCreateForm from "@/components/PropertyCreateForm";
 import { useRouteToast } from "./useRouteToast";
 
@@ -16,27 +11,13 @@ export default function CadastrarRouteClient({ broker, blockedReason, photoLimit
   blockedReason: string | null;
   photoLimit: number;
 }) {
-  const { t } = useI18n();
-
   const router = useRouter();
-  const searchParams = useSearchParams();
-  const abrirImovelId = searchParams.get("imovel");
-  const [reloadKey, setReloadKey] = useState(0);
   const { showToast, toastNode } = useRouteToast();
 
   return (
     <div className="max-w-3xl mx-auto space-y-6">
-      <PropertyInventory reloadKey={reloadKey} onChanged={() => setReloadKey((v) => v + 1)}
-        abrirImovelId={abrirImovelId} aoAbrir={() => { if (abrirImovelId) router.replace("/cadastrar"); }} />
-      <div>
-        <h2 className="text-xl font-bold text-white flex items-center gap-2"><PlusCircle className="w-5 h-5 text-amber-500" />{t("Cadastrar imóvel")}</h2>
-        <p className="text-sm text-slate-400">{t("Endereço completo e dados do proprietário ficam visíveis só para você. Campos com * são obrigatórios.")}</p>
-      </div>
-      <PropertyCreateForm key={reloadKey} broker={broker} blockedReason={blockedReason} photoLimit={photoLimit} onMessage={showToast}
-        onCreated={() => {
-          showToast("Imóvel publicado na vitrine da rede.");
-          router.push("/vitrine");
-        }} />
+      <PropertyCreateForm broker={broker} blockedReason={blockedReason} photoLimit={photoLimit} onMessage={showToast}
+        onCreated={() => router.push("/meus-imoveis?publicado=1")} />
       {toastNode}
     </div>
   );
