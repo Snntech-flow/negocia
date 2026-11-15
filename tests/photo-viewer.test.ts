@@ -26,8 +26,10 @@ test("🔴 a galeria mostra a foto escolhida, o contador e as setas", () => {
   assert.doesNotMatch(uma, /Próxima foto/);
 });
 
-test("🔴 na Vitrine, a foto do cartão e o selo de fotos abrem a galeria", () => {
+// ⚖️ 14/11/2026 (Sidney: "quando clicar na foto abrisse em outra página"): a FOTO do cartão passou a levar à página do imóvel
+// (tests/vitrine-pagina-do-imovel.test.ts); o selo "Ver N fotos" continua abrindo a galeria aqui.
+test("🔴 na Vitrine, o selo de fotos abre a galeria (a foto leva à página do imóvel)", () => {
   const fonte = readFileSync(new URL("../src/components/PropertyMarketplace.tsx", import.meta.url), "utf8");
-  assert.equal(fonte.match(/onClick=\{\(\) => abrirFotos\(prop\)\}/g)?.length, 2);
+  assert.equal(fonte.match(/onClick=\{\(\) => abrirFotos\(prop\)\}/g)?.length, 1);
   assert.match(fonte, /<PhotoViewer /);
 });

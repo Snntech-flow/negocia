@@ -2,7 +2,7 @@
 
 import { db, properties, users, buyerProfiles, leads, leadActivities, partnerships, partnershipActivities,
   pilotFeedback, transactions, notifications, dvpCertificates } from "../db";
-import { eq, ne, desc, and, or, sql, ilike, count, inArray } from "drizzle-orm";
+import { eq, ne, desc, and, or, sql, ilike, count, inArray, type SQL } from "drizzle-orm";
 import { alias } from "drizzle-orm/pg-core";
 import { getCurrentUserId } from "../auth";
 import { hasSubscriptionAccess } from "../subscription";
@@ -78,6 +78,73 @@ export async function loadWorkspaceContext(input: MarketplaceQuery = {}) {
     ownsProperty, ownsProfile, canBrowseNetwork, propertyScope, filteredPropertyScope };
 }
 
+// Os campos do imóvel na Vitrine — os MESMOS na lista e na página do imóvel (/vitrine/<id>, 14/11/2026). O que é só do
+// dono (endereço, proprietário) sai NULL para quem não é dono: `ownsProperty` vem do contexto de quem pede.
+function camposDoImovelDaVitrine(ownsProperty: SQL<boolean>) {
+  return {
+    id: properties.id,
+    title: properties.title,
+    propertyType: properties.propertyType,
+    salePrice: properties.salePrice,
+    condoFee: properties.condoFee,
+    iptu: properties.iptu,
+    city: properties.city,
+    neighborhood: properties.neighborhood,
+    bedrooms: properties.bedrooms,
+    suites: properties.suites,
+    bathrooms: properties.bathrooms,
+    parkingSpots: properties.parkingSpots,
+    areaM2: properties.areaM2,
+    description: properties.description,
+    photos: properties.photos,
+    purpose: properties.purpose,
+    acceptsTrade: properties.acceptsTrade,
+    tradeDetails: properties.tradeDetails,
+    condition: properties.condition,
+    hotelRoomsCount: properties.hotelRoomsCount,
+    usefulAreaM2: properties.usefulAreaM2,
+    totalAreaM2: properties.totalAreaM2,
+    solarPosition: properties.solarPosition,
+    viewType: properties.viewType,
+    propertyAge: properties.propertyAge,
+    deliveryForecast: properties.deliveryForecast,
+    iptuPeriod: properties.iptuPeriod,
+    documentationStatus: properties.documentationStatus,
+    acceptsFinancing: properties.acceptsFinancing,
+    privateAmenities: properties.privateAmenities,
+    condoAmenities: properties.condoAmenities,
+    garageType: properties.garageType,
+    cep: sql<string | null>`CASE WHEN ${ownsProperty} THEN ${properties.cep} ELSE NULL END`,
+    street: sql<string | null>`CASE WHEN ${ownsProperty} THEN ${properties.street} ELSE NULL END`,
+    streetNumber: sql<string | null>`CASE WHEN ${ownsProperty} THEN ${properties.streetNumber} ELSE NULL END`,
+    block: sql<string | null>`CASE WHEN ${ownsProperty} THEN ${properties.block} ELSE NULL END`,
+    floor: sql<string | null>`CASE WHEN ${ownsProperty} THEN ${properties.floor} ELSE NULL END`,
+    condoName: sql<string | null>`CASE WHEN ${ownsProperty} THEN ${properties.condoName} ELSE NULL END`,
+    hideStreet: properties.hideStreet,
+    videoUrl: properties.videoUrl,
+    // imóvel editado antes de 14/10/2026 ficou com a capa vazia: vale a primeira foto
+    coverPhoto: sql<string | null>`coalesce(${properties.coverPhoto}, ${properties.photos}->>0)`,
+    floorPlanPhotos: properties.floorPlanPhotos,
+    acceptsPartnership: properties.acceptsPartnership,
+    splitPercentage: properties.splitPercentage,
+    partnershipModels: properties.partnershipModels,
+    status: properties.status,
+    confidentialAddress: sql<string | null>`CASE WHEN ${ownsProperty} THEN ${properties.confidentialAddress} ELSE NULL END`,
+    ownerName: sql<string | null>`CASE WHEN ${ownsProperty} THEN ${properties.ownerName} ELSE NULL END`,
+    ownerPhone: sql<string | null>`CASE WHEN ${ownsProperty} THEN ${properties.ownerPhone} ELSE NULL END`,
+    createdAt: properties.createdAt,
+    broker: {
+      id: users.id,
+      verificationStatus: users.verificationStatus,
+      name: users.name,
+      creci: users.creci,
+      whatsapp: users.whatsapp,
+      avatarUrl: users.avatarUrl,
+      city: users.city,
+    },
+  };
+}
+
 export async function getMarketplaceData(input: MarketplaceQuery = {}) {
   try {
     const ctx = await loadWorkspaceContext(input);
@@ -89,68 +156,7 @@ export async function getMarketplaceData(input: MarketplaceQuery = {}) {
       includePartnerships, currentUser, isAdmin, veAdministracao, paginated, pattern, emptySessionId,
       ownsProperty, ownsProfile, canBrowseNetwork, propertyScope, filteredPropertyScope } = ctx;
     const propertyListQuery = includeProperties ? db
-      .select({
-        id: properties.id,
-        title: properties.title,
-        propertyType: properties.propertyType,
-        salePrice: properties.salePrice,
-        condoFee: properties.condoFee,
-        iptu: properties.iptu,
-        city: properties.city,
-        neighborhood: properties.neighborhood,
-        bedrooms: properties.bedrooms,
-        suites: properties.suites,
-        bathrooms: properties.bathrooms,
-        parkingSpots: properties.parkingSpots,
-        areaM2: properties.areaM2,
-        description: properties.description,
-        photos: properties.photos,
-        purpose: properties.purpose,
-        acceptsTrade: properties.acceptsTrade,
-        tradeDetails: properties.tradeDetails,
-        condition: properties.condition,
-        hotelRoomsCount: properties.hotelRoomsCount,
-        usefulAreaM2: properties.usefulAreaM2,
-        totalAreaM2: properties.totalAreaM2,
-        solarPosition: properties.solarPosition,
-        viewType: properties.viewType,
-        propertyAge: properties.propertyAge,
-        deliveryForecast: properties.deliveryForecast,
-        iptuPeriod: properties.iptuPeriod,
-        documentationStatus: properties.documentationStatus,
-        acceptsFinancing: properties.acceptsFinancing,
-        privateAmenities: properties.privateAmenities,
-        condoAmenities: properties.condoAmenities,
-        garageType: properties.garageType,
-        cep: sql<string | null>`CASE WHEN ${ownsProperty} THEN ${properties.cep} ELSE NULL END`,
-        street: sql<string | null>`CASE WHEN ${ownsProperty} THEN ${properties.street} ELSE NULL END`,
-        streetNumber: sql<string | null>`CASE WHEN ${ownsProperty} THEN ${properties.streetNumber} ELSE NULL END`,
-        block: sql<string | null>`CASE WHEN ${ownsProperty} THEN ${properties.block} ELSE NULL END`,
-        floor: sql<string | null>`CASE WHEN ${ownsProperty} THEN ${properties.floor} ELSE NULL END`,
-        condoName: sql<string | null>`CASE WHEN ${ownsProperty} THEN ${properties.condoName} ELSE NULL END`,
-        hideStreet: properties.hideStreet,
-        videoUrl: properties.videoUrl,
-        // imóvel editado antes de 14/10/2026 ficou com a capa vazia: vale a primeira foto
-        coverPhoto: sql<string | null>`coalesce(${properties.coverPhoto}, ${properties.photos}->>0)`,
-        floorPlanPhotos: properties.floorPlanPhotos,
-        acceptsPartnership: properties.acceptsPartnership,
-        splitPercentage: properties.splitPercentage,
-        partnershipModels: properties.partnershipModels,
-        status: properties.status,
-        confidentialAddress: sql<string | null>`CASE WHEN ${ownsProperty} THEN ${properties.confidentialAddress} ELSE NULL END`,
-        ownerName: sql<string | null>`CASE WHEN ${ownsProperty} THEN ${properties.ownerName} ELSE NULL END`,
-        ownerPhone: sql<string | null>`CASE WHEN ${ownsProperty} THEN ${properties.ownerPhone} ELSE NULL END`,
-        createdAt: properties.createdAt,
-        broker: {
-          id: users.id,
-          verificationStatus: users.verificationStatus,
-          name: users.name,
-          creci: users.creci,
-          whatsapp: users.whatsapp,
-          avatarUrl: users.avatarUrl,
-          city: users.city,
-        },
-      })
+      .select(camposDoImovelDaVitrine(ownsProperty))
       .from(properties)
       .innerJoin(users, eq(properties.brokerId, users.id))
       .where(filteredPropertyScope)
@@ -432,4 +438,23 @@ export async function getMarketplaceData(input: MarketplaceQuery = {}) {
     console.error("Erro ao carregar dados do marketplace:", { tipo, pgCode });
     throw error;
   }
+}
+
+// A página do imóvel na Vitrine (/vitrine/<id>, 14/11/2026 — Sidney: "quando clicar na foto abrisse em outra página").
+// Mesmo recorte de acesso da lista (o filteredPropertyScope da seção vitrine, sem filtro de busca): o corretor vê o
+// imóvel dele e, se pode navegar na rede (CRECI aprovado + assinatura em dia), os da rede; arquivado não aparece.
+// Fora disso — ou id que não é uuid — devolve null, e a página responde 404 sem dizer se o imóvel existe.
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+export async function getVitrineProperty(id: string) {
+  if (!UUID.test(id)) return null;
+  const ctx = await loadWorkspaceContext({ section: "vitrine" });
+  if (!ctx) return null;
+  const [imovel] = await db.select(camposDoImovelDaVitrine(ctx.ownsProperty))
+    .from(properties)
+    .innerJoin(users, eq(properties.brokerId, users.id))
+    .where(and(ctx.filteredPropertyScope, eq(properties.id, id)))
+    .limit(1);
+  if (!imovel) return null;
+  const [assinado] = await assinarFotosDeImoveis([imovel]);
+  return { property: assinado, currentUser: ctx.currentUser };
 }

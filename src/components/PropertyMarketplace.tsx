@@ -12,6 +12,7 @@ import PhotoViewer from "./PhotoViewer";
 import DescricaoDoImovel from "./DescricaoDoImovel";
 import { fotosComCapaNaFrente } from "@/lib/photo-order";
 import { useCallback, useState } from "react";
+import Link from "next/link";
 import { previsaoParaTela } from "@/lib/delivery-forecast";
 
 export default function PropertyMarketplace({ properties, propertyTotal, propertyPage, loading, currentUserId, propertyTypes,
@@ -152,12 +153,15 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
                     <div>
                       {/* Imagem principal com badges */}
                       <div className="relative h-44 w-full bg-slate-950 overflow-hidden">
-                        {prop.coverPhoto || prop.photos[0] ? <button type="button" onClick={() => abrirFotos(prop)} aria-label={t("Ver as fotos de {0}", [prop.title])} className="block h-full w-full cursor-zoom-in"><img
-                          src={prop.coverPhoto || prop.photos[0]}
-                          loading="lazy"
-                          alt={prop.title}
-                          className="w-full h-full object-cover"
-                        /></button> : <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-slate-400"><ImageIcon className="h-10 w-10" /><span className="text-xs">{t("Sem fotos cadastradas")}</span></div>}
+                        {/* 14/11/2026 (Sidney): a foto leva à página do imóvel (/vitrine/<id>); o "Ver N fotos" segue abrindo a galeria aqui. */}
+                        <Link href={`/vitrine/${prop.id}`} aria-label={t("Abrir a página de {0}", [prop.title])} className="block h-full w-full">
+                          {prop.coverPhoto || prop.photos[0] ? <img
+                            src={prop.coverPhoto || prop.photos[0]}
+                            loading="lazy"
+                            alt={prop.title}
+                            className="w-full h-full object-cover"
+                          /> : <div className="flex h-full w-full flex-col items-center justify-center gap-2 text-slate-400"><ImageIcon className="h-10 w-10" /><span className="text-xs">{t("Sem fotos cadastradas")}</span></div>}
+                        </Link>
                         <div className="absolute top-3 left-3 flex flex-wrap gap-1.5 max-w-[85%]">
                           <span className="bg-amber-500 text-slate-950 text-xs font-black px-2.5 py-1 rounded-md shadow-lg flex items-center gap-1">
                             {prop.acceptsPartnership ? t(rotuloDaCondicao(prop.partnershipModels)) : t("Fora da rede")}
