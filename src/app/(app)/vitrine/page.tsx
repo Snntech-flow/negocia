@@ -17,7 +17,6 @@ export default async function VitrinePage() {
       initialProperties={data.properties}
       initialPropertyTotal={data.propertyTotal}
       broker={broker}
-      currentUserId={user.id}
       blockedReason={blockedReasonFor(user)}
     />
   );

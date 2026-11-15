@@ -37,3 +37,16 @@ test("tela: a foto do cartão leva à página do imóvel; o \"Ver N fotos\" segu
   assert.match(cartao, /<Link href=\{`\/vitrine\/\$\{prop\.id\}`\}/);
   assert.match(cartao, /<button type="button" onClick=\{\(\) => abrirFotos\(prop\)\}[^>]*>\s*<ImageIcon/);
 });
+
+test("tela: o cartão é o resumo (foto, local, título, preço, descrição); características, itens, captador e ações só na página", () => {
+  // ⚖️ 14/11/2026 (Sidney, print da parte de baixo do cartão: "eu deixaria essa parte nos detalhes" → "Tudo da imagem").
+  const cartao = ler("src/components/PropertyMarketplace.tsx");
+  assert.match(cartao, /<Link href=\{`\/vitrine\/\$\{prop\.id\}`\} className="hover:underline">\{prop\.title\}<\/Link>/, "o título também leva à página");
+  for (const fora of ["Agendar visita", "Ficha para o cliente", "Editar em Meus imóveis", "CRECI verificado", "<Avatar", "prop.bedrooms", "prop.privateAmenities"]) {
+    assert.ok(!cartao.includes(fora), `"${fora}" saiu do cartão`);
+  }
+  const pagina = ler("src/components/ImovelDaVitrine.tsx");
+  for (const dentro of ["Agendar visita", "Ficha para o cliente", "Editar em Meus imóveis", "CRECI verificado", "<Avatar", "prop.bedrooms", "prop.privateAmenities"]) {
+    assert.ok(pagina.includes(dentro), `"${dentro}" está na página do imóvel`);
+  }
+});

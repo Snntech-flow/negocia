@@ -2,12 +2,11 @@
 
 import { useI18n } from "./I18nProvider";
 
-import { Building2, ShieldCheck, Search, PlusCircle, Lock, Image as ImageIcon, MapPin, Bed, Bath, Car, Maximize2, CheckCircle2, Pencil, Share2, Stamp } from "lucide-react";
+import { Building2, ShieldCheck, Search, PlusCircle, Lock, Image as ImageIcon, MapPin } from "lucide-react";
 import { rotuloDaCondicao } from "@/lib/partnership-models";
 import { PROPERTY_PAGE_SIZE } from "@/lib/marketplace-query";
 import type { Property } from "@/lib/property-types";
 import { optionLabel, CONDITIONS, PURPOSES } from "@/lib/property-options";
-import Avatar from "./Avatar";
 import PhotoViewer from "./PhotoViewer";
 import DescricaoDoImovel from "./DescricaoDoImovel";
 import { fotosComCapaNaFrente } from "@/lib/photo-order";
@@ -15,14 +14,13 @@ import { useCallback, useState } from "react";
 import Link from "next/link";
 import { previsaoParaTela } from "@/lib/delivery-forecast";
 
-export default function PropertyMarketplace({ properties, propertyTotal, propertyPage, loading, currentUserId, propertyTypes,
+export default function PropertyMarketplace({ properties, propertyTotal, propertyPage, loading, propertyTypes,
   propertyFilterPurpose, propertyFilterType, propertyFilterSearch, setPropertyFilterPurpose, setPropertyFilterType,
-  setPropertyFilterSearch, setPropertyPage, onCreate, blockedReason = null, onShare, onSchedule, onEdit }: {
-  properties: Property[]; propertyTotal: number; propertyPage: number; loading: boolean; currentUserId: string | null; propertyTypes: string[];
+  setPropertyFilterSearch, setPropertyPage, onCreate, blockedReason = null }: {
+  properties: Property[]; propertyTotal: number; propertyPage: number; loading: boolean; propertyTypes: string[];
   propertyFilterPurpose: string; propertyFilterType: string; propertyFilterSearch: string;
   setPropertyFilterPurpose: (value: string) => void; setPropertyFilterType: (value: string) => void; setPropertyFilterSearch: (value: string) => void;
-  setPropertyPage: (value: number) => void; onCreate: () => void; blockedReason?: string | null; onShare: (property: Property) => void; onSchedule: (property: Property) => void;
-  onEdit?: (property: Property) => void;
+  setPropertyPage: (value: number) => void; onCreate: () => void; blockedReason?: string | null;
 }) {
   const { t, locale } = useI18n();
 
@@ -35,7 +33,6 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
     if (fotos.length) setGaleria({ fotos, indice: 0, titulo: prop.title });
   };
   const formatBRL = (value: string) => Number(value).toLocaleString(locale, { style: "currency", currency: "BRL" });
-  const area = (value: string) => Number(value).toLocaleString(locale, { maximumFractionDigits: 2 });
   return (
 <div className="space-y-6">
             <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
@@ -210,7 +207,7 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
                               {prop.condoName ? `${prop.condoName} • ` : ""}
                               {prop.neighborhood}, {prop.city}
                             </div>
-                            <h3 className="font-bold text-base text-orange-700 leading-snug">{prop.title}</h3>
+                            <h3 className="font-bold text-base text-orange-700 leading-snug"><Link href={`/vitrine/${prop.id}`} className="hover:underline">{prop.title}</Link></h3>
                           </div>
                           <div>
                             <div className="text-lg font-black text-orange-700">{formatBRL(prop.salePrice)}</div>
@@ -221,83 +218,7 @@ export default function PropertyMarketplace({ properties, propertyTotal, propert
                         </div>
 
                         <DescricaoDoImovel texto={prop.description} />
-
-                        {/* Características */}
-                        <div className="grid grid-cols-2 gap-2 pt-3 border-t border-slate-800/80 text-xs text-slate-300">
-                          <div className="flex items-center gap-1.5 bg-slate-800/40 p-2 rounded-lg">
-                            <Bed className="w-3.5 h-3.5 text-orange-700" />
-                            <span>{prop.bedrooms} {prop.bedrooms === 1 ? t("quarto") : t("quartos")}</span>
-                          </div>
-                          <div className="flex items-center gap-1.5 bg-slate-800/40 p-2 rounded-lg">
-                            <Bath className="w-3.5 h-3.5 text-orange-700" />
-                            <span>{prop.bathrooms} {prop.bathrooms === 1 ? t("banheiro") : t("banheiros")}</span>
-                          </div>
-                          <div className="flex items-center gap-1.5 bg-slate-800/40 p-2 rounded-lg">
-                            <Car className="w-3.5 h-3.5 text-orange-700" />
-                            <span>{prop.parkingSpots} {prop.parkingSpots === 1 ? t("vaga") : t("vagas")}</span>
-                          </div>
-                          <div className="flex items-center gap-1.5 bg-slate-800/40 p-2 rounded-lg">
-                            <Maximize2 className="w-3.5 h-3.5 text-orange-700" />
-                            <span>{area(prop.usefulAreaM2 || prop.areaM2)} {t("m²")}</span>
-                          </div>
-                        </div>
-
-                        {/* Comodidades em destaque (se houver) */}
-                        {prop.privateAmenities && prop.privateAmenities.length > 0 && (
-                          <div className="flex flex-wrap gap-1 pt-1">
-                            {prop.privateAmenities.slice(0, 3).map((am) => (
-                              <span
-                                key={t(am)}
-                                className="text-[10px] bg-slate-800/60 text-slate-300 border border-slate-700/60 px-2 py-0.5 rounded-md"
-                              >
-                                {t(am)}
-                              </span>
-                            ))}
-                            {prop.privateAmenities.length > 3 && (
-                              <span className="text-[10px] text-orange-700 font-semibold px-1 py-0.5">
-                                +{prop.privateAmenities.length - 3} {t("itens")}</span>
-                            )}
-                          </div>
-                        )}
-
-                        {/* Info do Captador */}
-                        <div className="bg-slate-950/60 p-3 rounded-xl border border-slate-800/80 flex flex-wrap items-center justify-between gap-2">
-                          <div className="flex items-center gap-2.5">
-                            <Avatar name={prop.broker.name} url={prop.broker.avatarUrl} size={32} />
-                            <div>
-                              <div className="text-xs font-semibold text-white">{prop.broker.name}</div>
-                              <div className="text-[10px] text-slate-400">{t("Captador · CRECI")}{" "}{prop.broker.creci}</div>
-                            </div>
-                          </div>
-                          <span className="text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-0.5 rounded-full flex items-center gap-1">
-                            {prop.broker.verificationStatus === "aprovado" ? <><CheckCircle2 className="w-3 h-3" /> {t("CRECI verificado")}</> : "CRECI em análise"}
-                          </span>
-                        </div>
                       </div>
-                    </div>
-
-                    {/* Ações de Co-corretagem */}
-                    <div className="p-4 pt-0 grid grid-cols-2 gap-2">
-                      <button
-                        onClick={() => onShare(prop)}
-                        type="button"
-                        title={t("Ficha do imóvel com os seus dados de contato, para enviar ao cliente. Confira os dados antes de enviar.")}
-                        className="flex items-center justify-center gap-2 bg-gradient-to-r from-amber-500 to-amber-600 hover:from-amber-400 hover:to-amber-500 text-slate-950 font-bold text-xs py-2.5 px-3 rounded-xl transition shadow-md shadow-amber-500/10"
-                      >
-                        <Share2 className="w-4 h-4" />
-                        {t("Ficha para o cliente")}</button>
-                      {prop.broker.id !== currentUserId && prop.acceptsPartnership && prop.status === "disponivel" && prop.broker.verificationStatus === "aprovado" ? <button
-                        type="button"
-                        disabled={!!blockedReason}
-                        title={t(blockedReason) || undefined}
-                        onClick={() => onSchedule(prop)}
-                        className="flex items-center justify-center gap-2 bg-slate-800 hover:bg-slate-700 text-white font-semibold text-xs py-2.5 px-3 rounded-xl transition border border-slate-700 disabled:cursor-not-allowed disabled:opacity-50"
-                      ><Stamp className="w-4 h-4 text-emerald-400" />{t("Agendar visita")}</button> : prop.broker.id === currentUserId && onEdit ? <button
-                        type="button"
-                        onClick={() => onEdit(prop)}
-                        title={t("Imóvel seu: fotos, valor e condição de parceria se mudam em Imóveis › Meus imóveis.")}
-                        className="flex items-center justify-center gap-2 rounded-xl border border-[#131315] bg-[#ffffff] px-3 py-2.5 text-xs font-bold text-[#131315] transition hover:bg-[#f3f3f5]"
-                      ><Pencil className="h-4 w-4" />{t("Editar em Meus imóveis")}</button> : <button type="button" disabled className="flex cursor-not-allowed items-center justify-center gap-2 rounded-xl border border-slate-800 bg-slate-900 px-3 py-2.5 text-xs font-semibold text-slate-500" title={prop.broker.id === currentUserId ? t("Esta é uma captação sua; escolha um imóvel de outro corretor para iniciar uma parceria.") : t("Este imóvel não está aceitando parcerias.")}><Stamp className="h-4 w-4" />{prop.broker.id === currentUserId ? t("Imóvel da sua carteira") : t("Parceria indisponível")}</button>}
                     </div>
                   </div>
                 ))}

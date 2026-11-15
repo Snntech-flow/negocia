@@ -14,11 +14,10 @@ import { PROPERTY_TYPES } from "@/lib/property-options";
 import type { Property } from "@/lib/property-types";
 import type { SharingBroker } from "@/lib/white-label";
 
-export default function VitrineRouteClient({ initialProperties, initialPropertyTotal, broker, currentUserId, blockedReason }: {
+export default function VitrineRouteClient({ initialProperties, initialPropertyTotal, broker, blockedReason }: {
   initialProperties: Property[];
   initialPropertyTotal: number;
   broker: SharingBroker;
-  currentUserId: string | null;
   blockedReason: string | null;
 }) {
   const router = useRouter();
@@ -89,12 +88,9 @@ export default function VitrineRouteClient({ initialProperties, initialPropertyT
       <ScreenGuidance screen="vitrine" />
 
       <PropertyMarketplace properties={properties} propertyTotal={propertyTotal} propertyPage={propertyPage} loading={!loaded}
-        currentUserId={currentUserId} propertyTypes={PROPERTY_TYPES} propertyFilterPurpose={purpose} propertyFilterType={type} propertyFilterSearch={search}
+        propertyTypes={PROPERTY_TYPES} propertyFilterPurpose={purpose} propertyFilterType={type} propertyFilterSearch={search}
         setPropertyFilterPurpose={setPropertyFilterPurpose} setPropertyFilterType={setPropertyFilterType} setPropertyFilterSearch={setPropertyFilterSearch}
-        setPropertyPage={setPropertyPage} onCreate={() => router.push("/cadastrar")} blockedReason={blockedReason}
-        onShare={setSelectedForWhiteLabel}
-        onSchedule={(property) => router.push(`/dvp?imovel=${property.id}`)}
-        onEdit={(property) => router.push(`/meus-imoveis?imovel=${property.id}`)} />
+        setPropertyPage={setPropertyPage} onCreate={() => router.push("/cadastrar")} blockedReason={blockedReason} />
 
       {selectedForWhiteLabel && <WhiteLabelSheet key={selectedForWhiteLabel.id} property={selectedForWhiteLabel} broker={broker} onClose={() => setSelectedForWhiteLabel(null)} />}
     </>

@@ -66,5 +66,6 @@ test("🔴 Imóveis tem duas telas: Cadastrar imóvel abre no formulário e Meus
   assert.doesNotMatch(carteira, /PropertyCreateForm/);
   assert.match(carteira, /<Link href="\/cadastrar"/, "a carteira leva ao cadastro por um botão no topo");
   assert.match(ler("src/app/(app)/cadastrar/page.tsx"), /redirect\(`\/meus-imoveis\?imovel=\$\{imovel\}`\)/, "o endereço antigo de edição segue valendo");
-  assert.match(ler("src/components/app-shell/VitrineRouteClient.tsx"), /router\.push\(`\/meus-imoveis\?imovel=\$\{property\.id\}`\)/);
+  // 14/11/2026: os botões saíram do cartão da Vitrine — o "Editar em Meus imóveis" fica na página do imóvel.
+  assert.match(ler("src/components/ImovelDaVitrine.tsx"), /router\.push\(`\/meus-imoveis\?imovel=\$\{prop\.id\}`\)/);
 });
